@@ -150,7 +150,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         val file = pendingCameraFile
         if (ok && file != null && file.length() > 0) {
             scope.launch(Dispatchers.IO) {
-                dao.insertAttachment(Attachment(realId, file.name, file.absolutePath, "image/jpeg", true))
+                dao.insertAttachment(Attachment(noteId = realId, fileName = file.name, filePath = file.absolutePath, mimeType = "image/jpeg", isImage = true))
             }
         } else file?.delete()
         pendingCameraFile = null
@@ -169,10 +169,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                 note = note?.copy(body = if (current.isBlank()) text else "$current\n$text")
             }
         }
-    }
-    val audioPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) startRecording()
-        else Toast.makeText(context, "بدون دسترسی میکروفون ضبط ممکن نیست", Toast.LENGTH_SHORT).show()
     }
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
@@ -197,10 +193,16 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         val f = recordingFile; recordingFile = null
         if (f != null && f.length() > 2000) {
             scope.launch(Dispatchers.IO) {
-                dao.insertAttachment(Attachment(realId, f.name, f.absolutePath, "audio/mp4", false))
+                dao.insertAttachment(Attachment(noteId = realId, fileName = f.name, filePath = f.absolutePath, mimeType = "audio/mp4", isImage = false))
             }
         } else { f?.delete(); Toast.makeText(context, "ضبط خیلی کوتاه بود", Toast.LENGTH_SHORT).show() }
     }
+
+    val audioPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) startRecording()
+        else Toast.makeText(context, "بدون دسترسی میکروفون ضبط ممکن نیست", Toast.LENGTH_SHORT).show()
+    }
+
     fun micClick() {
         if (recorder != null) stopRecording()
         else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) startRecording()
@@ -576,7 +578,7 @@ private fun ChecklistEditor(note: Note, onChange: (Note) -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(checked = checked,
                 onCheckedChange = { onChange(note.copy(body = Checklist.toggleLine(note.body, i))) },
-                colors = CheckboxDefaults.colors(checkedBoxColor = Saffron, checkmarkColor = Ink))
+                colors = CheckboxDefaults.colors(checkedColor = Saffron, checkmarkColor = Ink))
             TextField(value = text,
                 onValueChange = { v ->
                     val mark = if (checked) "☑ " else "☐ "
@@ -748,7 +750,7 @@ private fun importUris(context: Context, scope: CoroutineScope, dao: NoteDao, no
         uris.forEach { uri ->
             val file = AttachmentStore.copyToPrivate(context, uri) ?: return@forEach
             val mime = context.contentResolver.getType(uri) ?: guessMimeType(file.name)
-            dao.insertAttachment(Attachment(noteId, file.name, file.absolutePath, mime, mime.startsWith("image/")))
+            dao.insertAttachment(Attachment(noteId = noteId, fileName = file.name, filePath = file.absolutePath, mimeType = mime, isImage = mime.startsWith("image/")))
         }
         withContext(Dispatchers.Main) {
             Toast.makeText(context, "ضمیمه اضافه شد ✔", Toast.LENGTH_SHORT).show()
