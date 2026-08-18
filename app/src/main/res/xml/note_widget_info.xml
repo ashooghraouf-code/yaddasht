@@ -2,6 +2,7 @@
     android:minWidth="180dp" android:minHeight="110dp"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/widget_note"
+    android:configure="ir.yaddasht.app.widget.WidgetConfigActivity"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
     android:description="@string/widget_desc" />
