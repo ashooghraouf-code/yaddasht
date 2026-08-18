@@ -79,8 +79,8 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
             (strokes + DrawStrokeData(currentPoints, brushColor, brushWidth)).forEach { s ->
                 if (s.points.size > 1) {
                     val path = Path().apply {
-                        moveTo(s.points.first())
-                        for (i in 1 until s.points.size) lineTo(s.points[i])
+                        moveTo(s.points.first().x, s.points.first().y)
+                        for (i in 1 until s.points.size) lineTo(s.points[i].x, s.points[i].y)
                     }
                     drawPath(path, s.color, style = DrawStroke(s.width))
                 } else if (s.points.size == 1) {
@@ -121,7 +121,7 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
                     }
                     val file = File(AttachmentStore.attachmentsDir(context), "DRAW_${System.currentTimeMillis()}.png")
                     FileOutputStream(file).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                    dao.insertAttachment(Attachment(noteId, file.name, file.absolutePath, "image/png", true))
+                    dao.insertAttachment(Attachment(noteId = noteId, fileName = file.name, filePath = file.absolutePath, mimeType = "image/png", isImage = true))
                     withContext(Dispatchers.Main) {
                         Toast.makeText(context, "نقاشی ضمیمه شد 🎨", Toast.LENGTH_SHORT).show()
                         onBack()
