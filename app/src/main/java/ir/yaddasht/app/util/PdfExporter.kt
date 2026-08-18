@@ -7,7 +7,6 @@ import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import android.text.Layout
 import android.text.StaticLayout
-import android.text.TextDirectionHeuristics
 import android.text.TextPaint
 import androidx.core.content.res.ResourcesCompat
 import ir.yaddasht.app.R
@@ -44,13 +43,13 @@ object PdfExporter {
             val titleText = note.title.ifBlank { "بدون عنوان" }
             val titleLayout = StaticLayout.Builder.obtain(titleText, 0, titleText.length, titlePaint, contentWidth)
                 .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-                .setDirection(TextDirectionHeuristics.FIRSTSTRONG_RTL).build()
+                .build()
 
             val bodyText = note.body.ifBlank { " " }
             val bodyLayout = StaticLayout.Builder.obtain(bodyText, 0, bodyText.length, bodyPaint, contentWidth)
                 .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-                .setDirection(TextDirectionHeuristics.FIRSTSTRONG_RTL)
-                .setLineSpacing(7f, 1.25f).build()
+                .setLineSpacing(7f, 1.25f)
+                .build()
 
             var pageIndex = 0
             var currentPage: PdfDocument.Page? = null
