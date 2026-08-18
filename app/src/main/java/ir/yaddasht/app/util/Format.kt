@@ -14,6 +14,6 @@ fun relativeTimeFa(ts: Long): String {
         minutes < 60 -> "${minutes.toInt().fa()} دقیقه پیش"
         minutes < 24 * 60 -> "${(minutes / 60).toInt().fa()} ساعت پیش"
         minutes < 7 * 24 * 60 -> "${(minutes / (24 * 60)).toInt().fa()} روز پیش"
-        else -> SimpleDateFormat("d MMMM yyyy", Locale.forLanguageTag("fa")).format(Date(ts))
+        else -> FaDate.short(ts)
     }
 }
