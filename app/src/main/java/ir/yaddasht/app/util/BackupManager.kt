@@ -74,7 +74,7 @@ object BackupManager {
                     val clean = name.replace(Regex("[^\\p{L}\\p{N}._ -]"), "_")
                     val file = File(AttachmentStore.attachmentsDir(context), "${System.currentTimeMillis()}_$clean")
                     file.writeBytes(data)
-                    dao.insertAttachment(Attachment(newId, name, file.absolutePath, ao.optString("mimeType", "*/*"), ao.optBoolean("isImage")))
+                    dao.insertAttachment(Attachment(noteId = newId, fileName = name, filePath = file.absolutePath, mimeType = ao.optString("mimeType", "*/*"), isImage = ao.optBoolean("isImage")))
                 }
                 count++
             }
