@@ -4,7 +4,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-fun String.faDigits(): String = map { c -> if (c in '0'..'9') ('۰' + (c - '0')) else c }
+fun String.faDigits(): String = map { c -> if (c in '0'..'9') ('۰' + (c - '0')) else c }.joinToString("")
 fun Int.fa(): String = toString().faDigits()
 
 fun relativeTimeFa(ts: Long): String {
