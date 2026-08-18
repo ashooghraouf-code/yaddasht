@@ -14,7 +14,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
 import ir.yaddasht.app.data.AppDatabase
-import ir.yaddasht.app.ui.YaddashtTheme
+import ir.yaddasht.app.ui.theme.YaddashtTheme
 import ir.yaddasht.app.ui.screen.DrawScreen
 import ir.yaddasht.app.ui.screen.EditorScreen
 import ir.yaddasht.app.ui.screen.HomeScreen
