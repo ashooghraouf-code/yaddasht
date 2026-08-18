@@ -42,6 +42,7 @@ import ir.yaddasht.app.data.NoteDao
 import ir.yaddasht.app.ui.theme.*
 import ir.yaddasht.app.util.BackupManager
 import ir.yaddasht.app.util.Checklist
+import ir.yaddasht.app.util.FaDate
 import ir.yaddasht.app.util.NoteLock
 import ir.yaddasht.app.util.fa
 import ir.yaddasht.app.util.relativeTimeFa
@@ -229,8 +230,7 @@ private fun HomeHeader(count: Int, onStats: () -> Unit, onBackup: () -> Unit, on
     }
 }
 
-private fun todayFa(): String =
-    SimpleDateFormat("EEEE، d MMMM yyyy", Locale.forLanguageTag("fa")).format(Date())
+private fun todayFa(): String = FaDate.full(System.currentTimeMillis())
 
 @Composable
 private fun StatsDialog(notes: List<Note>, attachTotal: Int, onDismiss: () -> Unit) {
@@ -259,8 +259,8 @@ private fun StatsDialog(notes: List<Note>, attachTotal: Int, onDismiss: () -> Un
 @Composable
 private fun StatRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, fontSize = 13.sp, color = InkSoft, modifier = Modifier.weight(1f))
-        Text(value, fontFamily = LalezarFont, fontSize = 18.sp, color = Ink)
+        Text(label, fontSize = 13.sp, color = MutedGreenText, modifier = Modifier.weight(1f))
+        Text(value, fontFamily = LalezarFont, fontSize = 18.sp, color = Saffron)
     }
 }
 
