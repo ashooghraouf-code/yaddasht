@@ -9,19 +9,19 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import ir.yaddasht.app.R
 
-val DeepGreen = Color(0xFF0D2B26)
-val DeepGreenSoft = Color(0xFF153B34)
-val LineGreen = Color(0xFF2C5148)
-val Saffron = Color(0xFFF2A93B)
-val Brick = Color(0xFFC64B2C)
-val Ink = Color(0xFF22302B)
-val InkSoft = Color(0xFF5C6B63)
-val PaperWhite = Color(0xFFFBF7EC)
-val MutedGreenText = Color(0xFF9DBBB0)
+val DeepGreen = Color(0xFF123B33)
+val DeepGreenSoft = Color(0xFF1B4A40)
+val LineGreen = Color(0xFF35685C)
+val Saffron = Color(0xFFFFB020)
+val Brick = Color(0xFFFF6B4A)
+val Ink = Color(0xFF243229)
+val InkSoft = Color(0xFF5F7168)
+val PaperWhite = Color(0xFFFFFBEE)
+val MutedGreenText = Color(0xFFA9C6BB)
 
 val PaperColors = listOf(
-    Color(0xFFFBF7EC), Color(0xFFFDE9B8), Color(0xFFD9EDDC),
-    Color(0xFFD8EAF2), Color(0xFFF7DBE2), Color(0xFFEDE4F3)
+    Color(0xFFFFF6E0), Color(0xFFFFE08A), Color(0xFFC9F0D8),
+    Color(0xFFCDE9FF), Color(0xFFFFD6E0), Color(0xFFE6DCFF)
 )
 
 fun paperColor(index: Int): Color = PaperColors.getOrElse(index) { PaperColors[0] }
