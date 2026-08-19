@@ -158,4 +158,61 @@ class MainActivity : FragmentActivity() {
                         if (screen is Screen.Home) NoteWidget.forceUpdate(this@MainActivity)
                     }
 
-                    DisposableEffect(Unit)
+                    DisposableEffect(Unit) {
+                        onShake = { screen = Screen.Editor(NEW_NOTE_ID) }
+                        onDispose { onShake = null }
+                    }
+
+                    when (val s = screen) {
+                        is Screen.Home -> HomeScreen(
+                            dao = dao,
+                            onOpenNote = { screen = Screen.Editor(it) },
+                            onNewNote = { screen = Screen.Editor(NEW_NOTE_ID) }
+                        )
+                        is Screen.Editor -> EditorScreen(
+                            dao = dao,
+                            noteId = s.noteId,
+                            onBack = { screen = Screen.Home },
+                            onOpenDraw = { screen = Screen.Draw(it) }
+                        )
+                        is Screen.Draw -> DrawScreen(
+                            dao = dao,
+                            noteId = s.noteId,
+                            onBack = { screen = Screen.Editor(s.noteId) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
+            sensorManager?.registerListener(shakeListener, it, SensorManager.SENSOR_DELAY_UI)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        sensorManager?.unregisterListener(shakeListener)
+    }
+}
+
+@Composable
+private fun LockScreen(onUnlock: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(DeepGreen), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("🏮", fontSize = 60.sp)
+            Spacer(Modifier.height(12.dp))
+            Text("چراغ راه قفل است", fontFamily = LalezarFont, fontSize = 26.sp, color = PaperWhite)
+            Spacer(Modifier.height(6.dp))
+            Text("یادداشت محرمانه داری؛ اول خودت را ثابت کن!", fontSize = 12.sp, color = MutedGreenText)
+            Spacer(Modifier.height(20.dp))
+            Button(onClick = onUnlock,
+                colors = ButtonDefaults.buttonColors(containerColor = Saffron, contentColor = Ink)) {
+                Text("باز کردن 🔓", fontFamily = LalezarFont, fontSize = 16.sp)
+            }
+        }
+    }
+}
