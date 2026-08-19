@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">یادداشت</string>
-    <string name="widget_desc">آخرین یادداشت شما، همیشه دم دست</string>
+    <string name="app_name">چراغ راه</string>
+    <string name="widget_desc">نمایش یادداشت انتخابی روی صفحهٔ خانگی</string>
 </resources>
