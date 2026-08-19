@@ -12,13 +12,28 @@ import android.os.Vibrator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import ir.yaddasht.app.data.AppDatabase
-import ir.yaddasht.app.ui.theme.YaddashtTheme
 import ir.yaddasht.app.ui.screen.DrawScreen
 import ir.yaddasht.app.ui.screen.EditorScreen
 import ir.yaddasht.app.ui.screen.HomeScreen
+import ir.yaddasht.app.ui.theme.*
+import ir.yaddasht.app.util.NoteLock
 import ir.yaddasht.app.widget.NoteWidget
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.sqrt
 
 const val NEW_NOTE_ID = -1L
@@ -51,6 +66,25 @@ class MainActivity : ComponentActivity() {
         override fun onAccuracyChanged(s: Sensor?, a: Int) {}
     }
 
+    fun showBiometric(onSuccess: () -> Unit) {
+        val executor = ContextCompat.getMainExecutor(this)
+        val prompt = BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                super.onAuthenticationSucceeded(result)
+                onSuccess()
+            }
+        })
+        val info = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("قفل چراغ راه 🔒")
+            .setSubtitle("با اثر انگشت یا رمز دستگاه باز کن")
+            .setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
+            .build()
+        prompt.authenticate(info)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -59,41 +93,64 @@ class MainActivity : ComponentActivity() {
         setContent {
             YaddashtTheme {
                 val dao = remember { AppDatabase.get(applicationContext).dao() }
-                val openNoteId = remember { intent.getLongExtra("note_id", 0L) }
-                var screen by remember {
-                    mutableStateOf<Screen>(when {
-                        openNoteId == NEW_NOTE_ID -> Screen.Editor(NEW_NOTE_ID)
-                        openNoteId > 0 -> Screen.Editor(openNoteId)
-                        else -> Screen.Home
-                    })
+                var authRequired by remember { mutableStateOf(false) }
+                var authChecked by remember { mutableStateOf(false) }
+
+                LaunchedEffect(Unit) {
+                    val hasLocked = withContext(Dispatchers.IO) {
+                        dao.allNotesSync().any { NoteLock.isLocked(it.body) }
+                    }
+                    val canBio = BiometricManager.from(this@MainActivity).canAuthenticate(
+                        BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                    ) == BiometricManager.BIOMETRIC_SUCCESS
+                    if (hasLocked && canBio) authRequired = true
+                    authChecked = true
                 }
 
-                LaunchedEffect(screen) {
-                    if (screen is Screen.Home) NoteWidget.forceUpdate(this@MainActivity)
+                LaunchedEffect(authRequired) {
+                    if (authRequired) showBiometric { authRequired = false }
                 }
 
-                DisposableEffect(Unit) {
-                    onShake = { screen = Screen.Editor(NEW_NOTE_ID) }
-                    onDispose { onShake = null }
-                }
+                if (authRequired) {
+                    LockScreen { showBiometric { authRequired = false } }
+                } else if (authChecked) {
+                    val openNoteId = remember { intent.getLongExtra("note_id", 0L) }
+                    var screen by remember {
+                        mutableStateOf<Screen>(when {
+                            openNoteId == NEW_NOTE_ID -> Screen.Editor(NEW_NOTE_ID)
+                            openNoteId > 0 -> Screen.Editor(openNoteId)
+                            else -> Screen.Home
+                        })
+                    }
 
-                when (val s = screen) {
-                    is Screen.Home -> HomeScreen(
-                        dao = dao,
-                        onOpenNote = { screen = Screen.Editor(it) },
-                        onNewNote = { screen = Screen.Editor(NEW_NOTE_ID) }
-                    )
-                    is Screen.Editor -> EditorScreen(
-                        dao = dao,
-                        noteId = s.noteId,
-                        onBack = { screen = Screen.Home },
-                        onOpenDraw = { screen = Screen.Draw(it) }
-                    )
-                    is Screen.Draw -> DrawScreen(
-                        dao = dao,
-                        noteId = s.noteId,
-                        onBack = { screen = Screen.Editor(s.noteId) }
-                    )
+                    LaunchedEffect(screen) {
+                        if (screen is Screen.Home) NoteWidget.forceUpdate(this@MainActivity)
+                    }
+
+                    DisposableEffect(Unit) {
+                        onShake = { screen = Screen.Editor(NEW_NOTE_ID) }
+                        onDispose { onShake = null }
+                    }
+
+                    when (val s = screen) {
+                        is Screen.Home -> HomeScreen(
+                            dao = dao,
+                            onOpenNote = { screen = Screen.Editor(it) },
+                            onNewNote = { screen = Screen.Editor(NEW_NOTE_ID) }
+                        )
+                        is Screen.Editor -> EditorScreen(
+                            dao = dao,
+                            noteId = s.noteId,
+                            onBack = { screen = Screen.Home },
+                            onOpenDraw = { screen = Screen.Draw(it) }
+                        )
+                        is Screen.Draw -> DrawScreen(
+                            dao = dao,
+                            noteId = s.noteId,
+                            onBack = { screen = Screen.Editor(s.noteId) }
+                        )
+                    }
                 }
             }
         }
@@ -109,5 +166,23 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         sensorManager?.unregisterListener(shakeListener)
+    }
+}
+
+@Composable
+private fun LockScreen(onUnlock: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(DeepGreen), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("🏮", fontSize = 60.sp)
+            Spacer(Modifier.height(12.dp))
+            Text("چراغ راه قفل است", fontFamily = LalezarFont, fontSize = 26.sp, color = PaperWhite)
+            Spacer(Modifier.height(6.dp))
+            Text("یادداشت محرمانه داری؛ اول خودت را ثابت کن!", fontSize = 12.sp, color = MutedGreenText)
+            Spacer(Modifier.height(20.dp))
+            Button(onClick = onUnlock,
+                colors = ButtonDefaults.buttonColors(containerColor = Saffron, contentColor = Ink)) {
+                Text("باز کردن 🔓", fontFamily = LalezarFont, fontSize = 16.sp)
+            }
+        }
     }
 }
