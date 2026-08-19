@@ -9,7 +9,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.biometric.BiometricManager
@@ -20,6 +19,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -43,25 +44,53 @@ sealed class Screen {
     data object Home : Screen()
     data class Editor(val noteId: Long) : Screen()
     data class Draw(val noteId: Long) : Screen()
+
+    companion object {
+        val SAVER: Saver<Screen, String> = Saver(
+            save = { s ->
+                when (s) {
+                    is Home -> "home"
+                    is Editor -> "e:${s.noteId}"
+                    is Draw -> "d:${s.noteId}"
+                }
+            },
+            restore = { str ->
+                when {
+                    str.startsWith("e:") -> Editor(str.removePrefix("e:").toLongOrNull() ?: NEW_NOTE_ID)
+                    str.startsWith("d:") -> Draw(str.removePrefix("d:").toLongOrNull() ?: NEW_NOTE_ID)
+                    else -> Home
+                }
+            }
+        )
+    }
 }
 
 class MainActivity : FragmentActivity() {
 
     private var sensorManager: SensorManager? = null
-    private var lastShake = 0L
+    private var shakeHits = 0
+    private var lastHitTime = 0L
+    private var lastTrigger = 0L
     private var onShake: (() -> Unit)? = null
 
     private val shakeListener = object : SensorEventListener {
         override fun onSensorChanged(e: SensorEvent) {
             val x = e.values[0]; val y = e.values[1]; val z = e.values[2]
             val g = sqrt(x * x + y * y + z * z)
-            if (g > 21 && System.currentTimeMillis() - lastShake > 3000) {
-                lastShake = System.currentTimeMillis()
-                (getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator)?.let {
-                    if (Build.VERSION.SDK_INT >= 26)
-                        it.vibrate(VibrationEffect.createOneShot(70, VibrationEffect.DEFAULT_AMPLITUDE))
+            val now = System.currentTimeMillis()
+            if (g > 22) {
+                if (now - lastHitTime > 700) shakeHits = 0
+                lastHitTime = now
+                shakeHits++
+                if (shakeHits >= 4 && now - lastTrigger > 3000) {
+                    lastTrigger = now
+                    shakeHits = 0
+                    (getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator)?.let {
+                        if (Build.VERSION.SDK_INT >= 26)
+                            it.vibrate(VibrationEffect.createOneShot(70, VibrationEffect.DEFAULT_AMPLITUDE))
+                    }
+                    onShake?.invoke()
                 }
-                onShake?.invoke()
             }
         }
         override fun onAccuracyChanged(s: Sensor?, a: Int) {}
@@ -117,7 +146,7 @@ class MainActivity : FragmentActivity() {
                     LockScreen { showBiometric { authRequired = false } }
                 } else if (authChecked) {
                     val openNoteId = remember { intent.getLongExtra("note_id", 0L) }
-                    var screen by remember {
+                    var screen by rememberSaveable(stateSaver = Screen.SAVER) {
                         mutableStateOf<Screen>(when {
                             openNoteId == NEW_NOTE_ID -> Screen.Editor(NEW_NOTE_ID)
                             openNoteId > 0 -> Screen.Editor(openNoteId)
@@ -129,61 +158,4 @@ class MainActivity : FragmentActivity() {
                         if (screen is Screen.Home) NoteWidget.forceUpdate(this@MainActivity)
                     }
 
-                    DisposableEffect(Unit) {
-                        onShake = { screen = Screen.Editor(NEW_NOTE_ID) }
-                        onDispose { onShake = null }
-                    }
-
-                    when (val s = screen) {
-                        is Screen.Home -> HomeScreen(
-                            dao = dao,
-                            onOpenNote = { screen = Screen.Editor(it) },
-                            onNewNote = { screen = Screen.Editor(NEW_NOTE_ID) }
-                        )
-                        is Screen.Editor -> EditorScreen(
-                            dao = dao,
-                            noteId = s.noteId,
-                            onBack = { screen = Screen.Home },
-                            onOpenDraw = { screen = Screen.Draw(it) }
-                        )
-                        is Screen.Draw -> DrawScreen(
-                            dao = dao,
-                            noteId = s.noteId,
-                            onBack = { screen = Screen.Editor(s.noteId) }
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
-            sensorManager?.registerListener(shakeListener, it, SensorManager.SENSOR_DELAY_UI)
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        sensorManager?.unregisterListener(shakeListener)
-    }
-}
-
-@Composable
-private fun LockScreen(onUnlock: () -> Unit) {
-    Box(Modifier.fillMaxSize().background(DeepGreen), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("🏮", fontSize = 60.sp)
-            Spacer(Modifier.height(12.dp))
-            Text("چراغ راه قفل است", fontFamily = LalezarFont, fontSize = 26.sp, color = PaperWhite)
-            Spacer(Modifier.height(6.dp))
-            Text("یادداشت محرمانه داری؛ اول خودت را ثابت کن!", fontSize = 12.sp, color = MutedGreenText)
-            Spacer(Modifier.height(20.dp))
-            Button(onClick = onUnlock,
-                colors = ButtonDefaults.buttonColors(containerColor = Saffron, contentColor = Ink)) {
-                Text("باز کردن 🔓", fontFamily = LalezarFont, fontSize = 16.sp)
-            }
-        }
-    }
-}
+                    DisposableEffect(Unit)
