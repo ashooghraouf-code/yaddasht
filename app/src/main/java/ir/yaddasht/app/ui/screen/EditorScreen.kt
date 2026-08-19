@@ -549,7 +549,7 @@ private fun ShamsiDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> U
         text = {
             Column {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    DateStep(FaDate.monthName(jm).ifEmpty { "?" },
+                    DateStep(FaDate.monthName(jm),
                         { if (jm < 12) jm++ else { jm = 1; if (jy < jy0 + 3) jy++ } },
                         { if (jm > 1) jm-- else { jm = 12; if (jy > jy0 - 1) jy-- } })
                     DateStep(jd.fa(),
@@ -560,7 +560,7 @@ private fun ShamsiDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> U
                         { if (jy > jy0 - 1) jy-- })
                 }
                 Spacer(Modifier.height(12.dp))
-                Text("معادل میلادی: $gy/${gm.toString().padStart(2,'0')}/${gd.toString().padStart(2,'0')}",
+                Text("معادل میلادی: $gy/${gm.toString().padStart(2, '0')}/${gd.toString().padStart(2, '0')}",
                     fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .7f))
             }
         },
@@ -808,4 +808,15 @@ private fun FocusModeOverlay(body: String, onChange: (String) -> Unit, onExit: (
 }
 
 private fun importUris(context: Context, scope: CoroutineScope, dao: NoteDao, noteId: Long, uris: List<Uri>) {
-    if (uris.isEmpty())
+    if (uris.isEmpty()) return
+    scope.launch(Dispatchers.IO) {
+        uris.forEach { uri ->
+            val file = AttachmentStore.copyToPrivate(context, uri) ?: return@forEach
+            val mime = context.contentResolver.getType(uri) ?: guessMimeType(file.name)
+            dao.insertAttachment(Attachment(noteId = noteId, fileName = file.name, filePath = file.absolutePath, mimeType = mime, isImage = mime.startsWith("image/")))
+        }
+        withContext(Dispatchers.Main) {
+            Toast.makeText(context, "ضمیمه اضافه شد ✔", Toast.LENGTH_SHORT).show()
+        }
+    }
+}
