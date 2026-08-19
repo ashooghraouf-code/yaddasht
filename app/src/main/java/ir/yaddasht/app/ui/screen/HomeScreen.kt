@@ -138,7 +138,7 @@ fun HomeScreen(dao: NoteDao, onOpenNote: (Long) -> Unit, onNewNote: () -> Unit) 
                 SearchBox(query, { query = it }, Modifier.padding(horizontal = 20.dp))
                 when {
                     notes.isEmpty() -> EmptyState()
-                    filtered.isEmpty() -> CenterMessage("چیزی پیدا نشد! 🔍")
+                    filtered.isEmpty() -> CenterMessage("چیزی پیدا نشد 🔍")
                     else -> LazyVerticalGrid(
                         columns = GridCells.Adaptive(168.dp),
                         contentPadding = PaddingValues(14.dp, 16.dp, 14.dp, 120.dp),
@@ -217,7 +217,7 @@ private fun HomeHeader(count: Int, onStats: () -> Unit, onBackup: () -> Unit, on
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("یادداشت", fontFamily = LalezarFont, fontSize = 38.sp, color = PaperWhite)
+                Text("چراغ راه", fontFamily = LalezarFont, fontSize = 38.sp, color = PaperWhite)
                 Text("بدون محدودیت • ${count.fa()} یادداشت • 🤝 تکان بده = جدید",
                     fontSize = 10.sp, color = Saffron)
             }
@@ -374,9 +374,9 @@ private fun EmptyState() {
         Box(Modifier.size(110.dp).clip(CircleShape).border(2.dp, Saffron.copy(alpha = .5f), CircleShape),
             contentAlignment = Alignment.Center) { Text("✍️", fontSize = 46.sp) }
         Spacer(Modifier.height(20.dp))
-        Text("دفترچه‌ات خالی است!", fontFamily = LalezarFont, fontSize = 26.sp, color = PaperWhite)
+        Text("دفترچه‌ات خالی است", fontFamily = LalezarFont, fontSize = 26.sp, color = PaperWhite)
         Spacer(Modifier.height(8.dp))
-        Text("یادداشت بنویس، صدا ضبط کن، نقاشی بکش، چک‌لیست بساز و رویشان قفل بگذار!",
+        Text("یادداشت بنویس، صدا ضبط کن، نقاشی بکش، چک‌لیست بساز و رویشان قفل بگذار ✨",
             fontSize = 13.sp, color = MutedGreenText, textAlign = TextAlign.Center)
     }
 }
