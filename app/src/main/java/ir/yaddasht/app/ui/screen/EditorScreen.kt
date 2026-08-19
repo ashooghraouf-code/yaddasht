@@ -94,6 +94,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     var pass1 by remember { mutableStateOf("") }
     var pass2 by remember { mutableStateOf("") }
     var lockError by remember { mutableStateOf("") }
+    var showRecoveryCode by remember { mutableStateOf<String?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var pickedDate by remember { mutableLongStateOf(0L) }
@@ -292,8 +293,8 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                             .background(Saffron.copy(alpha = .28f))
                             .padding(horizontal = 10.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically) {
-                            Text("⏰ یادآور: " + SimpleDateFormat("EEEE d MMMM – HH:mm",
-                                Locale.forLanguageTag("fa")).format(Date(rem)),
+                            Text("⏰ یادآور: " + FaDate.full(rem) + " – " +
+                                SimpleDateFormat("HH:mm", Locale.US).format(Date(rem)),
                                 fontSize = 12.sp, color = Ink, modifier = Modifier.weight(1f))
                             Icon(Icons.Filled.Close, "لغو یادآور", tint = Brick,
                                 modifier = Modifier.size(20.dp).clickable {
@@ -355,26 +356,30 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                         }
                     }
                 }
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-
-                    if (recorder != null) RecordStopPill(recordSeconds, ::stopRecording)
-                    else AttachButton("صدا", Icons.Filled.Mic, ::micClick)
-
-                    AttachButton("دوربین", Icons.Filled.CameraAlt) {
-                        val file = AttachmentStore.createCameraFile(context)
-                        pendingCameraFile = file
-                        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                        takePicture.launch(uri)
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        if (recorder != null) RecordStopPill(recordSeconds, ::stopRecording)
+                        else AttachButton("صدا", Icons.Filled.Mic, Modifier.weight(1f), ::micClick)
+                        AttachButton("دوربین", Icons.Filled.CameraAlt, Modifier.weight(1f)) {
+                            val file = AttachmentStore.createCameraFile(context)
+                            pendingCameraFile = file
+                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                            takePicture.launch(uri)
+                        }
+                        AttachButton("گالری", Icons.Filled.Image, Modifier.weight(1f)) { pickImages.launch("image/*") }
                     }
-                    AttachButton("گالری", Icons.Filled.Image) { pickImages.launch("image/*") }
-                    AttachButton("فایل", Icons.Filled.AttachFile) { pickDocs.launch(arrayOf("*/*")) }
-                    AttachButton("نقاشی", Icons.Filled.Brush) { onOpenDraw(realId) }
-                    IconButton(onClick = { showPalette = !showPalette }) {
-                        Icon(Icons.Filled.Palette, "رنگ",
-                            tint = if (showPalette) Saffron else Color(0xFF5E8077))
+                    Row(Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        AttachButton("فایل", Icons.Filled.AttachFile, Modifier.weight(1f)) { pickDocs.launch(arrayOf("*/*")) }
+                        AttachButton("نقاشی", Icons.Filled.Brush, Modifier.weight(1f)) { onOpenDraw(realId) }
+                        IconButton(onClick = { showPalette = !showPalette }) {
+                            Icon(Icons.Filled.Palette, "رنگ",
+                                tint = if (showPalette) Saffron else Color(0xFF5E8077))
+                        }
                     }
                 }
             }
@@ -408,7 +413,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             text = {
                 Column {
                     OutlinedTextField(pass1, { pass1 = it },
-                        label = { Text("رمز عبور") }, singleLine = true,
+                        label = { Text(if (mode == LockMode.Unlock) "رمز یا کد بازیابی" else "رمز عبور") }, singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         modifier = Modifier.fillMaxWidth())
@@ -434,15 +439,25 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                             pass1 != pass2 -> lockError = "تکرار رمز یکسان نیست"
                             note?.body.isNullOrBlank() -> lockError = "یادداشت خالی است!"
                             else -> {
-                                note = note?.copy(body = NoteLock.lock(note!!.body, pass1))
+                                val original = note!!.body
+                                val code = Recovery.genCode()
+                                note = note?.copy(body = NoteLock.lock(original, pass1))
+                                Recovery.saveBackup(context, realId, code, original)
                                 lockMode = null
+                                showRecoveryCode = code
                                 Toast.makeText(context, "یادداشت قفل شد 🔒", Toast.LENGTH_SHORT).show()
                             }
                         }
                         LockMode.Unlock -> {
                             val unlocked = note?.body?.let { NoteLock.unlock(it, pass1) }
-                            if (unlocked == null) lockError = "رمز اشتباه است! ❌"
-                            else { note = note?.copy(body = unlocked); lockMode = null }
+                            if (unlocked != null) { note = note?.copy(body = unlocked); lockMode = null }
+                            else {
+                                val rec = Recovery.tryRecover(context, realId, pass1)
+                                if (rec != null) {
+                                    note = note?.copy(body = rec); lockMode = null
+                                    Toast.makeText(context, "با کد بازیابی باز شد 🔑", Toast.LENGTH_SHORT).show()
+                                } else lockError = "رمز یا کد بازیابی اشتباه است! ❌"
+                            }
                         }
                     }
                 }) { Text("تأیید", color = Saffron, fontWeight = FontWeight.Bold) }
@@ -450,19 +465,26 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             dismissButton = { TextButton(onClick = { lockMode = null }) { Text("انصراف") } })
     }
 
-    if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let {
-                        pickedDate = it; showDatePicker = false; showTimePicker = true
-                    }
-                }) { Text("ادامه", color = Saffron, fontWeight = FontWeight.Bold) }
+    showRecoveryCode?.let { code ->
+        AlertDialog(onDismissRequest = { showRecoveryCode = null },
+            title = { Text("🔑 کد بازیابی", fontFamily = LalezarFont, fontSize = 20.sp) },
+            text = {
+                Column {
+                    Text("این کد را جای امن بنویس! اگه روزی رمزت را فراموش کردی، با همین کد می‌تونی یادداشت را باز کنی:")
+                    Spacer(Modifier.height(12.dp))
+                    Text(code, fontFamily = LalezarFont, fontSize = 30.sp,
+                        color = Saffron, modifier = Modifier.fillMaxWidth(),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                }
             },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("انصراف") } }
-        ) { DatePicker(datePickerState) }
+            confirmButton = { TextButton(onClick = { showRecoveryCode = null }) { Text("ذخیره کردم ✅", color = Saffron, fontWeight = FontWeight.Bold) } })
+    }
+
+    if (showDatePicker) {
+        ShamsiDatePickerDialog(
+            onConfirm = { pickedDate = it; showDatePicker = false; showTimePicker = true },
+            onDismiss = { showDatePicker = false }
+        )
     }
 
     if (showTimePicker) {
@@ -471,11 +493,8 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             onDismissRequest = { showTimePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    val utc = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = pickedDate }
                     val local = Calendar.getInstance().apply {
-                        set(Calendar.YEAR, utc.get(Calendar.YEAR))
-                        set(Calendar.MONTH, utc.get(Calendar.MONTH))
-                        set(Calendar.DAY_OF_MONTH, utc.get(Calendar.DAY_OF_MONTH))
+                        timeInMillis = pickedDate
                         set(Calendar.HOUR_OF_DAY, timePickerState.hour)
                         set(Calendar.MINUTE, timePickerState.minute)
                         set(Calendar.SECOND, 0)
@@ -513,6 +532,50 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             onChange = { note = note?.copy(body = it) },
             onExit = { showFocus = false }
         )
+    }
+}
+
+@Composable
+private fun ShamsiDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) {
+    val (jy0, jm0, jd0) = FaDate.jalali(System.currentTimeMillis())
+    var jy by remember { mutableIntStateOf(jy0) }
+    var jm by remember { mutableIntStateOf(jm0) }
+    var jd by remember { mutableIntStateOf(jd0) }
+    if (jd > FaDate.monthLength(jy, jm)) jd = FaDate.monthLength(jy, jm)
+    val (gy, gm, gd) = FaDate.toGregorian(jy, jm, jd)
+
+    AlertDialog(onDismissRequest = onDismiss,
+        title = { Text("📅 انتخاب تاریخ یادآور", fontFamily = LalezarFont, fontSize = 20.sp) },
+        text = {
+            Column {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    DateStep(FaDate.monthName(jm).ifEmpty { "?" },
+                        { if (jm < 12) jm++ else { jm = 1; if (jy < jy0 + 3) jy++ } },
+                        { if (jm > 1) jm-- else { jm = 12; if (jy > jy0 - 1) jy-- } })
+                    DateStep(jd.fa(),
+                        { if (jd < FaDate.monthLength(jy, jm)) jd++ },
+                        { if (jd > 1) jd-- })
+                    DateStep(jy.fa(),
+                        { if (jy < jy0 + 3) jy++ },
+                        { if (jy > jy0 - 1) jy-- })
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("معادل میلادی: $gy/${gm.toString().padStart(2,'0')}/${gd.toString().padStart(2,'0')}",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .7f))
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(FaDate.epoch(jy, jm, jd)) }) { Text("ادامه", color = Saffron, fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } })
+}
+
+@Composable
+private fun DateStep(value: String, onPlus: () -> Unit, onMinus: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        TextButton(onClick = onPlus) { Text("+", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+        Text(value, fontFamily = LalezarFont, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+        TextButton(onClick = onMinus) { Text("−", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
     }
 }
 
@@ -612,8 +675,8 @@ private fun RecordStopPill(seconds: Int, onStop: () -> Unit) {
 }
 
 @Composable
-private fun AttachButton(text: String, icon: ImageVector, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(14.dp),
+private fun AttachButton(text: String, icon: ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Surface(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(14.dp),
         color = DeepGreenSoft, border = androidx.compose.foundation.BorderStroke(1.dp, LineGreen)) {
         Row(Modifier.padding(horizontal = 13.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = Saffron, modifier = Modifier.size(18.dp))
@@ -745,15 +808,4 @@ private fun FocusModeOverlay(body: String, onChange: (String) -> Unit, onExit: (
 }
 
 private fun importUris(context: Context, scope: CoroutineScope, dao: NoteDao, noteId: Long, uris: List<Uri>) {
-    if (uris.isEmpty()) return
-    scope.launch(Dispatchers.IO) {
-        uris.forEach { uri ->
-            val file = AttachmentStore.copyToPrivate(context, uri) ?: return@forEach
-            val mime = context.contentResolver.getType(uri) ?: guessMimeType(file.name)
-            dao.insertAttachment(Attachment(noteId = noteId, fileName = file.name, filePath = file.absolutePath, mimeType = mime, isImage = mime.startsWith("image/")))
-        }
-        withContext(Dispatchers.Main) {
-            Toast.makeText(context, "ضمیمه اضافه شد ✔", Toast.LENGTH_SHORT).show()
-        }
-    }
-}
+    if (uris.isEmpty())
