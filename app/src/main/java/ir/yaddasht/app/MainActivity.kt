@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import ir.yaddasht.app.data.AppDatabase
 import ir.yaddasht.app.ui.screen.DrawScreen
 import ir.yaddasht.app.ui.screen.EditorScreen
@@ -44,7 +45,7 @@ sealed class Screen {
     data class Draw(val noteId: Long) : Screen()
 }
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private var sensorManager: SensorManager? = null
     private var lastShake = 0L
@@ -66,7 +67,7 @@ class MainActivity : ComponentActivity() {
         override fun onAccuracyChanged(s: Sensor?, a: Int) {}
     }
 
-    fun showBiometric(onSuccess: () -> Unit) {
+    private fun showBiometric(onSuccess: () -> Unit) {
         val executor = ContextCompat.getMainExecutor(this)
         val prompt = BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
