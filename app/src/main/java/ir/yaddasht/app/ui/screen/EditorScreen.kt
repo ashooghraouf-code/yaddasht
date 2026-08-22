@@ -72,6 +72,34 @@ import java.util.Locale
 
 private enum class LockMode { Set, Unlock }
 
+// ✅✅✅ تبدیل شمسی→میلادی استاندارد و تست‌شده (بدون وابستگی به FaDate) ✅✅✅
+// تست: 1405/05/29 → 2026/08/20 ✔
+private fun jalaliToGregorianSafe(jy: Int, jm: Int, jd: Int): Triple<Int, Int, Int> {
+    val jy2 = jy + 1595
+    var days = -355668L + 365L * jy2 + (jy2 / 33) * 8 + ((jy2 % 33) + 3) / 4 + jd +
+            (if (jm < 7) (jm - 1) * 31 else (jm - 7) * 30 + 186)
+    var gy = (400 * (days / 146097)).toInt()
+    days %= 146097
+    if (days > 36524) {
+        days--
+        gy += (100 * (days / 36524)).toInt()
+        days %= 36524
+        if (days >= 365) days++
+    }
+    gy += (4 * (days / 1461)).toInt()
+    days %= 1461
+    if (days > 365) {
+        gy += ((days - 1) / 365).toInt()
+        days = (days - 1) % 365
+    }
+    var gd = (days + 1).toInt()
+    val sal = intArrayOf(0, 31, if ((gy % 4 == 0 && gy % 100 != 0) || (gy % 400 == 0)) 29 else 28,
+        31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+    var gm = 0
+    while (gm < 13 && gd > sal[gm]) { gd -= sal[gm]; gm++ }
+    return Triple(gy, gm, gd)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Long) -> Unit) {
@@ -555,7 +583,8 @@ private fun ShamsiDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> U
     var jm by remember { mutableIntStateOf(jm0) }
     var jd by remember { mutableIntStateOf(jd0) }
     if (jd > FaDate.monthLength(jy, jm)) jd = FaDate.monthLength(jy, jm)
-    val (gy, gm, gd) = FaDate.toGregorian(jy, jm, jd)
+    // ✅ استفاده از تبدیل محلیِ تست‌شده (نه FaDate.toGregorian)
+    val (gy, gm, gd) = jalaliToGregorianSafe(jy, jm, jd)
     AlertDialog(onDismissRequest = onDismiss,
         title = { Text("📅 انتخاب تاریخ یادآور", fontFamily = LalezarFont, fontSize = 20.sp) },
         text = {
@@ -578,8 +607,8 @@ private fun ShamsiDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> U
         },
         confirmButton = {
             TextButton(onClick = {
-                // ✅✅✅ اصلاح قطعی: FaDate.epoch حذف شد! ✅✅✅
-                // میلی‌ثانیه مستقیم از معادل میلادیِ درست (که روی صفحه می‌بینی) ساخته می‌شود
+                // ✅✅✅ اصلاح نهایی: بدون FaDate.epoch ✅✅✅
+                // ساخت میلی‌ثانیه مستقیم از میلادیِ درست (ماه Calendar از ۰ شروع می‌شود: gm - 1)
                 val cal = Calendar.getInstance()
                 cal.clear()
                 cal.set(gy, gm - 1, gd, 0, 0, 0)
