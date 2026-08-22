@@ -247,12 +247,12 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        Toast.makeText(context, "یادآور تنظیم شد ⏰", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "یادآور تنظیم شد ", Toast.LENGTH_SHORT).show()
     }
 
     fun exportPdf() {
         val n = note ?: return
-        val pdfNote = if (isLocked) n.copy(body = " این یادداشت قفل است") else n
+        val pdfNote = if (isLocked) n.copy(body = "🔒 این یادداشت قفل است") else n
         scope.launch(Dispatchers.IO) {
             val file = PdfExporter.exportNote(context, pdfNote)
             withContext(Dispatchers.Main) {
@@ -269,7 +269,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                 IconButton(onClick = exit) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = PaperWhite)
                 }
-                Text(if (isLocked) "🔒 یادداشت محرمانه" else "یادداشت",
+                Text(if (isLocked) " یادداشت محرمانه" else "یادداشت",
                     fontFamily = LalezarFont, fontSize = 20.sp, color = PaperWhite,
                     modifier = Modifier.weight(1f).padding(start = 4.dp))
                 IconButton(onClick = { note = note?.copy(pinned = !(note?.pinned ?: false)) }) {
@@ -291,7 +291,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                     lockError = ""; pass1 = ""; pass2 = ""
                     lockMode = if (isLocked) LockMode.Unlock else LockMode.Set
                 }
-                ToolChip("", "یادآور") { showDatePicker = true }
+                ToolChip("⏰", "یادآور") { showDatePicker = true }
                 ToolChip("✅", if (isChecklist) "خروج از چک‌لیست" else "چک‌لیست") {
                     if (!isLocked) note?.let { n ->
                         note = n.copy(body = if (isChecklist) Checklist.fromChecklist(n.body)
@@ -299,7 +299,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                     }
                 }
                 ToolChip("🗣️", "دیکته") { if (!isLocked) launchSpeech() }
-                ToolChip("📄", "PDF") { if (!isLocked) exportPdf() }
+                ToolChip("", "PDF") { if (!isLocked) exportPdf() }
                 ToolChip("✒️", "تمرکز") { if (!isLocked && !isChecklist) showFocus = true }
             }
 
@@ -413,7 +413,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     if (confirmDelete) {
         AlertDialog(onDismissRequest = { confirmDelete = false },
             title = { Text("حذف یادداشت؟", fontFamily = LalezarFont, fontSize = 20.sp) },
-            text = { Text("این یادداشت همراه با همهٔ ضمیمه‌هایش برای همیشه حذف می‌شود.") },
+            text = { Text("این یادداشت همراه با همه ضمیمه‌هایش برای همیشه حذف می‌شود.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
@@ -479,8 +479,8 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                                 val rec = Recovery.tryRecover(context, realId, pass1)
                                 if (rec != null) {
                                     note = note?.copy(body = rec); lockMode = null
-                                    Toast.makeText(context, "با کد بازیابی باز شد ", Toast.LENGTH_SHORT).show()
-                                } else lockError = "رمز یا کد بازیابی اشتباه است! ❌"
+                                    Toast.makeText(context, "با کد بازیابی باز شد 🔑", Toast.LENGTH_SHORT).show()
+                                } else lockError = "رمز یا کد بازیابی اشتباه است! "
                             }
                         }
                     }
@@ -491,7 +491,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
 
     showRecoveryCode?.let { code ->
         AlertDialog(onDismissRequest = { showRecoveryCode = null },
-            title = { Text(" کد بازیابی", fontFamily = LalezarFont, fontSize = 20.sp) },
+            title = { Text("🔑 کد بازیابی", fontFamily = LalezarFont, fontSize = 20.sp) },
             text = {
                 Column {
                     Text("این کد را جای امن بنویس! اگه روزی رمزت را فراموش کردی، با همین کد می‌تونی یادداشت را باز کنی:")
@@ -511,22 +511,20 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         )
     }
 
-    // ✅ بخش اصلاح‌شده: استفاده از timezone تهران برای جلوگیری از جابجایی تاریخ
+    // ✅ بخش اصلاح‌شده: محاسبه مستقیم بدون Calendar برای جلوگیری از جابجایی تاریخ
     if (showTimePicker) {
         val timePickerState = rememberTimePickerState()
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    // ✅ استفاده از timezone تهران برای جلوگیری از جابجایی تاریخ
-                    val local = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tehran")).apply {
-                        timeInMillis = pickedDate
-                        set(Calendar.HOUR_OF_DAY, timePickerState.hour)
-                        set(Calendar.MINUTE, timePickerState.minute)
-                        set(Calendar.SECOND, 0)
-                        set(Calendar.MILLISECOND, 0)
-                    }
-                    if (local.timeInMillis > System.currentTimeMillis()) scheduleReminder(local.timeInMillis)
+                    // ✅ محاسبه مستقیم: اضافه کردن ساعت و دقیقه به pickedDate
+                    // بدون استفاده از Calendar برای جلوگیری از مشکلات timezone
+                    val hourMillis = timePickerState.hour.toLong() * 60 * 60 * 1000
+                    val minuteMillis = timePickerState.minute.toLong() * 60 * 1000
+                    val finalTime = pickedDate + hourMillis + minuteMillis
+                    
+                    if (finalTime > System.currentTimeMillis()) scheduleReminder(finalTime)
                     else Toast.makeText(context, "این زمان گذشته است!", Toast.LENGTH_SHORT).show()
                     showTimePicker = false
                 }) { Text("تنظیم ", color = Saffron, fontWeight = FontWeight.Bold) }
@@ -629,7 +627,7 @@ private fun ToolChip(emoji: String, label: String, onClick: () -> Unit) {
 private fun LockedBox(onUnlock: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(vertical = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("🔒", fontSize = 42.sp)
+        Text("", fontSize = 42.sp)
         Spacer(Modifier.height(10.dp))
         Text("این یادداشت قفل است", fontFamily = LalezarFont, fontSize = 19.sp, color = Ink)
         Spacer(Modifier.height(14.dp))
@@ -663,7 +661,7 @@ private fun ChecklistEditor(note: Note, onChange: (Note) -> Unit) {
     }
     lines.forEachIndexed { i, line ->
         val checked = line.startsWith("☑  ")
-        val text = line.removePrefix("☐  ").removePrefix("☑  ")
+        val text = line.removePrefix("  ").removePrefix("☑  ")
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(checked = checked,
                 onCheckedChange = { onChange(note.copy(body = Checklist.toggleLine(note.body, i))) },
