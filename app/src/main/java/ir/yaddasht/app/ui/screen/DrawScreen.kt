@@ -44,13 +44,11 @@ private data class DrawStrokeData(val points: List<androidx.compose.ui.geometry.
 fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-
     var strokes by remember { mutableStateOf(emptyList<DrawStrokeData>()) }
     var currentPoints by remember { mutableStateOf(emptyList<androidx.compose.ui.geometry.Offset>()) }
     var brushColor by remember { mutableStateOf(Color(0xFF22302B)) }
     var brushWidth by remember { mutableFloatStateOf(7f) }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
-
     val brushColors = listOf(
         Color(0xFF22302B), Color(0xFFC64B2C), Color(0xFFD98A16),
         Color(0xFF2E7D52), Color(0xFF2B6CB0), Color(0xFFB83280), Color.White
@@ -89,7 +87,10 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
             }
         }
 
-        Row(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(14.dp),
+        // ✅ نوار بالا: با فاصله از نوار وضعیت گوشی
+        Row(Modifier.align(Alignment.TopCenter).fillMaxWidth()
+            .statusBarsPadding()
+            .padding(14.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically) {
             DrawButton("✕") { onBack() }
@@ -117,8 +118,8 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
                         val p = android.graphics.Path()
                         p.moveTo(s.points.first().x, s.points.first().y)
                         for (i in 1 until s.points.size) p.lineTo(s.points[i].x, s.points[i].y)
-                        c.drawPath(p, paint)
                     }
+                    c.drawPath(p, paint)
                     val file = File(AttachmentStore.attachmentsDir(context), "DRAW_${System.currentTimeMillis()}.png")
                     FileOutputStream(file).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
                     dao.insertAttachment(Attachment(noteId = noteId, fileName = file.name, filePath = file.absolutePath, mimeType = "image/png", isImage = true))
@@ -133,12 +134,15 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
             }
         }
 
+        // ✅ نوار پایین: با فاصله از نوار ناوبری گوشی (دیگر تداخل ندارد)
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-            .background(DeepGreen.copy(alpha = .93f)).padding(14.dp)) {
+            .background(DeepGreen.copy(alpha = .95f), RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 brushColors.forEach { c ->
-                    Box(Modifier.size(30.dp).clip(CircleShape).background(c)
+                    Box(Modifier.size(34.dp).clip(CircleShape).background(c)
                         .border(if (brushColor == c) 3.dp else 1.dp,
                             if (brushColor == c) Saffron else Color.Black.copy(alpha = .2f), CircleShape)
                         .clickable { brushColor = c })
@@ -150,7 +154,8 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("〰️", fontSize = 15.sp)
                 Slider(value = brushWidth, onValueChange = { brushWidth = it },
-                    valueRange = 2f..28f, modifier = Modifier.weight(1f),
+                    valueRange = 2f..28f,
+                    modifier = Modifier.weight(1f).height(44.dp),
                     colors = SliderDefaults.colors(thumbColor = Saffron, activeTrackColor = Saffron))
             }
         }
