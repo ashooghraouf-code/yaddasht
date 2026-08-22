@@ -20,13 +20,20 @@ class ReminderReceiver : BroadcastReceiver() {
         val pi = PendingIntent.getActivity(context, noteId.toInt(), open,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
+        // ✅ زنگ آلارم گوشی + لرزش پله‌ای + اولویت بیشینه
         val notification = NotificationCompat.Builder(context, ReminderScheduler.CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("⏰ یادآور: $title")
             .setContentText("وقتشه! برای دیدن یادداشتت ضربه بزن.")
+            .setStyle(NotificationCompat.BigTextStyle()
+                .bigText("وقتشه! برای دیدن یادداشتت ضربه بزن."))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
             .setContentIntent(pi)
+            .setSound(ReminderScheduler.reminderSoundUri(context))
+            .setVibrate(longArrayOf(0, 500, 200, 500, 200, 500))
             .build()
 
         try {
