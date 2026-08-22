@@ -6,7 +6,9 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 
@@ -43,13 +45,23 @@ object ReminderScheduler {
         }
     }
 
+    fun requestExactAlarmPermission(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+            intent.data = Uri.parse("package:${context.packageName}")
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        }
+    }
+
     fun schedule(context: Context, noteId: Long, title: String, timeMillis: Long) {
         ensureChannel(context)
         
         // بررسی permission برای Android 12+
         if (!canScheduleExactAlarms(context)) {
             Log.e(TAG, "Cannot schedule exact alarms - permission denied")
-            Toast.makeText(context, "دسترسی یادآور داده نشده است", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "لطفاً دسترسی یادآور را از تنظیمات بدهید", Toast.LENGTH_LONG).show()
+            requestExactAlarmPermission(context)
             return
         }
         
@@ -91,10 +103,11 @@ object ReminderScheduler {
             }
             
             Log.d(TAG, "Reminder scheduled for note $noteId at $timeMillis")
-            Toast.makeText(context, "یادآور تنظیم شد ", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "یادآور تنظیم شد ⏰", Toast.LENGTH_SHORT).show()
         } catch (e: SecurityException) {
             Log.e(TAG, "SecurityException while scheduling alarm", e)
-            Toast.makeText(context, "خطا در تنظیم یادآور", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "خطا در تنظیم یادآور - دسترسی لازم است", Toast.LENGTH_SHORT).show()
+            requestExactAlarmPermission(context)
         } catch (e: Exception) {
             Log.e(TAG, "Exception while scheduling alarm", e)
             Toast.makeText(context, "خطا در تنظیم یادآور", Toast.LENGTH_SHORT).show()
