@@ -230,23 +230,12 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
 
     fun scheduleReminder(ts: Long) {
         val n = note ?: return
-
-        // بررسی permission برای Android 12+ (API 31+)
-        if (!ReminderScheduler.canScheduleExactAlarms(context)) {
-            Toast.makeText(context, "لطفاً دسترسی یادآور را از تنظیمات بدهید", Toast.LENGTH_LONG).show()
-            ReminderScheduler.requestExactAlarmPermission(context)
-            return
-        }
-
         note = n.copy(reminderAt = ts)
         ReminderScheduler.schedule(context, realId, n.title, ts)
-
-        // درخواست permission برای notification در Android 13+ (API 33+)
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-
         Toast.makeText(context, "یادآور تنظیم شد ", Toast.LENGTH_SHORT).show()
     }
 
@@ -299,7 +288,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                     }
                 }
                 ToolChip("🗣️", "دیکته") { if (!isLocked) launchSpeech() }
-                ToolChip("", "PDF") { if (!isLocked) exportPdf() }
+                ToolChip("📄", "PDF") { if (!isLocked) exportPdf() }
                 ToolChip("✒️", "تمرکز") { if (!isLocked && !isChecklist) showFocus = true }
             }
 
@@ -413,7 +402,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     if (confirmDelete) {
         AlertDialog(onDismissRequest = { confirmDelete = false },
             title = { Text("حذف یادداشت؟", fontFamily = LalezarFont, fontSize = 20.sp) },
-            text = { Text("این یادداشت همراه با همه ضمیمه‌هایش برای همیشه حذف می‌شود.") },
+            text = { Text("این یادداشت همراه با همهٔ ضمیمه‌هایش برای همیشه حذف می‌شود.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
@@ -432,7 +421,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
 
     lockMode?.let { mode ->
         AlertDialog(onDismissRequest = { lockMode = null },
-            title = { Text(if (mode == LockMode.Set) "🔒 گذاشتن رمز" else "🔓 باز کردن قفل",
+            title = { Text(if (mode == LockMode.Set) " گذاشتن رمز" else "🔓 باز کردن قفل",
                 fontFamily = LalezarFont, fontSize = 20.sp) },
             text = {
                 Column {
@@ -511,20 +500,22 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         )
     }
 
-    // ✅ بخش اصلاح‌شده: محاسبه مستقیم بدون Calendar برای جلوگیری از جابجایی تاریخ
+    // ✅ بخش اصلاح‌شده: استفاده از Calendar با timezone تهران
     if (showTimePicker) {
         val timePickerState = rememberTimePickerState()
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    // ✅ محاسبه مستقیم: اضافه کردن ساعت و دقیقه به pickedDate
-                    // بدون استفاده از Calendar برای جلوگیری از مشکلات timezone
-                    val hourMillis = timePickerState.hour.toLong() * 60 * 60 * 1000
-                    val minuteMillis = timePickerState.minute.toLong() * 60 * 1000
-                    val finalTime = pickedDate + hourMillis + minuteMillis
-                    
-                    if (finalTime > System.currentTimeMillis()) scheduleReminder(finalTime)
+                    // ✅ استفاده از Calendar با timezone تهران برای جلوگیری از جابجایی
+                    val local = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tehran")).apply {
+                        timeInMillis = pickedDate
+                        set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                        set(Calendar.MINUTE, timePickerState.minute)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }
+                    if (local.timeInMillis > System.currentTimeMillis()) scheduleReminder(local.timeInMillis)
                     else Toast.makeText(context, "این زمان گذشته است!", Toast.LENGTH_SHORT).show()
                     showTimePicker = false
                 }) { Text("تنظیم ", color = Saffron, fontWeight = FontWeight.Bold) }
@@ -560,6 +551,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     }
 }
 
+// ✅ بخش اصلاح‌شده: ساخت تاریخ با timezone تهران
 @Composable
 private fun ShamsiDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) {
     val (jy0, jm0, jd0) = FaDate.jalali(System.currentTimeMillis())
@@ -589,7 +581,13 @@ private fun ShamsiDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> U
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(FaDate.epoch(jy, jm, jd)) }) { Text("ادامه", color = Saffron, fontWeight = FontWeight.Bold) }
+            TextButton(onClick = {
+                // ✅ ساخت تاریخ با timezone تهران برای جلوگیری از جابجایی
+                val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tehran"))
+                cal.set(gy, gm - 1, gd, 0, 0, 0)
+                cal.set(Calendar.MILLISECOND, 0)
+                onConfirm(cal.timeInMillis)
+            }) { Text("ادامه", color = Saffron, fontWeight = FontWeight.Bold) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } })
 }
@@ -627,7 +625,7 @@ private fun ToolChip(emoji: String, label: String, onClick: () -> Unit) {
 private fun LockedBox(onUnlock: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(vertical = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("", fontSize = 42.sp)
+        Text("🔒", fontSize = 42.sp)
         Spacer(Modifier.height(10.dp))
         Text("این یادداشت قفل است", fontFamily = LalezarFont, fontSize = 19.sp, color = Ink)
         Spacer(Modifier.height(14.dp))
@@ -654,14 +652,14 @@ private fun ChecklistEditor(note: Note, onChange: (Note) -> Unit) {
         }
         if (done == total) {
             Spacer(Modifier.height(8.dp))
-            Text("🎉 آفرین! همه کارها انجام شد", color = Color(0xFF2E7D52),
+            Text("🎉 آفرین! همهٔ کارها انجام شد", color = Color(0xFF2E7D52),
                 fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
         Spacer(Modifier.height(10.dp))
     }
     lines.forEachIndexed { i, line ->
         val checked = line.startsWith("☑  ")
-        val text = line.removePrefix("  ").removePrefix("☑  ")
+        val text = line.removePrefix("☐  ").removePrefix("☑  ")
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(checked = checked,
                 onCheckedChange = { onChange(note.copy(body = Checklist.toggleLine(note.body, i))) },
