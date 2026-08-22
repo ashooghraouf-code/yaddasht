@@ -78,7 +78,6 @@ private enum class LockMode { Set, Unlock }
 fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Long) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-
     var realId by remember { mutableLongStateOf(noteId) }
     var ready by remember { mutableStateOf(noteId != NEW_NOTE_ID) }
     var note by remember { mutableStateOf<Note?>(null) }
@@ -89,7 +88,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     var confirmDelete by remember { mutableStateOf(false) }
     var viewerImage by remember { mutableStateOf<Attachment?>(null) }
     var showFocus by remember { mutableStateOf(false) }
-
     var lockMode by remember { mutableStateOf<LockMode?>(null) }
     var pass1 by remember { mutableStateOf("") }
     var pass2 by remember { mutableStateOf("") }
@@ -109,14 +107,17 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         if (noteId == NEW_NOTE_ID) realId = withContext(Dispatchers.IO) { dao.insert(Note()) }
         ready = true
     }
+
     LaunchedEffect(ready, realId) {
         if (!ready) return@LaunchedEffect
         dao.observeNote(realId).collect { n -> note = n; if (lastSaved == null) lastSaved = n }
     }
+
     LaunchedEffect(ready, realId) {
         if (!ready) return@LaunchedEffect
         dao.observeAttachments(realId).collect { attachments = it }
     }
+
     LaunchedEffect(ready) {
         if (!ready) return@LaunchedEffect
         snapshotFlow { note }.debounce(350).collect { n ->
@@ -128,6 +129,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             }
         }
     }
+
     LaunchedEffect(recorder != null) {
         if (recorder != null) while (true) { delay(1000); recordSeconds++ }
     }
@@ -145,6 +147,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             onBack()
         }
     }
+
     BackHandler(onBack = exit)
 
     val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
@@ -156,12 +159,15 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         } else file?.delete()
         pendingCameraFile = null
     }
+
     val pickImages = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) {
         importUris(context, scope, dao, realId, it)
     }
+
     val pickDocs = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) {
         importUris(context, scope, dao, realId, it)
     }
+
     val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val text = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
@@ -171,6 +177,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             }
         }
     }
+
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     fun startRecording() {
@@ -188,6 +195,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             r.release(); Toast.makeText(context, "ضبط شروع نشد", Toast.LENGTH_SHORT).show()
         }
     }
+
     fun stopRecording() {
         try { recorder?.stop() } catch (_: Exception) {}
         recorder?.release(); recorder = null
@@ -209,6 +217,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) startRecording()
         else audioPermission.launch(Manifest.permission.RECORD_AUDIO)
     }
+
     fun launchSpeech() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -218,16 +227,30 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         try { speechLauncher.launch(intent) }
         catch (e: Exception) { Toast.makeText(context, "این دستگاه دیکته ندارد", Toast.LENGTH_SHORT).show() }
     }
+
+    // ✅ تابع اصلاح‌شده scheduleReminder با بررسی مجوز Alarm
     fun scheduleReminder(ts: Long) {
         val n = note ?: return
+
+        // بررسی permission برای Android 12+ (API 31+)
+        if (!ReminderScheduler.canScheduleExactAlarms(context)) {
+            Toast.makeText(context, "لطفاً دسترسی یادآور را از تنظیمات بدهید", Toast.LENGTH_LONG).show()
+            ReminderScheduler.requestExactAlarmPermission(context)
+            return
+        }
+
         note = n.copy(reminderAt = ts)
         ReminderScheduler.schedule(context, realId, n.title, ts)
+
+        // درخواست permission برای notification در Android 13+ (API 33+)
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+
         Toast.makeText(context, "یادآور تنظیم شد ⏰", Toast.LENGTH_SHORT).show()
     }
+
     fun exportPdf() {
         val n = note ?: return
         val pdfNote = if (isLocked) n.copy(body = "🔒 این یادداشت قفل است") else n
@@ -314,6 +337,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
                     Spacer(Modifier.height(6.dp))
 
                     if (!isLocked && attachments.isNotEmpty()) {
@@ -356,6 +380,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                         }
                     }
                 }
+
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(Modifier.fillMaxWidth(),
@@ -543,9 +568,8 @@ private fun ShamsiDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> U
     var jd by remember { mutableIntStateOf(jd0) }
     if (jd > FaDate.monthLength(jy, jm)) jd = FaDate.monthLength(jy, jm)
     val (gy, gm, gd) = FaDate.toGregorian(jy, jm, jd)
-
     AlertDialog(onDismissRequest = onDismiss,
-        title = { Text("📅 انتخاب تاریخ یادآور", fontFamily = LalezarFont, fontSize = 20.sp) },
+        title = { Text(" انتخاب تاریخ یادآور", fontFamily = LalezarFont, fontSize = 20.sp) },
         text = {
             Column {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -636,15 +660,15 @@ private fun ChecklistEditor(note: Note, onChange: (Note) -> Unit) {
         Spacer(Modifier.height(10.dp))
     }
     lines.forEachIndexed { i, line ->
-        val checked = line.startsWith("☑ ")
-        val text = line.removePrefix("☐ ").removePrefix("☑ ")
+        val checked = line.startsWith("☑  ")
+        val text = line.removePrefix("☐  ").removePrefix("☑  ")
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(checked = checked,
                 onCheckedChange = { onChange(note.copy(body = Checklist.toggleLine(note.body, i))) },
                 colors = CheckboxDefaults.colors(checkedColor = Saffron, checkmarkColor = Ink))
             TextField(value = text,
                 onValueChange = { v ->
-                    val mark = if (checked) "☑ " else "☐ "
+                    val mark = if (checked) "☑  " else "☐  "
                     val list = lines.toMutableList(); list[i] = mark + v
                     onChange(note.copy(body = list.joinToString("\n")))
                 },
@@ -654,7 +678,7 @@ private fun ChecklistEditor(note: Note, onChange: (Note) -> Unit) {
                 modifier = Modifier.weight(1f))
         }
     }
-    TextButton(onClick = { onChange(note.copy(body = note.body.trimEnd('\n') + "\n☐ ")) }) {
+    TextButton(onClick = { onChange(note.copy(body = note.body.trimEnd('\n') + "\n☐  ")) }) {
         Text("+ مورد جدید", color = Saffron, fontWeight = FontWeight.Bold)
     }
 }
@@ -721,12 +745,13 @@ private fun AttachmentsSection(
     }
 
     audios.forEach { att -> AudioAttachmentRow(att, { onShare(att) }, { onDelete(att) }) }
+
     docs.forEach { att ->
         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)
             .clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = .05f))
             .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically) {
-            Text("📄", fontSize = 18.sp)
+            Text("", fontSize = 18.sp)
             Spacer(Modifier.width(8.dp))
             Text(att.fileName, fontSize = 12.sp, color = Ink, maxLines = 1,
                 overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
