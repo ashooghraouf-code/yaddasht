@@ -44,7 +44,6 @@ sealed class Screen {
     data object Home : Screen()
     data class Editor(val noteId: Long) : Screen()
     data class Draw(val noteId: Long) : Screen()
-
     companion object {
         val SAVER: Saver<Screen, String> = Saver(
             save = { s ->
@@ -66,7 +65,6 @@ sealed class Screen {
 }
 
 class MainActivity : FragmentActivity() {
-
     private var sensorManager: SensorManager? = null
     private var shakeHits = 0
     private var lastHitTime = 0L
@@ -119,10 +117,10 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
-
         setContent {
             YaddashtTheme {
                 val dao = remember { AppDatabase.get(applicationContext).dao() }
+                val taskDao = remember { AppDatabase.get(applicationContext).taskDao() }
                 var authRequired by remember { mutableStateOf(false) }
                 var authChecked by remember { mutableStateOf(false) }
 
@@ -166,6 +164,7 @@ class MainActivity : FragmentActivity() {
                     when (val s = screen) {
                         is Screen.Home -> HomeScreen(
                             dao = dao,
+                            taskDao = taskDao,
                             onOpenNote = { screen = Screen.Editor(it) },
                             onNewNote = { screen = Screen.Editor(NEW_NOTE_ID) }
                         )
