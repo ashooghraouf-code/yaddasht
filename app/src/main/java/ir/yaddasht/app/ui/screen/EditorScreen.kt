@@ -69,7 +69,6 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import java.util.TimeZone
 
 private enum class LockMode { Set, Unlock }
 
@@ -236,7 +235,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        Toast.makeText(context, "یادآور تنظیم شد ", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "یادآور تنظیم شد ⏰", Toast.LENGTH_SHORT).show()
     }
 
     fun exportPdf() {
@@ -258,7 +257,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                 IconButton(onClick = exit) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = PaperWhite)
                 }
-                Text(if (isLocked) " یادداشت محرمانه" else "یادداشت",
+                Text(if (isLocked) "🔒 یادداشت محرمانه" else "یادداشت",
                     fontFamily = LalezarFont, fontSize = 20.sp, color = PaperWhite,
                     modifier = Modifier.weight(1f).padding(start = 4.dp))
                 IconButton(onClick = { note = note?.copy(pinned = !(note?.pinned ?: false)) }) {
@@ -421,7 +420,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
 
     lockMode?.let { mode ->
         AlertDialog(onDismissRequest = { lockMode = null },
-            title = { Text(if (mode == LockMode.Set) " گذاشتن رمز" else "🔓 باز کردن قفل",
+            title = { Text(if (mode == LockMode.Set) "🔒 گذاشتن رمز" else "🔓 باز کردن قفل",
                 fontFamily = LalezarFont, fontSize = 20.sp) },
             text = {
                 Column {
@@ -469,7 +468,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                                 if (rec != null) {
                                     note = note?.copy(body = rec); lockMode = null
                                     Toast.makeText(context, "با کد بازیابی باز شد 🔑", Toast.LENGTH_SHORT).show()
-                                } else lockError = "رمز یا کد بازیابی اشتباه است! "
+                                } else lockError = "رمز یا کد بازیابی اشتباه است! ❌"
                             }
                         }
                     }
@@ -500,15 +499,13 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         )
     }
 
-    // ✅ بخش اصلاح‌شده: استفاده از Calendar با timezone تهران
     if (showTimePicker) {
         val timePickerState = rememberTimePickerState()
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    // ✅ استفاده از Calendar با timezone تهران برای جلوگیری از جابجایی
-                    val local = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tehran")).apply {
+                    val local = Calendar.getInstance().apply {
                         timeInMillis = pickedDate
                         set(Calendar.HOUR_OF_DAY, timePickerState.hour)
                         set(Calendar.MINUTE, timePickerState.minute)
@@ -518,7 +515,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                     if (local.timeInMillis > System.currentTimeMillis()) scheduleReminder(local.timeInMillis)
                     else Toast.makeText(context, "این زمان گذشته است!", Toast.LENGTH_SHORT).show()
                     showTimePicker = false
-                }) { Text("تنظیم ", color = Saffron, fontWeight = FontWeight.Bold) }
+                }) { Text("تنظیم ⏰", color = Saffron, fontWeight = FontWeight.Bold) }
             },
             dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("انصراف") } },
             text = { TimePicker(timePickerState) }
@@ -551,7 +548,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     }
 }
 
-// ✅ بخش اصلاح‌شده: ساخت تاریخ با timezone تهران
 @Composable
 private fun ShamsiDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) {
     val (jy0, jm0, jd0) = FaDate.jalali(System.currentTimeMillis())
@@ -582,10 +578,11 @@ private fun ShamsiDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> U
         },
         confirmButton = {
             TextButton(onClick = {
-                // ✅ ساخت تاریخ با timezone تهران برای جلوگیری از جابجایی
-                val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tehran"))
+                // ✅✅✅ اصلاح قطعی: FaDate.epoch حذف شد! ✅✅✅
+                // میلی‌ثانیه مستقیم از معادل میلادیِ درست (که روی صفحه می‌بینی) ساخته می‌شود
+                val cal = Calendar.getInstance()
+                cal.clear()
                 cal.set(gy, gm - 1, gd, 0, 0, 0)
-                cal.set(Calendar.MILLISECOND, 0)
                 onConfirm(cal.timeInMillis)
             }) { Text("ادامه", color = Saffron, fontWeight = FontWeight.Bold) }
         },
@@ -658,15 +655,15 @@ private fun ChecklistEditor(note: Note, onChange: (Note) -> Unit) {
         Spacer(Modifier.height(10.dp))
     }
     lines.forEachIndexed { i, line ->
-        val checked = line.startsWith("☑  ")
-        val text = line.removePrefix("☐  ").removePrefix("☑  ")
+        val checked = line.startsWith("☑ ")
+        val text = line.removePrefix("☐ ").removePrefix("☑ ")
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(checked = checked,
                 onCheckedChange = { onChange(note.copy(body = Checklist.toggleLine(note.body, i))) },
                 colors = CheckboxDefaults.colors(checkedColor = Saffron, checkmarkColor = Ink))
             TextField(value = text,
                 onValueChange = { v ->
-                    val mark = if (checked) "☑  " else "☐  "
+                    val mark = if (checked) "☑ " else "☐ "
                     val list = lines.toMutableList(); list[i] = mark + v
                     onChange(note.copy(body = list.joinToString("\n")))
                 },
@@ -676,7 +673,7 @@ private fun ChecklistEditor(note: Note, onChange: (Note) -> Unit) {
                 modifier = Modifier.weight(1f))
         }
     }
-    TextButton(onClick = { onChange(note.copy(body = note.body.trimEnd('\n') + "\n☐  ")) }) {
+    TextButton(onClick = { onChange(note.copy(body = note.body.trimEnd('\n') + "\n☐ ")) }) {
         Text("+ مورد جدید", color = Saffron, fontWeight = FontWeight.Bold)
     }
 }
