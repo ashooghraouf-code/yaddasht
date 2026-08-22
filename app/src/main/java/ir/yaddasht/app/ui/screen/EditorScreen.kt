@@ -228,7 +228,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         catch (e: Exception) { Toast.makeText(context, "این دستگاه دیکته ندارد", Toast.LENGTH_SHORT).show() }
     }
 
-    // ✅ تابع اصلاح‌شده scheduleReminder با بررسی مجوز Alarm
     fun scheduleReminder(ts: Long) {
         val n = note ?: return
 
@@ -253,7 +252,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
 
     fun exportPdf() {
         val n = note ?: return
-        val pdfNote = if (isLocked) n.copy(body = "🔒 این یادداشت قفل است") else n
+        val pdfNote = if (isLocked) n.copy(body = " این یادداشت قفل است") else n
         scope.launch(Dispatchers.IO) {
             val file = PdfExporter.exportNote(context, pdfNote)
             withContext(Dispatchers.Main) {
@@ -292,7 +291,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                     lockError = ""; pass1 = ""; pass2 = ""
                     lockMode = if (isLocked) LockMode.Unlock else LockMode.Set
                 }
-                ToolChip("⏰", "یادآور") { showDatePicker = true }
+                ToolChip("", "یادآور") { showDatePicker = true }
                 ToolChip("✅", if (isChecklist) "خروج از چک‌لیست" else "چک‌لیست") {
                     if (!isLocked) note?.let { n ->
                         note = n.copy(body = if (isChecklist) Checklist.fromChecklist(n.body)
@@ -480,7 +479,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                                 val rec = Recovery.tryRecover(context, realId, pass1)
                                 if (rec != null) {
                                     note = note?.copy(body = rec); lockMode = null
-                                    Toast.makeText(context, "با کد بازیابی باز شد 🔑", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "با کد بازیابی باز شد ", Toast.LENGTH_SHORT).show()
                                 } else lockError = "رمز یا کد بازیابی اشتباه است! ❌"
                             }
                         }
@@ -492,7 +491,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
 
     showRecoveryCode?.let { code ->
         AlertDialog(onDismissRequest = { showRecoveryCode = null },
-            title = { Text("🔑 کد بازیابی", fontFamily = LalezarFont, fontSize = 20.sp) },
+            title = { Text(" کد بازیابی", fontFamily = LalezarFont, fontSize = 20.sp) },
             text = {
                 Column {
                     Text("این کد را جای امن بنویس! اگه روزی رمزت را فراموش کردی، با همین کد می‌تونی یادداشت را باز کنی:")
@@ -512,22 +511,25 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         )
     }
 
+    // ✅ بخش اصلاح‌شده: استفاده از timezone تهران برای جلوگیری از جابجایی تاریخ
     if (showTimePicker) {
         val timePickerState = rememberTimePickerState()
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    val local = Calendar.getInstance().apply {
+                    // ✅ استفاده از timezone تهران برای جلوگیری از جابجایی تاریخ
+                    val local = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tehran")).apply {
                         timeInMillis = pickedDate
                         set(Calendar.HOUR_OF_DAY, timePickerState.hour)
                         set(Calendar.MINUTE, timePickerState.minute)
                         set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
                     }
                     if (local.timeInMillis > System.currentTimeMillis()) scheduleReminder(local.timeInMillis)
                     else Toast.makeText(context, "این زمان گذشته است!", Toast.LENGTH_SHORT).show()
                     showTimePicker = false
-                }) { Text("تنظیم ⏰", color = Saffron, fontWeight = FontWeight.Bold) }
+                }) { Text("تنظیم ", color = Saffron, fontWeight = FontWeight.Bold) }
             },
             dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("انصراف") } },
             text = { TimePicker(timePickerState) }
@@ -569,7 +571,7 @@ private fun ShamsiDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> U
     if (jd > FaDate.monthLength(jy, jm)) jd = FaDate.monthLength(jy, jm)
     val (gy, gm, gd) = FaDate.toGregorian(jy, jm, jd)
     AlertDialog(onDismissRequest = onDismiss,
-        title = { Text(" انتخاب تاریخ یادآور", fontFamily = LalezarFont, fontSize = 20.sp) },
+        title = { Text("📅 انتخاب تاریخ یادآور", fontFamily = LalezarFont, fontSize = 20.sp) },
         text = {
             Column {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -654,7 +656,7 @@ private fun ChecklistEditor(note: Note, onChange: (Note) -> Unit) {
         }
         if (done == total) {
             Spacer(Modifier.height(8.dp))
-            Text("🎉 آفرین! همهٔ کارها انجام شد", color = Color(0xFF2E7D52),
+            Text("🎉 آفرین! همه کارها انجام شد", color = Color(0xFF2E7D52),
                 fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
         Spacer(Modifier.height(10.dp))
@@ -751,7 +753,7 @@ private fun AttachmentsSection(
             .clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = .05f))
             .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically) {
-            Text("", fontSize = 18.sp)
+            Text("📄", fontSize = 18.sp)
             Spacer(Modifier.width(8.dp))
             Text(att.fileName, fontSize = 12.sp, color = Ink, maxLines = 1,
                 overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
