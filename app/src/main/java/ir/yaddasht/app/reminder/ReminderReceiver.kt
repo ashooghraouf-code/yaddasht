@@ -32,7 +32,6 @@ class ReminderReceiver : BroadcastReceiver() {
             .setContentIntent(pi)
             .setVibrate(longArrayOf(0, 600, 250, 600))
             .build()
-        // 🔔 زنگ مداوم تا وقتی کاربر لمس نکند (اگر خواستی قطع شود، خط زیر را حذف کن)
         notification.flags = notification.flags or Notification.FLAG_INSISTENT
 
         try {
