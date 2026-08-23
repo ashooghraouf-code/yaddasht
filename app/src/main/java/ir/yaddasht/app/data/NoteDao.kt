@@ -1,53 +1,55 @@
 package ir.yaddasht.app.data
 
-import androidx.room.Dao
-import androidx.room.Query
-import androidx.room.Insert
-import androidx.room.Update
-import androidx.room.Delete
+import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface NoteDao {
-    @Query("SELECT * FROM notes ORDER BY pinned DESC, updatedAt DESC")
+    @Query("SELECT * FROM notes ORDER BY updatedAt DESC")
     fun observeNotes(): Flow<List<Note>>
+
+    @Query("SELECT * FROM notes ORDER BY updatedAt DESC")
+    fun getAllNotes(): Flow<List<Note>>
+
+    @Query("SELECT * FROM notes ORDER BY updatedAt DESC")
+    fun allNotesSync(): List<Note>
 
     @Query("SELECT * FROM notes WHERE id = :id")
     fun observeNote(id: Long): Flow<Note?>
 
-    @Insert
+    @Query("SELECT * FROM notes WHERE id = :id")
+    suspend fun getNoteById(id: Long): Note?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(note: Note): Long
 
     @Update
     suspend fun update(note: Note)
 
+    @Delete
+    suspend fun delete(note: Note)
+
     @Query("DELETE FROM notes WHERE id = :id")
     suspend fun deleteById(id: Long)
 
-    @Query("SELECT * FROM attachments WHERE noteId = :noteId ORDER BY id")
+    @Query("SELECT * FROM attachments WHERE noteId = :noteId ORDER BY id ASC")
     fun observeAttachments(noteId: Long): Flow<List<Attachment>>
+
+    @Query("SELECT * FROM attachments")
+    fun allAttachments(): List<Attachment>
 
     @Query("SELECT * FROM attachments WHERE noteId = :noteId")
     suspend fun attachmentsByNote(noteId: Long): List<Attachment>
 
-    @Insert
+    @Query("SELECT COUNT(*) FROM attachments WHERE noteId = :noteId")
+    suspend fun attachmentCount(noteId: Long): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAttachment(attachment: Attachment): Long
 
     @Delete
     suspend fun deleteAttachment(attachment: Attachment)
 
-    @Query("SELECT COUNT(*) FROM attachments WHERE noteId = :noteId")
-    suspend fun attachmentCount(noteId: Long): Int
-
-    @Query("SELECT noteId, COUNT(*) AS count FROM attachments GROUP BY noteId")
+    @Query("SELECT noteId, COUNT(*) as count FROM attachments GROUP BY noteId")
     fun observeAttachmentCounts(): Flow<List<AttachmentCount>>
-
-    @Query("SELECT * FROM notes ORDER BY updatedAt DESC LIMIT 1")
-    suspend fun latestNote(): Note?
-
-    @Query("SELECT * FROM notes")
-    suspend fun allNotesSync(): List<Note>
-
-    @Query("SELECT * FROM attachments")
-    suspend fun allAttachments(): List<Attachment>
 }
