@@ -59,6 +59,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -141,6 +142,7 @@ fun HomeScreen(
     var showStats by remember { mutableStateOf(false) }
     var hideMemory by rememberSaveable { mutableStateOf(false) }
     var showAddTask by remember { mutableStateOf(false) }
+    var newTaskOnDate by remember { mutableLongStateOf(0L) }
 
     val (tjy, tjm, tjd) = FaDate.jalali(System.currentTimeMillis())
     var calJy by remember { mutableIntStateOf(tjy) }
@@ -282,6 +284,15 @@ fun HomeScreen(
                                 IconButton(onClick = { if (calJm < 12) calJm++ else { calJm = 1; calJy++ } }) { Icon(Icons.Filled.ChevronLeft, "بعد", tint = Saffron) }
                             }
                             Spacer(Modifier.height(6.dp))
+
+                            // راهنما
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                                LegendItem(Color(0xFFE5484D), "وظیفه نزدیک")
+                                LegendItem(Color(0xFF46A758), "وظیفه دور")
+                                LegendItem(Saffron, "یادآور یادداشت")
+                            }
+                            Spacer(Modifier.height(4.dp))
+
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                                 WeekDaysFa.forEach { w -> Text(w, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Saffron, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
                             }
@@ -297,19 +308,46 @@ fun HomeScreen(
                                             val dayItems = itemsByDay[Triple(calJy, calJm, d)].orEmpty()
                                             val isToday = calJy == tjy && calJm == tjm && d == tjd
                                             val isSel = calDay == d
-                                            Column(Modifier.weight(1f).height(72.dp)
+                                            Box(Modifier.weight(1f).height(72.dp)
                                                 .clip(RoundedCornerShape(12.dp))
                                                 .background(if (isSel) DeepGreenSoft else Color.Transparent)
                                                 .border(if (isToday) 1.5.dp else 0.dp, Saffron, RoundedCornerShape(12.dp))
-                                                .clickable { calDay = d }
-                                                .padding(3.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text(d.fa(), fontSize = 12.sp, color = if (isToday) Saffron else PaperWhite,
-                                                    fontWeight = if (isToday || isSel) FontWeight.Bold else FontWeight.Normal)
-                                                dayItems.take(2).forEach { item ->
-                                                    Box(Modifier.fillMaxWidth().height(7.dp).padding(top = 2.dp).clip(RoundedCornerShape(3.dp))
-                                                        .background(taskTint(item.second, item.third)))
+                                                .combinedClickable(
+                                                    onClick = { calDay = d },
+                                                    onLongClick = {
+                                                        calDay = d
+                                                        val m = dayMillis(calJy, calJm, d)
+                                                        newTaskOnDate = m
+                                                    }
+                                                )
+                                                .padding(3.dp)) {
+                                                Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Text(d.fa(), fontSize = 12.sp, color = if (isToday) Saffron else PaperWhite,
+                                                        fontWeight = if (isToday || isSel) FontWeight.Bold else FontWeight.Normal)
+                                                    // نوارهای رنگی تفکیکی
+                                                    val taskItems = dayItems.filter { it.first.startsWith("task:") }
+                                                    val noteItems = dayItems.filter { it.first.startsWith("note:") }
+                                                    taskItems.take(2).forEach { item ->
+                                                        Box(Modifier.fillMaxWidth().height(6.dp).padding(top = 2.dp).clip(RoundedCornerShape(3.dp))
+                                                            .background(taskTint(item.second, item.third)))
+                                                    }
+                                                    noteItems.take(2 - taskItems.size.coerceAtMost(2)).forEach { _ ->
+                                                        Box(Modifier.fillMaxWidth().height(6.dp).padding(top = 2.dp).clip(RoundedCornerShape(3.dp))
+                                                            .background(Saffron))
+                                                    }
+                                                    if (dayItems.size > 2) Text("+${(dayItems.size - 2).fa()}", fontSize = 8.sp, color = MutedGreenText)
                                                 }
-                                                if (dayItems.size > 2) Text("+${(dayItems.size - 2).fa()}", fontSize = 8.sp, color = MutedGreenText)
+                                                // دکمه + کوچک گوشه
+                                                if (dayItems.isNotEmpty() || isSel || isToday) {
+                                                    Box(Modifier.align(Alignment.BottomEnd).size(18.dp)
+                                                        .clip(CircleShape).background(Saffron)
+                                                        .clickable {
+                                                            calDay = d
+                                                            newTaskOnDate = dayMillis(calJy, calJm, d)
+                                                        }, contentAlignment = Alignment.Center) {
+                                                        Text("+", fontSize = 12.sp, color = Ink, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -318,7 +356,17 @@ fun HomeScreen(
                                 Spacer(Modifier.height(3.dp))
                             }
                             Spacer(Modifier.height(10.dp))
-                            Text("یادآورها و وظایف ${calDay.fa()} ${FaDate.monthName(calJm)}:", fontFamily = LalezarFont, fontSize = 16.sp, color = Saffron)
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text("📍 ${calDay.fa()} ${FaDate.monthName(calJm)}", fontFamily = LalezarFont, fontSize = 16.sp, color = Saffron, modifier = Modifier.weight(1f))
+                                Surface(onClick = { newTaskOnDate = dayMillis(calJy, calJm, calDay) },
+                                    shape = RoundedCornerShape(10.dp), color = Saffron) {
+                                    Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Filled.Add, null, tint = Ink, modifier = Modifier.size(14.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("وظیفه جدید", fontSize = 11.sp, color = Ink, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
                             Spacer(Modifier.height(6.dp))
                             val selItems = itemsByDay[Triple(calJy, calJm, calDay)].orEmpty()
                             if (selItems.isEmpty()) Text("برای این روز یادآور یا وظیفه‌ای نیست 🌤️", fontSize = 12.sp, color = MutedGreenText)
@@ -365,6 +413,18 @@ fun HomeScreen(
             Toast.makeText(context, "وظیفه اضافه شد ✅", Toast.LENGTH_SHORT).show()
         })
 
+    // ✅ دیالوگ افزودن وظیفه روی تاریخ مشخص (با کلیک طولانی یا دکمه +)
+    if (newTaskOnDate > 0) {
+        AddTaskDialog(
+            initialDate = newTaskOnDate,
+            onDismiss = { newTaskOnDate = 0L },
+            onSave = { title, due, pr ->
+                scope.launch(Dispatchers.IO) { taskDao.insert(Task(title = title, dueDate = due, priority = pr)) }
+                newTaskOnDate = 0L
+                Toast.makeText(context, "وظیفه برای ${FaDate.full(due)} اضافه شد ✅", Toast.LENGTH_SHORT).show()
+            })
+    }
+
     noteToDelete?.let { note ->
         AlertDialog(onDismissRequest = { noteToDelete = null },
             title = { Text("حذف یادداشت؟", fontFamily = LalezarFont, fontSize = 20.sp) },
@@ -380,6 +440,15 @@ fun HomeScreen(
                 }) { Text("حذف", color = Brick, fontWeight = FontWeight.Bold) }
             },
             dismissButton = { TextButton(onClick = { noteToDelete = null }) { Text("انصراف") } })
+    }
+}
+
+@Composable
+private fun LegendItem(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(10.dp).clip(RoundedCornerShape(2.dp)).background(color))
+        Spacer(Modifier.width(4.dp))
+        Text(label, fontSize = 9.sp, color = MutedGreenText)
     }
 }
 
@@ -404,24 +473,61 @@ private fun TaskCard(task: Task, onClick: () -> Unit, onToggle: () -> Unit, onDe
     }
 }
 
+// ✅ دیالوگ بهبودیافته با قابلیت دریافت تاریخ اولیه
 @Composable
-private fun AddTaskDialog(onDismiss: () -> Unit, onSave: (String, Long, Priority) -> Unit) {
+private fun AddTaskDialog(initialDate: Long = 0L, onDismiss: () -> Unit, onSave: (String, Long, Priority) -> Unit) {
     var title by remember { mutableStateOf("") }
-    var dueOpt by remember { mutableIntStateOf(0) }
+    var dueDate by remember { mutableLongStateOf(initialDate) }
+    var showCalendar by remember { mutableStateOf(false) }
     var priority by remember { mutableStateOf(Priority.NORMAL) }
+
     AlertDialog(onDismissRequest = onDismiss,
         title = { Text("✅ وظیفه جدید", fontFamily = LalezarFont, fontSize = 20.sp) },
         text = {
             Column {
                 OutlinedTextField(title, { title = it }, label = { Text("عنوان وظیفه") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    DueChip("بدون تاریخ", dueOpt == 0) { dueOpt = 0 }
-                    DueChip("امروز", dueOpt == 1) { dueOpt = 1 }
-                    DueChip("فردا", dueOpt == 2) { dueOpt = 2 }
-                    DueChip("هفته بعد", dueOpt == 3) { dueOpt = 3 }
+
+                // نمایش تاریخ انتخاب‌شده + دکمه تقویم
+                Surface(onClick = { showCalendar = true },
+                    shape = RoundedCornerShape(12.dp),
+                    color = DeepGreenSoft,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, LineGreen)) {
+                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("📅", fontSize = 18.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("سررسید", fontSize = 10.sp, color = MutedGreenText)
+                            Text(if (dueDate > 0) FaDate.full(dueDate) else "انتخاب نشده",
+                                fontSize = 13.sp, color = if (dueDate > 0) Saffron else PaperWhite,
+                                fontWeight = FontWeight.Bold)
+                        }
+                        if (dueDate > 0) {
+                            IconButton(onClick = { dueDate = 0L }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Filled.Close, "حذف", tint = Brick, modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    }
                 }
+
                 Spacer(Modifier.height(12.dp))
+                Text("سرعتی:", fontSize = 12.sp, color = MutedGreenText)
+                Spacer(Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    QuickDateChip("امروز", onClick = {
+                        dueDate = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 21); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis
+                    })
+                    QuickDateChip("فردا", onClick = {
+                        dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1); set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0) }.timeInMillis
+                    })
+                    QuickDateChip("هفته بعد", onClick = {
+                        dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 7) }.timeInMillis
+                    })
+                }
+
+                Spacer(Modifier.height(12.dp))
+                Text("اولویت:", fontSize = 12.sp, color = MutedGreenText)
+                Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     DueChip("🔴 مهم", priority == Priority.HIGH) { priority = Priority.HIGH }
                     DueChip("🟡 عادی", priority == Priority.NORMAL) { priority = Priority.NORMAL }
@@ -430,19 +536,30 @@ private fun AddTaskDialog(onDismiss: () -> Unit, onSave: (String, Long, Priority
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                if (title.isNotBlank()) {
-                    val due = when (dueOpt) {
-                        1 -> Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 21); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis
-                        2 -> Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1); set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0) }.timeInMillis
-                        3 -> Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 7) }.timeInMillis
-                        else -> 0L
-                    }
-                    onSave(title.trim(), due, priority)
-                }
-            }) { Text("افزودن", color = Saffron, fontWeight = FontWeight.Bold) }
+            TextButton(enabled = title.isNotBlank(), onClick = {
+                onSave(title.trim(), dueDate, priority)
+            }) { Text("افزودن", color = if (title.isNotBlank()) Saffron else Color.Gray, fontWeight = FontWeight.Bold) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } })
+
+    if (showCalendar) {
+        ShamsiCalendarPickerDialog(
+            onConfirm = { millis ->
+                // ساعت پیش‌فرض ۲۱:۰۰ روی تاریخ انتخاب‌شده
+                val finalTime = millis + 21L * 3600_000
+                dueDate = finalTime
+                showCalendar = false
+            },
+            onDismiss = { showCalendar = false })
+    }
+}
+
+@Composable
+private fun QuickDateChip(label: String, onClick: () -> Unit) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(10.dp), color = DeepGreenSoft,
+        border = androidx.compose.foundation.BorderStroke(1.dp, LineGreen)) {
+        Text(label, Modifier.padding(horizontal = 10.dp, vertical = 6.dp), fontSize = 11.sp, color = PaperWhite)
+    }
 }
 
 @Composable
