@@ -141,7 +141,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             onBack()
         }
     }
-
     BackHandler(onBack = exit)
 
     val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
@@ -170,12 +169,9 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         val file = AttachmentStore.createAudioFile(context)
         val r = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(context) else @Suppress("DEPRECATION") MediaRecorder()
         try {
-            r.setAudioSource(MediaRecorder.AudioSource.MIC)
-            r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            r.setOutputFile(file.absolutePath)
-            r.prepare(); r.start()
-            recorder = r; recordingFile = file; recordSeconds = 0
+            r.setAudioSource(MediaRecorder.AudioSource.MIC); r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC); r.setOutputFile(file.absolutePath)
+            r.prepare(); r.start(); recorder = r; recordingFile = file; recordSeconds = 0
         } catch (e: Exception) { r.release(); Toast.makeText(context, "ضبط شروع نشد", Toast.LENGTH_SHORT).show() }
     }
     fun stopRecording() {
@@ -199,8 +195,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     fun launchSpeech() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "حرف بزن… 🎙️")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR"); putExtra(RecognizerIntent.EXTRA_PROMPT, "حرف بزن… 🎙️")
         }
         try { speechLauncher.launch(intent) } catch (e: Exception) { Toast.makeText(context, "این دستگاه دیکته ندارد", Toast.LENGTH_SHORT).show() }
     }
@@ -208,8 +203,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         val n = note ?: return
         note = n.copy(reminderAt = ts)
         ReminderScheduler.schedule(context, realId, n.title, ts)
-        if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
             notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         Toast.makeText(context, "یادآور تنظیم شد ⏰", Toast.LENGTH_SHORT).show()
     }
@@ -219,8 +213,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         scope.launch(Dispatchers.IO) {
             val file = PdfExporter.exportNote(context, pdfNote)
             withContext(Dispatchers.Main) {
-                if (file != null) sharePdf(context, file, n.title)
-                else Toast.makeText(context, "ساخت PDF ناموفق بود", Toast.LENGTH_SHORT).show()
+                if (file != null) sharePdf(context, file, n.title) else Toast.makeText(context, "ساخت PDF ناموفق بود", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -229,8 +222,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         Column(Modifier.fillMaxSize().padding(padding)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = exit) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = PaperWhite) }
-                Text(if (isLocked) "🔒 یادداشت محرمانه" else "یادداشت",
-                    fontFamily = LalezarFont, fontSize = 20.sp, color = PaperWhite,
+                Text(if (isLocked) "🔒 یادداشت محرمانه" else "یادداشت", fontFamily = LalezarFont, fontSize = 20.sp, color = PaperWhite,
                     modifier = Modifier.weight(1f).padding(start = 4.dp))
                 IconButton(onClick = { note = note?.copy(pinned = !(note?.pinned ?: false)) }) {
                     Icon(Icons.Filled.PushPin, "سنجاق", tint = if (note?.pinned == true) Saffron else Color(0xFF5E8077))
@@ -240,21 +232,17 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                 }
                 IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Filled.Delete, "حذف", tint = Brick) }
             }
-
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ToolChip("🔒", if (isLocked) "باز کن" else "قفل") { lockError = ""; pass1 = ""; pass2 = ""; lockMode = if (isLocked) LockMode.Unlock else LockMode.Set }
                 ToolChip("⏰", "یادآور") { showDatePicker = true }
                 ToolChip("✅", if (isChecklist) "خروج از چک‌لیست" else "چک‌لیست") {
-                    if (!isLocked) note?.let { n ->
-                        note = n.copy(body = if (isChecklist) Checklist.fromChecklist(n.body) else Checklist.toChecklist(n.body))
-                    }
+                    if (!isLocked) note?.let { n -> note = n.copy(body = if (isChecklist) Checklist.fromChecklist(n.body) else Checklist.toChecklist(n.body)) }
                 }
                 ToolChip("🗣️", "دیکته") { if (!isLocked) launchSpeech() }
                 ToolChip("📄", "PDF") { if (!isLocked) exportPdf() }
                 ToolChip("✒️", "تمرکز") { if (!isLocked && !isChecklist) showFocus = true }
             }
-
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(paperColor(note?.color ?: 0)).padding(16.dp)) {
                     val rem = note?.reminderAt ?: 0
@@ -263,11 +251,9 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                             .padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("⏰ یادآور: " + FaDate.full(rem) + " – " + SimpleDateFormat("HH:mm", Locale.US).format(Date(rem)),
                                 fontSize = 12.sp, color = Ink, modifier = Modifier.weight(1f))
-                            Icon(Icons.Filled.Close, "لغو یادآور", tint = Brick,
-                                modifier = Modifier.size(20.dp).clickable {
-                                    note = note?.copy(reminderAt = 0)
-                                    ReminderScheduler.cancel(context, realId)
-                                })
+                            Icon(Icons.Filled.Close, "لغو یادآور", tint = Brick, modifier = Modifier.size(20.dp).clickable {
+                                note = note?.copy(reminderAt = 0); ReminderScheduler.cancel(context, realId)
+                            })
                         }
                         Spacer(Modifier.height(10.dp))
                     }
@@ -277,10 +263,8 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                         colors = transparentFieldColors(), singleLine = true, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(6.dp))
                     if (!isLocked && attachments.isNotEmpty()) {
-                        AttachmentsSection(attachments,
-                            onImageClick = { viewerImage = it },
-                            onShare = { shareAttachment(context, it) },
-                            onDelete = { att -> scope.launch(Dispatchers.IO) { dao.deleteAttachment(att); File(att.filePath).delete() } })
+                        AttachmentsSection(attachments, { viewerImage = it }, { shareAttachment(context, it) },
+                            { att -> scope.launch(Dispatchers.IO) { dao.deleteAttachment(att); File(att.filePath).delete() } })
                         Spacer(Modifier.height(10.dp))
                     }
                     when {
@@ -294,14 +278,12 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                 }
                 Spacer(Modifier.height(24.dp))
             }
-
             Column(Modifier.fillMaxWidth().background(DeepGreen)) {
                 AnimatedVisibility(showPalette) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 6.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                         PaperColors.forEachIndexed { i, c ->
                             Box(Modifier.size(32.dp).clip(CircleShape).background(c)
-                                .border(if ((note?.color ?: 0) == i) 3.dp else 1.dp,
-                                    if ((note?.color ?: 0) == i) Saffron else Color.Black.copy(alpha = .2f), CircleShape)
+                                .border(if ((note?.color ?: 0) == i) 3.dp else 1.dp, if ((note?.color ?: 0) == i) Saffron else Color.Black.copy(alpha = .2f), CircleShape)
                                 .clickable { note = note?.copy(color = i) })
                         }
                     }
@@ -311,10 +293,8 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                         if (recorder != null) RecordStopPill(recordSeconds, ::stopRecording)
                         else AttachButton("صدا", Icons.Filled.Mic, Modifier.weight(1f), ::micClick)
                         AttachButton("دوربین", Icons.Filled.CameraAlt, Modifier.weight(1f)) {
-                            val file = AttachmentStore.createCameraFile(context)
-                            pendingCameraFile = file
-                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                            takePicture.launch(uri)
+                            val file = AttachmentStore.createCameraFile(context); pendingCameraFile = file
+                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file); takePicture.launch(uri)
                         }
                         AttachButton("گالری", Icons.Filled.Image, Modifier.weight(1f)) { pickImages.launch("image/*") }
                     }
@@ -405,14 +385,13 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                 Column {
                     Text("این کد را جای امن بنویس! اگه روزی رمزت را فراموش کردی، با همین کد می‌تونی یادداشت را باز کنی:")
                     Spacer(Modifier.height(12.dp))
-                    Text(code, fontFamily = LalezarFont, fontSize = 30.sp, color = Saffron,
-                        modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    Text(code, fontFamily = LalezarFont, fontSize = 30.sp, color = Saffron, modifier = Modifier.fillMaxWidth(),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 }
             },
             confirmButton = { TextButton(onClick = { showRecoveryCode = null }) { Text("ذخیره کردم ✅", color = Saffron, fontWeight = FontWeight.Bold) } })
     }
 
-    // ✅ تقویم دیواری جدید
     if (showDatePicker) {
         ShamsiCalendarPickerDialog(
             onConfirm = { pickedDate = it; showDatePicker = false; showTimePicker = true },
@@ -420,32 +399,26 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     }
 
     if (showTimePicker) {
-        val timePickerState = rememberTimePickerState()
+        val st = rememberTimePickerState()
         AlertDialog(onDismissRequest = { showTimePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    // ✅ جمع مستقیم میلی‌ثانیه — بدون پرش ماه
-                    val finalTime = pickedDate + timePickerState.hour.toLong() * 3600_000 + timePickerState.minute.toLong() * 60_000
+                    val finalTime = pickedDate + st.hour.toLong() * 3600_000 + st.minute.toLong() * 60_000
                     if (finalTime > System.currentTimeMillis()) scheduleReminder(finalTime)
                     else Toast.makeText(context, "این زمان گذشته است!", Toast.LENGTH_SHORT).show()
                     showTimePicker = false
                 }) { Text("تنظیم ⏰", color = Saffron, fontWeight = FontWeight.Bold) }
             },
             dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("انصراف") } },
-            text = { TimePicker(timePickerState) })
+            text = { TimePicker(st) })
     }
 
     viewerImage?.let { att ->
         Dialog(onDismissRequest = { viewerImage = null }) {
             Box(Modifier.fillMaxSize().background(Color(0xFF06100E))) {
-                AsyncImage(model = File(att.filePath), contentDescription = att.fileName,
-                    contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
-                IconButton(onClick = { viewerImage = null }, modifier = Modifier.align(Alignment.TopStart).padding(10.dp)) {
-                    Icon(Icons.Filled.Close, "بستن", tint = Color.White)
-                }
-                IconButton(onClick = { shareAttachment(context, att) }, modifier = Modifier.align(Alignment.TopEnd).padding(10.dp)) {
-                    Icon(Icons.Filled.Share, "ارسال", tint = Saffron)
-                }
+                AsyncImage(model = File(att.filePath), contentDescription = att.fileName, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+                IconButton(onClick = { viewerImage = null }, modifier = Modifier.align(Alignment.TopStart).padding(10.dp)) { Icon(Icons.Filled.Close, "بستن", tint = Color.White) }
+                IconButton(onClick = { shareAttachment(context, att) }, modifier = Modifier.align(Alignment.TopEnd).padding(10.dp)) { Icon(Icons.Filled.Share, "ارسال", tint = Saffron) }
             }
         }
     }
@@ -477,9 +450,7 @@ private fun LockedBox(onUnlock: () -> Unit) {
         Text("🔒", fontSize = 42.sp); Spacer(Modifier.height(10.dp))
         Text("این یادداشت قفل است", fontFamily = LalezarFont, fontSize = 19.sp, color = Ink)
         Spacer(Modifier.height(14.dp))
-        Button(onClick = onUnlock, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = PaperWhite)) {
-            Text("باز کردن با رمز", fontFamily = VazirFont)
-        }
+        Button(onClick = onUnlock, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = PaperWhite)) { Text("باز کردن با رمز", fontFamily = VazirFont) }
     }
 }
 
@@ -492,8 +463,7 @@ private fun ChecklistEditor(note: Note, onChange: (Note) -> Unit) {
             LinearProgressIndicator(progress = { done.toFloat() / total.coerceAtLeast(1) },
                 modifier = Modifier.weight(1f).height(9.dp).clip(RoundedCornerShape(5.dp)),
                 color = if (done == total) Color(0xFF3E9B4F) else Saffron, trackColor = Color.Black.copy(alpha = .08f))
-            Spacer(Modifier.width(10.dp))
-            Text("${done.fa()}/${total.fa()}", fontFamily = LalezarFont, fontSize = 16.sp, color = Ink)
+            Spacer(Modifier.width(10.dp)); Text("${done.fa()}/${total.fa()}", fontFamily = LalezarFont, fontSize = 16.sp, color = Ink)
         }
         if (done == total) { Spacer(Modifier.height(8.dp)); Text("🎉 آفرین! همهٔ کارها انجام شد", color = Color(0xFF2E7D52), fontWeight = FontWeight.Bold, fontSize = 13.sp) }
         Spacer(Modifier.height(10.dp))
@@ -552,13 +522,11 @@ private fun AttachmentsSection(attachments: List<Attachment>,
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
             images.forEach { att ->
                 Box(Modifier.padding(end = 10.dp).size(96.dp).clip(RoundedCornerShape(14.dp))) {
-                    AsyncImage(model = File(att.filePath), contentDescription = att.fileName,
-                        contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clickable { onImageClick(att) })
-                    IconButton(onClick = { onDelete(att) }, modifier = Modifier.align(Alignment.TopStart).size(26.dp)
-                        .clip(CircleShape).background(Color.Black.copy(alpha = .45f))) {
+                    AsyncImage(model = File(att.filePath), contentDescription = att.fileName, contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clickable { onImageClick(att) })
+                    IconButton(onClick = { onDelete(att) }, modifier = Modifier.align(Alignment.TopStart).size(26.dp).clip(CircleShape).background(Color.Black.copy(alpha = .45f))) {
                         Icon(Icons.Filled.Close, null, tint = Color.White, modifier = Modifier.size(15.dp)) }
-                    IconButton(onClick = { onShare(att) }, modifier = Modifier.align(Alignment.TopEnd).size(26.dp)
-                        .clip(CircleShape).background(Color.Black.copy(alpha = .45f))) {
+                    IconButton(onClick = { onShare(att) }, modifier = Modifier.align(Alignment.TopEnd).size(26.dp).clip(CircleShape).background(Color.Black.copy(alpha = .45f))) {
                         Icon(Icons.Filled.Share, null, tint = Saffron, modifier = Modifier.size(15.dp)) }
                 }
             }
@@ -567,8 +535,7 @@ private fun AttachmentsSection(attachments: List<Attachment>,
     }
     audios.forEach { att -> AudioAttachmentRow(att, { onShare(att) }, { onDelete(att) }) }
     docs.forEach { att ->
-        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp))
-            .background(Color.Black.copy(alpha = .05f)).padding(horizontal = 10.dp, vertical = 6.dp),
+        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = .05f)).padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically) {
             Text("📄", fontSize = 18.sp); Spacer(Modifier.width(8.dp))
             Text(att.fileName, fontSize = 12.sp, color = Ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
@@ -583,16 +550,14 @@ private fun AudioAttachmentRow(att: Attachment, onShare: () -> Unit, onDelete: (
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
     var playing by remember { mutableStateOf(false) }
     DisposableEffect(att.id) { onDispose { player?.release() } }
-    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp))
-        .background(Saffron.copy(alpha = .18f)).padding(horizontal = 10.dp, vertical = 6.dp),
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(Saffron.copy(alpha = .18f)).padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Text("🎤", fontSize = 18.sp); Spacer(Modifier.width(8.dp))
         Text("پیام صوتی", fontSize = 12.sp, color = Ink, modifier = Modifier.weight(1f))
         IconButton(onClick = {
             if (playing) { player?.stop(); player?.release(); player = null; playing = false }
             else { player = MediaPlayer().apply { setDataSource(att.filePath); setOnCompletionListener { mp -> playing = false; mp.release() }; prepare(); start() }; playing = true }
-        }, modifier = Modifier.size(32.dp)) {
-            Icon(if (playing) Icons.Filled.Stop else Icons.Filled.PlayArrow, if (playing) "توقف" else "پخش", tint = Ink) }
+        }, modifier = Modifier.size(32.dp)) { Icon(if (playing) Icons.Filled.Stop else Icons.Filled.PlayArrow, if (playing) "توقف" else "پخش", tint = Ink) }
         IconButton(onClick = onShare, modifier = Modifier.size(30.dp)) { Icon(Icons.Filled.Share, "ارسال", tint = InkSoft, modifier = Modifier.size(16.dp)) }
         IconButton(onClick = onDelete, modifier = Modifier.size(30.dp)) { Icon(Icons.Filled.Close, "حذف", tint = Brick, modifier = Modifier.size(16.dp)) }
     }
