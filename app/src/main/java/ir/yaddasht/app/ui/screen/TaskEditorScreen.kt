@@ -2,7 +2,6 @@ package ir.yaddasht.app.ui.screen
 
 import android.Manifest
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaPlayer
@@ -14,13 +13,26 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,9 +40,44 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,7 +98,11 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
-import ir.yaddasht.app.data.*
+import ir.yaddasht.app.data.Attachment
+import ir.yaddasht.app.data.Note
+import ir.yaddasht.app.data.Task
+import ir.yaddasht.app.data.TaskAttachment
+import ir.yaddasht.app.data.TaskDao
 import ir.yaddasht.app.reminder.ReminderScheduler
 import ir.yaddasht.app.ui.theme.*
 import ir.yaddasht.app.util.*
@@ -102,8 +153,11 @@ fun TaskEditorScreen(taskDao: TaskDao, taskId: Long, onBack: () -> Unit, onOpenD
     LaunchedEffect(taskId) {
         val t = withContext(Dispatchers.IO) { taskDao.getTaskById(taskId) }
         if (t != null) {
-            task = t; title = t.title; desc = t.description
-            hasReminder = t.hasReminder; reminderAt = t.reminderTime
+            task = t
+            title = t.title
+            desc = t.description
+            hasReminder = t.hasReminder
+            reminderAt = t.reminderTime
         }
         loaded = true
     }
@@ -115,12 +169,16 @@ fun TaskEditorScreen(taskDao: TaskDao, taskId: Long, onBack: () -> Unit, onOpenD
         if (recorder != null) while (true) { delay(1000); recordSeconds++ }
     }
 
+    // ✅ بدون updatedAt (چون در Task وجود ندارد)
     fun saveTask() {
         val t = task ?: return
         scope.launch(Dispatchers.IO) {
-            taskDao.update(t.copy(title = title, description = desc,
-                hasReminder = hasReminder, reminderTime = reminderAt,
-                updatedAt = System.currentTimeMillis()))
+            taskDao.update(t.copy(
+                title = title,
+                description = desc,
+                hasReminder = hasReminder,
+                reminderTime = reminderAt
+            ))
         }
     }
 
@@ -160,8 +218,11 @@ fun TaskEditorScreen(taskDao: TaskDao, taskId: Long, onBack: () -> Unit, onOpenD
             r.setOutputFile(file.absolutePath)
             r.prepare(); r.start()
             recorder = r; recordingFile = file; recordSeconds = 0
-        } catch (e: Exception) { r.release(); Toast.makeText(context, "ضبط شروع نشد", Toast.LENGTH_SHORT).show() }
+        } catch (e: Exception) {
+            r.release(); Toast.makeText(context, "ضبط شروع نشد", Toast.LENGTH_SHORT).show()
+        }
     }
+
     fun stopRecording() {
         try { recorder?.stop() } catch (_: Exception) {}
         recorder?.release(); recorder = null
@@ -172,24 +233,31 @@ fun TaskEditorScreen(taskDao: TaskDao, taskId: Long, onBack: () -> Unit, onOpenD
             }
         } else { f?.delete(); Toast.makeText(context, "ضبط خیلی کوتاه بود", Toast.LENGTH_SHORT).show() }
     }
+
     val audioPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) startRecording() else Toast.makeText(context, "بدون میکروفون ضبط ممکن نیست", Toast.LENGTH_SHORT).show()
+        if (granted) startRecording()
+        else Toast.makeText(context, "بدون میکروفون ضبط ممکن نیست", Toast.LENGTH_SHORT).show()
     }
+
     fun micClick() {
         if (recorder != null) stopRecording()
         else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) startRecording()
         else audioPermission.launch(Manifest.permission.RECORD_AUDIO)
     }
+
     fun launchSpeech() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
             putExtra(RecognizerIntent.EXTRA_PROMPT, "حرف بزن… 🎙️")
         }
-        try { speechLauncher.launch(intent) } catch (e: Exception) { Toast.makeText(context, "دیکته در دسترس نیست", Toast.LENGTH_SHORT).show() }
+        try { speechLauncher.launch(intent) }
+        catch (e: Exception) { Toast.makeText(context, "دیکته در دسترس نیست", Toast.LENGTH_SHORT).show() }
     }
+
     fun scheduleReminder(ts: Long) {
-        hasReminder = true; reminderAt = ts
+        hasReminder = true
+        reminderAt = ts
         ReminderScheduler.schedule(context, taskId, title.ifBlank { "وظیفه" }, ts, isTask = true)
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
@@ -197,6 +265,7 @@ fun TaskEditorScreen(taskDao: TaskDao, taskId: Long, onBack: () -> Unit, onOpenD
         saveTask()
         Toast.makeText(context, "یادآور وظیفه تنظیم شد ⏰", Toast.LENGTH_SHORT).show()
     }
+
     fun exportPdf() {
         scope.launch(Dispatchers.IO) {
             val file = PdfExporter.exportNote(context, Note(title = title.ifBlank { "وظیفه" }, body = if (isLocked) "🔒 قفل است" else desc))
@@ -221,7 +290,10 @@ fun TaskEditorScreen(taskDao: TaskDao, taskId: Long, onBack: () -> Unit, onOpenD
 
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TToolChip("🔒", if (isLocked) "باز کن" else "قفل") { lockError = ""; pass1 = ""; pass2 = ""; lockMode = if (isLocked) TLockMode.Unlock else TLockMode.Set }
+                TToolChip("🔒", if (isLocked) "باز کن" else "قفل") {
+                    lockError = ""; pass1 = ""; pass2 = ""
+                    lockMode = if (isLocked) TLockMode.Unlock else TLockMode.Set
+                }
                 TToolChip("⏰", "یادآور") { showDatePicker = true }
                 TToolChip("✅", if (isChecklist) "خروج از چک‌لیست" else "چک‌لیست") {
                     desc = if (isChecklist) Checklist.fromChecklist(desc) else Checklist.toChecklist(desc)
@@ -236,12 +308,14 @@ fun TaskEditorScreen(taskDao: TaskDao, taskId: Long, onBack: () -> Unit, onOpenD
                     if (hasReminder && reminderAt > System.currentTimeMillis()) {
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Saffron.copy(alpha = .28f))
                             .padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("⏰ یادآور: " + FaDate.full(reminderAt) + " – " + SimpleDateFormat("HH:mm", Locale.US).format(Date(reminderAt)),
+                            Text("⏰ یادآور: " + FaDate.full(reminderAt) + " – " +
+                                    SimpleDateFormat("HH:mm", Locale.US).format(Date(reminderAt)),
                                 fontSize = 12.sp, color = Ink, modifier = Modifier.weight(1f))
                             Icon(Icons.Filled.Close, "لغو", tint = Brick,
                                 modifier = Modifier.size(20.dp).clickable {
                                     hasReminder = false; reminderAt = 0
-                                    ReminderScheduler.cancel(context, taskId, isTask = true); saveTask()
+                                    ReminderScheduler.cancel(context, taskId, isTask = true)
+                                    saveTask()
                                 })
                         }
                         Spacer(Modifier.height(10.dp))
@@ -255,7 +329,11 @@ fun TaskEditorScreen(taskDao: TaskDao, taskId: Long, onBack: () -> Unit, onOpenD
                         TaskAttachmentsSection(attachments,
                             onImageClick = { viewerImage = it },
                             onShare = { shareAttachment(context, Attachment(noteId = it.taskId, fileName = it.fileName, filePath = it.filePath, mimeType = it.mimeType, isImage = it.isImage)) },
-                            onDelete = { att -> scope.launch(Dispatchers.IO) { taskDao.deleteTaskAttachment(att); File(att.filePath).delete() } })
+                            onDelete = { att ->
+                                scope.launch(Dispatchers.IO) {
+                                    taskDao.deleteTaskAttachment(att); File(att.filePath).delete()
+                                }
+                            })
                         Spacer(Modifier.height(10.dp))
                     }
                     when {
@@ -311,16 +389,20 @@ fun TaskEditorScreen(taskDao: TaskDao, taskId: Long, onBack: () -> Unit, onOpenD
     lockMode?.let { mode ->
         AlertDialog(onDismissRequest = { lockMode = null },
             title = { Text(if (mode == TLockMode.Set) "🔒 گذاشتن رمز" else "🔓 باز کردن قفل", fontFamily = LalezarFont, fontSize = 20.sp) },
-            text = { Column {
-                OutlinedTextField(pass1, { pass1 = it }, label = { Text("رمز عبور") }, singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth())
-                if (mode == TLockMode.Set) { Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(pass2, { pass2 = it }, label = { Text("تکرار رمز") }, singleLine = true,
+            text = {
+                Column {
+                    OutlinedTextField(pass1, { pass1 = it }, label = { Text("رمز عبور") }, singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth()) }
-                if (lockError.isNotBlank()) { Spacer(Modifier.height(8.dp)); Text(lockError, color = Brick, fontSize = 12.sp) }
-            } },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth())
+                    if (mode == TLockMode.Set) {
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(pass2, { pass2 = it }, label = { Text("تکرار رمز") }, singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth())
+                    }
+                    if (lockError.isNotBlank()) { Spacer(Modifier.height(8.dp)); Text(lockError, color = Brick, fontSize = 12.sp) }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = {
                     when (mode) {
@@ -328,11 +410,16 @@ fun TaskEditorScreen(taskDao: TaskDao, taskId: Long, onBack: () -> Unit, onOpenD
                             pass1.length < 4 -> lockError = "رمز حداقل ۴ کاراکتر"
                             pass1 != pass2 -> lockError = "تکرار رمز یکسان نیست"
                             desc.isBlank() -> lockError = "متن خالی است!"
-                            else -> { desc = NoteLock.lock(desc, pass1); lockMode = null; Toast.makeText(context, "وظیفه قفل شد 🔒", Toast.LENGTH_SHORT).show() }
+                            else -> {
+                                desc = NoteLock.lock(desc, pass1)
+                                lockMode = null
+                                Toast.makeText(context, "وظیفه قفل شد 🔒", Toast.LENGTH_SHORT).show()
+                            }
                         }
                         TLockMode.Unlock -> {
                             val u = NoteLock.unlock(desc, pass1)
-                            if (u != null) { desc = u; lockMode = null } else lockError = "رمز اشتباه است! ❌"
+                            if (u != null) { desc = u; lockMode = null }
+                            else lockError = "رمز اشتباه است! ❌"
                         }
                     }
                 }) { Text("تأیید", color = Saffron, fontWeight = FontWeight.Bold) }
@@ -349,12 +436,11 @@ fun TaskEditorScreen(taskDao: TaskDao, taskId: Long, onBack: () -> Unit, onOpenD
         AlertDialog(onDismissRequest = { showTimePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tehran")).apply {
-                        timeInMillis = pickedDate
-                        set(Calendar.HOUR_OF_DAY, st.hour); set(Calendar.MINUTE, st.minute)
-                        set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-                    }
-                    if (cal.timeInMillis > System.currentTimeMillis()) scheduleReminder(cal.timeInMillis)
+                    // ✅ جمع مستقیم میلی‌ثانیه (بدون Calendar) تا تاریخ جابجا نشود
+                    val hourMillis = st.hour.toLong() * 60 * 60 * 1000
+                    val minuteMillis = st.minute.toLong() * 60 * 1000
+                    val finalTime = pickedDate + hourMillis + minuteMillis
+                    if (finalTime > System.currentTimeMillis()) scheduleReminder(finalTime)
                     else Toast.makeText(context, "این زمان گذشته است!", Toast.LENGTH_SHORT).show()
                     showTimePicker = false
                 }) { Text("تنظیم ⏰", color = Saffron, fontWeight = FontWeight.Bold) }
@@ -388,37 +474,53 @@ private fun TShamsiDateDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) 
     val (gy, gm, gd) = FaDate.toGregorian(jy, jm, jd)
     AlertDialog(onDismissRequest = onDismiss,
         title = { Text("📅 تاریخ یادآور وظیفه", fontFamily = LalezarFont, fontSize = 20.sp) },
-        text = { Column {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                TDateStep(FaDate.monthName(jm), { if (jm < 12) jm++ else { jm = 1; if (jy < jy0 + 3) jy++ } }, { if (jm > 1) jm-- else { jm = 12; if (jy > jy0 - 1) jy-- } })
-                TDateStep(jd.fa(), { if (jd < FaDate.monthLength(jy, jm)) jd++ }, { if (jd > 1) jd-- })
-                TDateStep(jy.fa(), { if (jy < jy0 + 3) jy++ }, { if (jy > jy0 - 1) jy-- })
+        text = {
+            Column {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    TDateStep(FaDate.monthName(jm),
+                        { if (jm < 12) jm++ else { jm = 1; if (jy < jy0 + 3) jy++ } },
+                        { if (jm > 1) jm-- else { jm = 12; if (jy > jy0 - 1) jy-- } })
+                    TDateStep(jd.fa(),
+                        { if (jd < FaDate.monthLength(jy, jm)) jd++ },
+                        { if (jd > 1) jd-- })
+                    TDateStep(jy.fa(),
+                        { if (jy < jy0 + 3) jy++ },
+                        { if (jy > jy0 - 1) jy-- })
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("معادل میلادی: $gy/${gm.toString().padStart(2, '0')}/${gd.toString().padStart(2, '0')}", fontSize = 12.sp)
             }
-            Spacer(Modifier.height(12.dp))
-            Text("معادل میلادی: $gy/${gm.toString().padStart(2, '0')}/${gd.toString().padStart(2, '0')}", fontSize = 12.sp)
-        } },
+        },
         confirmButton = {
             TextButton(onClick = {
+                // ✅ اصلاح قطعی تاریخ: clear + gm-1 + timezone تهران
                 val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tehran"))
-                cal.clear(); cal.set(gy, gm - 1, gd, 0, 0, 0); cal.set(Calendar.MILLISECOND, 0)
+                cal.clear()
+                cal.set(gy, gm - 1, gd, 0, 0, 0)
+                cal.set(Calendar.MILLISECOND, 0)
                 onConfirm(cal.timeInMillis)
             }) { Text("ادامه", color = Saffron, fontWeight = FontWeight.Bold) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } })
 }
 
-@Composable private fun TDateStep(v: String, plus: () -> Unit, minus: () -> Unit) {
+@Composable
+private fun TDateStep(v: String, plus: () -> Unit, minus: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         TextButton(onClick = plus) { Text("+", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
         Text(v, fontFamily = LalezarFont, fontSize = 18.sp)
         TextButton(onClick = minus) { Text("−", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
     }
 }
-@Composable private fun tTransparent() = TextFieldDefaults.colors(
+
+@Composable
+private fun tTransparent() = TextFieldDefaults.colors(
     focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
     disabledContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent,
     unfocusedIndicatorColor = Color.Transparent, disabledIndicatorColor = Color.Transparent)
-@Composable private fun TToolChip(emoji: String, label: String, onClick: () -> Unit) {
+
+@Composable
+private fun TToolChip(emoji: String, label: String, onClick: () -> Unit) {
     Surface(onClick = onClick, shape = RoundedCornerShape(12.dp), color = DeepGreenSoft,
         border = androidx.compose.foundation.BorderStroke(1.dp, LineGreen)) {
         Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -426,7 +528,9 @@ private fun TShamsiDateDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) 
         }
     }
 }
-@Composable private fun TLockedBox(onUnlock: () -> Unit) {
+
+@Composable
+private fun TLockedBox(onUnlock: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(vertical = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("🔒", fontSize = 42.sp); Spacer(Modifier.height(10.dp))
         Text("این وظیفه قفل است", fontFamily = LalezarFont, fontSize = 19.sp, color = Ink)
@@ -436,7 +540,9 @@ private fun TShamsiDateDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) 
         }
     }
 }
-@Composable private fun TChecklistEditor(desc: String, onChange: (String) -> Unit) {
+
+@Composable
+private fun TChecklistEditor(desc: String, onChange: (String) -> Unit) {
     val lines = desc.lines()
     val (done, total) = Checklist.progress(desc)
     if (total > 0) {
@@ -466,18 +572,23 @@ private fun TShamsiDateDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) 
     }
     TextButton(onClick = { onChange(desc.trimEnd('\n') + "\n☐ ") }) { Text("+ مورد جدید", color = Saffron, fontWeight = FontWeight.Bold) }
 }
-@Composable private fun TRecordPill(seconds: Int, onStop: () -> Unit) {
+
+@Composable
+private fun TRecordPill(seconds: Int, onStop: () -> Unit) {
     val tr = rememberInfiniteTransition(label = "blink")
     val a by tr.animateFloat(1f, .25f, infiniteRepeatable(tween(550), RepeatMode.Reverse), label = "dot")
     Surface(onClick = onStop, shape = RoundedCornerShape(14.dp), color = Brick) {
         Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(10.dp).clip(CircleShape).background(Color.White.copy(alpha = a)))
             Spacer(Modifier.width(7.dp))
-            Text("توقف ضبط • ${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}".faDigits(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text("توقف ضبط • ${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}".faDigits(),
+                color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
-@Composable private fun TAttachButton(text: String, icon: ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) {
+
+@Composable
+private fun TAttachButton(text: String, icon: ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(14.dp), color = DeepGreenSoft,
         border = androidx.compose.foundation.BorderStroke(1.dp, LineGreen)) {
         Row(Modifier.padding(horizontal = 13.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -486,7 +597,9 @@ private fun TShamsiDateDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) 
         }
     }
 }
-@Composable private fun TaskAttachmentsSection(attachments: List<TaskAttachment>,
+
+@Composable
+private fun TaskAttachmentsSection(attachments: List<TaskAttachment>,
     onImageClick: (TaskAttachment) -> Unit, onShare: (TaskAttachment) -> Unit, onDelete: (TaskAttachment) -> Unit) {
     val images = attachments.filter { it.isImage }
     val audios = attachments.filter { !it.isImage && it.mimeType.startsWith("audio/") }
@@ -499,7 +612,8 @@ private fun TShamsiDateDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) 
                         contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clickable { onImageClick(att) })
                     IconButton(onClick = { onDelete(att) }, modifier = Modifier.align(Alignment.TopStart).size(26.dp)
                         .clip(CircleShape).background(Color.Black.copy(alpha = .45f))) {
-                        Icon(Icons.Filled.Close, null, tint = Color.White, modifier = Modifier.size(15.dp)) }
+                        Icon(Icons.Filled.Close, null, tint = Color.White, modifier = Modifier.size(15.dp))
+                    }
                 }
             }
         }
@@ -516,12 +630,20 @@ private fun TShamsiDateDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) 
             Text("پیام صوتی", fontSize = 12.sp, color = Ink, modifier = Modifier.weight(1f))
             IconButton(onClick = {
                 if (playing) { player?.stop(); player?.release(); player = null; playing = false }
-                else { player = MediaPlayer().apply { setDataSource(att.filePath)
-                    setOnCompletionListener { mp -> playing = false; mp.release() }; prepare(); start() }; playing = true }
+                else {
+                    player = MediaPlayer().apply {
+                        setDataSource(att.filePath)
+                        setOnCompletionListener { mp -> playing = false; mp.release() }
+                        prepare(); start()
+                    }
+                    playing = true
+                }
             }, modifier = Modifier.size(32.dp)) {
-                Icon(if (playing) Icons.Filled.Stop else Icons.Filled.PlayArrow, "پخش", tint = Ink) }
+                Icon(if (playing) Icons.Filled.Stop else Icons.Filled.PlayArrow, "پخش", tint = Ink)
+            }
             IconButton(onClick = { onDelete(att) }, modifier = Modifier.size(30.dp)) {
-                Icon(Icons.Filled.Close, "حذف", tint = Brick, modifier = Modifier.size(16.dp)) }
+                Icon(Icons.Filled.Close, "حذف", tint = Brick, modifier = Modifier.size(16.dp))
+            }
         }
     }
     docs.forEach { att ->
@@ -535,7 +657,9 @@ private fun TShamsiDateDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) 
         }
     }
 }
-@Composable private fun TFocusOverlay(body: String, onChange: (String) -> Unit, onExit: () -> Unit) {
+
+@Composable
+private fun TFocusOverlay(body: String, onChange: (String) -> Unit, onExit: () -> Unit) {
     val words = remember(body) { body.split(Regex("\\s+")).count { it.isNotBlank() } }
     Dialog(onDismissRequest = onExit, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(Modifier.fillMaxSize().background(PaperWhite)) {
@@ -548,11 +672,13 @@ private fun TShamsiDateDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) 
                 }
                 TextField(value = body, onValueChange = onChange,
                     textStyle = TextStyle(fontFamily = VazirFont, fontSize = 19.sp, color = Ink, lineHeight = 36.sp),
-                    colors = tTransparent(), modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 26.dp, vertical = 10.dp))
+                    colors = tTransparent(),
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 26.dp, vertical = 10.dp))
             }
         }
     }
 }
+
 private fun importTaskUris(context: Context, scope: CoroutineScope, taskDao: TaskDao, taskId: Long, uris: List<Uri>) {
     if (uris.isEmpty()) return
     scope.launch(Dispatchers.IO) {
