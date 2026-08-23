@@ -55,6 +55,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -142,9 +143,16 @@ fun HomeScreen(
     var showAddTask by remember { mutableStateOf(false) }
 
     val (tjy, tjm, tjd) = FaDate.jalali(System.currentTimeMillis())
-    var calJy by rememberSaveable { mutableIntStateOf(tjy) }
-    var calJm by rememberSaveable { mutableIntStateOf(tjm) }
-    var calDay by rememberSaveable { mutableIntStateOf(tjd) }
+    var calJy by remember { mutableIntStateOf(tjy) }
+    var calJm by remember { mutableIntStateOf(tjm) }
+    var calDay by remember { mutableIntStateOf(tjd) }
+
+    LaunchedEffect(tab) {
+        if (tab == 2) {
+            val (jy, jm, jd) = FaDate.jalali(System.currentTimeMillis())
+            calJy = jy; calJm = jm; calDay = jd
+        }
+    }
 
     val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -176,8 +184,11 @@ fun HomeScreen(
     val filteredTasks = tasks.filter { query.isBlank() || it.title.contains(query, true) }
     val memory = remember(notes) { pickMemory(notes) }
 
-    val tasksByDay = remember(tasks, calJy, calJm) {
-        tasks.filter { it.dueDate > 0 }.groupBy { val (a, b, c) = FaDate.jalali(it.dueDate); Triple(a, b, c) }
+    val itemsByDay = remember(tasks, notes, calJy, calJm) {
+        val list = mutableListOf<Triple<String, Long, Boolean>>()
+        tasks.filter { it.dueDate > 0 }.forEach { list.add(Triple("task:${it.id}", it.dueDate, it.isCompleted)) }
+        notes.filter { it.reminderAt > 0 }.forEach { list.add(Triple("note:${it.id}", it.reminderAt, false)) }
+        list.groupBy { val (a, b, c) = FaDate.jalali(it.second); Triple(a, b, c) }
     }
 
     Scaffold(containerColor = DeepGreen,
@@ -185,8 +196,7 @@ fun HomeScreen(
             when (tab) {
                 0 -> NewNoteFab(onNewNote)
                 else -> ExtendedFloatingActionButton(onClick = { showAddTask = true }, containerColor = Saffron, contentColor = Ink) {
-                    Icon(Icons.Filled.Add, "جدید")
-                    Spacer(Modifier.width(8.dp))
+                    Icon(Icons.Filled.Add, "جدید"); Spacer(Modifier.width(8.dp))
                     Text("وظیفه جدید", fontFamily = LalezarFont, fontSize = 17.sp)
                 }
             }
@@ -213,8 +223,7 @@ fun HomeScreen(
                         shape = RoundedCornerShape(16.dp), color = Saffron.copy(alpha = .14f),
                         border = androidx.compose.foundation.BorderStroke(1.dp, Saffron.copy(alpha = .4f))) {
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("⏳", fontSize = 22.sp)
-                            Spacer(Modifier.width(10.dp))
+                            Text("⏳", fontSize = 22.sp); Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
                                 Text("خاطره‌ای از گذشته", fontFamily = LalezarFont, fontSize = 14.sp, color = Saffron)
                                 Text(memory.title.ifBlank { "بدون عنوان" }, fontSize = 12.sp, color = PaperWhite, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -285,7 +294,7 @@ fun HomeScreen(
                                     row.forEach { d ->
                                         if (d == 0) Box(Modifier.weight(1f))
                                         else {
-                                            val dayTasks = tasksByDay[Triple(calJy, calJm, d)].orEmpty()
+                                            val dayItems = itemsByDay[Triple(calJy, calJm, d)].orEmpty()
                                             val isToday = calJy == tjy && calJm == tjm && d == tjd
                                             val isSel = calDay == d
                                             Column(Modifier.weight(1f).height(72.dp)
@@ -294,11 +303,13 @@ fun HomeScreen(
                                                 .border(if (isToday) 1.5.dp else 0.dp, Saffron, RoundedCornerShape(12.dp))
                                                 .clickable { calDay = d }
                                                 .padding(3.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text(d.fa(), fontSize = 12.sp, color = if (isToday) Saffron else PaperWhite, fontWeight = if (isToday || isSel) FontWeight.Bold else FontWeight.Normal)
-                                                dayTasks.take(2).forEach { t ->
-                                                    Box(Modifier.fillMaxWidth().height(7.dp).padding(top = 2.dp).clip(RoundedCornerShape(3.dp)).background(taskTint(t.dueDate, t.isCompleted)))
+                                                Text(d.fa(), fontSize = 12.sp, color = if (isToday) Saffron else PaperWhite,
+                                                    fontWeight = if (isToday || isSel) FontWeight.Bold else FontWeight.Normal)
+                                                dayItems.take(2).forEach { item ->
+                                                    Box(Modifier.fillMaxWidth().height(7.dp).padding(top = 2.dp).clip(RoundedCornerShape(3.dp))
+                                                        .background(taskTint(item.second, item.third)))
                                                 }
-                                                if (dayTasks.size > 2) Text("+${(dayTasks.size - 2).fa()}", fontSize = 8.sp, color = MutedGreenText)
+                                                if (dayItems.size > 2) Text("+${(dayItems.size - 2).fa()}", fontSize = 8.sp, color = MutedGreenText)
                                             }
                                         }
                                     }
@@ -307,14 +318,34 @@ fun HomeScreen(
                                 Spacer(Modifier.height(3.dp))
                             }
                             Spacer(Modifier.height(10.dp))
-                            Text("وظایف ${calDay.fa()} ${FaDate.monthName(calJm)}:", fontFamily = LalezarFont, fontSize = 16.sp, color = Saffron)
+                            Text("یادآورها و وظایف ${calDay.fa()} ${FaDate.monthName(calJm)}:", fontFamily = LalezarFont, fontSize = 16.sp, color = Saffron)
                             Spacer(Modifier.height(6.dp))
-                            val selTasks = tasksByDay[Triple(calJy, calJm, calDay)].orEmpty()
-                            if (selTasks.isEmpty()) Text("برای این روز وظیفه‌ای نیست 🌤️", fontSize = 12.sp, color = MutedGreenText)
-                            selTasks.forEach { task ->
-                                TaskCard(task, onClick = { onOpenTask(task.id) },
-                                    onToggle = { scope.launch(Dispatchers.IO) { taskDao.update(task.copy(isCompleted = !task.isCompleted)) } },
-                                    onDelete = { scope.launch(Dispatchers.IO) { taskDao.deleteById(task.id) } })
+                            val selItems = itemsByDay[Triple(calJy, calJm, calDay)].orEmpty()
+                            if (selItems.isEmpty()) Text("برای این روز یادآور یا وظیفه‌ای نیست 🌤️", fontSize = 12.sp, color = MutedGreenText)
+                            selItems.forEach { item ->
+                                if (item.first.startsWith("note:")) {
+                                    val id = item.first.removePrefix("note:").toLongOrNull() ?: -1L
+                                    val note = notes.find { it.id == id }
+                                    if (note != null) {
+                                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(DeepGreenSoft)
+                                            .border(1.5.dp, Saffron.copy(alpha = .75f), RoundedCornerShape(18.dp))
+                                            .clickable { onOpenNote(note.id) }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Text("📝", fontSize = 18.sp); Spacer(Modifier.width(8.dp))
+                                            Column(Modifier.weight(1f)) {
+                                                Text(note.title.ifBlank { "یادداشت" }, fontFamily = VazirFont, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = PaperWhite)
+                                                Text("⏰ " + FaDate.full(note.reminderAt), fontSize = 11.sp, color = Saffron)
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    val id = item.first.removePrefix("task:").toLongOrNull() ?: -1L
+                                    val task = tasks.find { it.id == id }
+                                    if (task != null) {
+                                        TaskCard(task, onClick = { onOpenTask(task.id) },
+                                            onToggle = { scope.launch(Dispatchers.IO) { taskDao.update(task.copy(isCompleted = !task.isCompleted)) } },
+                                            onDelete = { scope.launch(Dispatchers.IO) { taskDao.deleteById(task.id) } })
+                                    }
+                                }
                                 Spacer(Modifier.height(8.dp))
                             }
                             Spacer(Modifier.height(120.dp))
@@ -504,8 +535,7 @@ private fun StatRow(label: String, value: String) {
 private fun SearchBox(query: String, onQueryChange: (String) -> Unit, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(DeepGreenSoft).border(1.dp, LineGreen, RoundedCornerShape(16.dp)).padding(horizontal = 14.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Default.Search, null, tint = Saffron)
-        Spacer(Modifier.width(10.dp))
+        Icon(Icons.Default.Search, null, tint = Saffron); Spacer(Modifier.width(10.dp))
         TextField(value = query, onValueChange = onQueryChange, placeholder = { Text("جستجو در یادداشت‌ها و وظایف…", color = MutedGreenText) },
             colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
             textStyle = androidx.compose.ui.text.TextStyle(color = PaperWhite, fontSize = 14.sp), singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -573,9 +603,7 @@ private fun SectionLabel(text: String) {
 @Composable
 private fun NewNoteFab(onNewNote: () -> Unit) {
     ExtendedFloatingActionButton(onClick = onNewNote, containerColor = Saffron, contentColor = Ink) {
-        Icon(Icons.Filled.Add, "جدید")
-        Spacer(Modifier.width(8.dp))
-        Text("یادداشت جدید", fontFamily = LalezarFont, fontSize = 17.sp)
+        Icon(Icons.Filled.Add, "جدید"); Spacer(Modifier.width(8.dp)); Text("یادداشت جدید", fontFamily = LalezarFont, fontSize = 17.sp)
     }
 }
 
