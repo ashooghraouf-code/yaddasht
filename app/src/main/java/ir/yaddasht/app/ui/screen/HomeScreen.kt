@@ -24,14 +24,12 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -62,7 +60,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Calendar
 
-// 🎨 رنگ هوشمند وظایف: هرچه سررسید نزدیک‌تر = قرمزتر، دورتر = سبزتر
 private fun taskTint(due: Long, completed: Boolean): Color {
     if (completed) return Color(0xFF5E8077)
     if (due <= 0L) return Color(0xFFE5484D)
@@ -156,15 +153,10 @@ fun HomeScreen(
         Box(Modifier.fillMaxSize().padding(padding)) {
             PaperDots()
             Column(Modifier.fillMaxSize()) {
-                // ✅ هدر با گرادیان نرم
-                Box(Modifier.fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(DeepGreen, DeepGreenSoft)))) {
-                    HomeHeader(count = notes.size, onStats = { showStats = true },
-                        onBackup = { doBackup() },
-                        onRestore = { restoreLauncher.launch(arrayOf("*/*")) })
-                }
+                HomeHeader(count = notes.size, onStats = { showStats = true },
+                    onBackup = { doBackup() },
+                    onRestore = { restoreLauncher.launch(arrayOf("*/*")) })
 
-                // ✅ تب‌های یادداشت / وظایف
                 TabRow(selectedTabIndex = tab,
                     containerColor = Color.Transparent,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)) {
@@ -405,7 +397,7 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
 
 @Composable
 private fun HomeHeader(count: Int, onStats: () -> Unit, onBackup: () -> Unit, onRestore: () -> Unit) {
-    Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)) {
+    Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(52.dp).clip(CircleShape).background(Saffron), contentAlignment = Alignment.Center) {
                 Text("ی", fontFamily = LalezarFont, fontSize = 30.sp, color = Ink)
