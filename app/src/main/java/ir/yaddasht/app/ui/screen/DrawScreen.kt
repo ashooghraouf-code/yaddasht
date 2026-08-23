@@ -7,14 +7,32 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,7 +50,13 @@ import ir.yaddasht.app.data.Attachment
 import ir.yaddasht.app.data.NoteDao
 import ir.yaddasht.app.data.TaskAttachment
 import ir.yaddasht.app.data.TaskDao
-import ir.yaddasht.app.ui.theme.*
+import ir.yaddasht.app.ui.theme.DeepGreen
+import ir.yaddasht.app.ui.theme.Ink
+import ir.yaddasht.app.ui.theme.LalezarFont
+import ir.yaddasht.app.ui.theme.LineGreen
+import ir.yaddasht.app.ui.theme.MutedGreenText
+import ir.yaddasht.app.ui.theme.PaperWhite
+import ir.yaddasht.app.ui.theme.Saffron
 import ir.yaddasht.app.util.AttachmentStore
 import ir.yaddasht.app.util.fa
 import kotlinx.coroutines.Dispatchers
@@ -44,8 +68,7 @@ import java.io.FileOutputStream
 private data class DrawStrokeData(val points: List<androidx.compose.ui.geometry.Offset>, val color: Color, val width: Float)
 
 @Composable
-fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit,
-               isTask: Boolean = false, taskDao: TaskDao? = null) {
+fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, isTask: Boolean = false, taskDao: TaskDao? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var strokes by remember { mutableStateOf(emptyList<DrawStrokeData>()) }
@@ -53,8 +76,7 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit,
     var brushColor by remember { mutableStateOf(Color(0xFF22302B)) }
     var brushWidth by remember { mutableFloatStateOf(7f) }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
-    val brushColors = listOf(Color(0xFF22302B), Color(0xFFC64B2C), Color(0xFFD98A16),
-        Color(0xFF2E7D52), Color(0xFF2B6CB0), Color(0xFFB83280), Color.White)
+    val brushColors = listOf(Color(0xFF22302B), Color(0xFFC64B2C), Color(0xFFD98A16), Color(0xFF2E7D52), Color(0xFF2B6CB0), Color(0xFFB83280), Color.White)
 
     Box(Modifier.fillMaxSize().background(PaperWhite)) {
         Canvas(Modifier.fillMaxSize().onSizeChanged { canvasSize = it }
@@ -85,9 +107,7 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit,
             DrawButton("🗑") { strokes = emptyList() }
             Spacer(Modifier.weight(1f))
             Surface(onClick = {
-                if (strokes.isEmpty() || canvasSize == IntSize.Zero) {
-                    Toast.makeText(context, "اول یه چیزی بکش! 🖌️", Toast.LENGTH_SHORT).show(); return@Surface
-                }
+                if (strokes.isEmpty() || canvasSize == IntSize.Zero) { Toast.makeText(context, "اول یه چیزی بکش! 🖌️", Toast.LENGTH_SHORT).show(); return@Surface }
                 scope.launch(Dispatchers.IO) {
                     val bmp = Bitmap.createBitmap(canvasSize.width, canvasSize.height, Bitmap.Config.ARGB_8888)
                     val c = android.graphics.Canvas(bmp); c.drawColor(android.graphics.Color.WHITE)
@@ -100,13 +120,9 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit,
                     }
                     val file = File(AttachmentStore.attachmentsDir(context), "DRAW_${System.currentTimeMillis()}.png")
                     FileOutputStream(file).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                    if (isTask && taskDao != null)
-                        taskDao.insertTaskAttachment(TaskAttachment(taskId = noteId, fileName = file.name, filePath = file.absolutePath, mimeType = "image/png", isImage = true))
-                    else
-                        dao.insertAttachment(Attachment(noteId = noteId, fileName = file.name, filePath = file.absolutePath, mimeType = "image/png", isImage = true))
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "نقاشی ضمیمه شد 🎨", Toast.LENGTH_SHORT).show(); onBack()
-                    }
+                    if (isTask && taskDao != null) taskDao.insertTaskAttachment(TaskAttachment(taskId = noteId, fileName = file.name, filePath = file.absolutePath, mimeType = "image/png", isImage = true))
+                    else dao.insertAttachment(Attachment(noteId = noteId, fileName = file.name, filePath = file.absolutePath, mimeType = "image/png", isImage = true))
+                    withContext(Dispatchers.Main) { Toast.makeText(context, "نقاشی ضمیمه شد 🎨", Toast.LENGTH_SHORT).show(); onBack() }
                 }
             }, shape = RoundedCornerShape(14.dp), color = Saffron) {
                 Text("💾 ذخیره", Modifier.padding(horizontal = 16.dp, vertical = 9.dp), color = Ink, fontFamily = LalezarFont, fontSize = 15.sp)
