@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -62,7 +63,7 @@ import java.util.Calendar
 
 private fun taskTint(due: Long, completed: Boolean): Color {
     if (completed) return Color(0xFF5E8077)
-    if (due <= 0L) return Color(0xFFE5484D)
+    if (due <= 0L) return Color(0xFF888888)
     val now = System.currentTimeMillis()
     val days = (due - now).toFloat() / 86_400_000f
     val t = days.coerceIn(0f, 7f) / 7f
@@ -70,16 +71,6 @@ private fun taskTint(due: Long, completed: Boolean): Color {
     val amber = Color(0xFFF5A524)
     val green = Color(0xFF46A758)
     return if (t < .5f) lerp(red, amber, t / .5f) else lerp(amber, green, (t - .5f) / .5f)
-}
-
-private fun dueMillis(opt: Int): Long {
-    val c = Calendar.getInstance()
-    return when (opt) {
-        1 -> { c.set(Calendar.HOUR_OF_DAY, 21); c.set(Calendar.MINUTE, 0); c.set(Calendar.SECOND, 0); c.timeInMillis }
-        2 -> { c.add(Calendar.DAY_OF_YEAR, 1); c.set(Calendar.HOUR_OF_DAY, 12); c.set(Calendar.MINUTE, 0); c.set(Calendar.SECOND, 0); c.timeInMillis }
-        3 -> { c.add(Calendar.DAY_OF_YEAR, 7); c.timeInMillis }
-        else -> 0L
-    }
 }
 
 @Composable
@@ -108,9 +99,11 @@ fun HomeScreen(
             scope.launch(Dispatchers.IO) {
                 val count = BackupManager.restore(context, dao, uri)
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context,
+                    Toast.makeText(
+                        context,
                         if (count > 0) "$count یادداشت بازیابی شد ✅" else "فایل پشتیبان معتبر نبود ❌",
-                        Toast.LENGTH_LONG).show()
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         }
@@ -131,49 +124,69 @@ fun HomeScreen(
         }
     }
 
-    val filtered = notes.filter {
+    val filteredNotes = notes.filter {
         query.isBlank() || it.title.contains(query, true) ||
-        (!NoteLock.isLocked(it.body) && it.body.contains(query, true))
+                (!NoteLock.isLocked(it.body) && it.body.contains(query, true))
     }
-    val pinned = filtered.filter { it.pinned }
-    val others = filtered.filterNot { it.pinned }
+    val pinned = filteredNotes.filter { it.pinned }
+    val others = filteredNotes.filterNot { it.pinned }
     val filteredTasks = tasks.filter { query.isBlank() || it.title.contains(query, true) }
     val memory = remember(notes) { pickMemory(notes) }
 
-    Scaffold(containerColor = DeepGreen,
+    Scaffold(
+        containerColor = DeepGreen,
         floatingActionButton = {
             if (tab == 0) NewNoteFab(onNewNote)
-            else ExtendedFloatingActionButton(onClick = { showAddTask = true },
-                containerColor = Saffron, contentColor = Ink) {
+            else ExtendedFloatingActionButton(
+                onClick = { showAddTask = true },
+                containerColor = Saffron,
+                contentColor = Ink
+            ) {
                 Icon(Icons.Filled.Add, "جدید")
                 Spacer(Modifier.width(8.dp))
                 Text("وظیفه جدید", fontFamily = LalezarFont, fontSize = 17.sp)
             }
-        }) { padding ->
+        }
+    ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             PaperDots()
             Column(Modifier.fillMaxSize()) {
-                HomeHeader(count = notes.size, onStats = { showStats = true },
+                HomeHeader(
+                    count = notes.size,
+                    onStats = { showStats = true },
                     onBackup = { doBackup() },
-                    onRestore = { restoreLauncher.launch(arrayOf("*/*")) })
+                    onRestore = { restoreLauncher.launch(arrayOf("*/*")) }
+                )
 
-                TabRow(selectedTabIndex = tab,
+                TabRow(
+                    selectedTabIndex = tab,
                     containerColor = Color.Transparent,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)) {
-                    Tab(selected = tab == 0, onClick = { tab = 0 },
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
+                ) {
+                    Tab(
+                        selected = tab == 0,
+                        onClick = { tab = 0 },
                         text = { Text("📝 یادداشت‌ها (${notes.size.fa()})", fontFamily = LalezarFont, fontSize = 15.sp) },
-                        selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
-                    Tab(selected = tab == 1, onClick = { tab = 1 },
+                        selectedContentColor = Saffron,
+                        unselectedContentColor = MutedGreenText
+                    )
+                    Tab(
+                        selected = tab == 1,
+                        onClick = { tab = 1 },
                         text = { Text("✅ وظایف (${tasks.count { !it.isCompleted }.fa()})", fontFamily = LalezarFont, fontSize = 15.sp) },
-                        selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
+                        selectedContentColor = Saffron,
+                        unselectedContentColor = MutedGreenText
+                    )
                 }
 
                 if (!hideMemory && memory != null && query.isBlank() && tab == 0) {
-                    Surface(onClick = { onOpenNote(memory.id) },
+                    Surface(
+                        onClick = { onOpenNote(memory.id) },
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
                         shape = RoundedCornerShape(16.dp),
                         color = Saffron.copy(alpha = .14f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Saffron.copy(alpha = .4f))) {
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Saffron.copy(alpha = .4f))
+                    ) {
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("⏳", fontSize = 22.sp)
                             Spacer(Modifier.width(10.dp))
@@ -194,7 +207,7 @@ fun HomeScreen(
                 if (tab == 0) {
                     when {
                         notes.isEmpty() -> EmptyState()
-                        filtered.isEmpty() -> CenterMessage("چیزی پیدا نشد 🔍")
+                        filteredNotes.isEmpty() -> CenterMessage("چیزی پیدا نشد 🔍")
                         else -> LazyVerticalGrid(
                             columns = GridCells.Adaptive(168.dp),
                             contentPadding = PaddingValues(14.dp, 16.dp, 14.dp, 120.dp),
@@ -229,19 +242,17 @@ fun HomeScreen(
                             contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 120.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            filteredTasks.forEach { task ->
-                                item {
-                                    TaskCard(task,
-                                        onToggle = {
-                                            scope.launch(Dispatchers.IO) {
-                                                taskDao.update(task.copy(isCompleted = !task.isCompleted))
-                                            }
-                                        },
-                                        onDelete = {
-                                            scope.launch(Dispatchers.IO) { taskDao.deleteById(task.id) }
-                                        })
-                                    Spacer(Modifier.height(10.dp))
-                                }
+                            items(filteredTasks, key = { it.id }) { task ->
+                                TaskCard(task,
+                                    onToggle = {
+                                        scope.launch(Dispatchers.IO) {
+                                            taskDao.update(task.copy(isCompleted = !task.isCompleted))
+                                        }
+                                    },
+                                    onDelete = {
+                                        scope.launch(Dispatchers.IO) { taskDao.deleteById(task.id) }
+                                    })
+                                Spacer(Modifier.height(10.dp))
                             }
                         }
                     }
@@ -346,7 +357,19 @@ private fun AddTaskDialog(onDismiss: () -> Unit, onSave: (String, Long, Priority
         },
         confirmButton = {
             TextButton(onClick = {
-                if (title.isNotBlank()) onSave(title.trim(), dueMillis(dueOpt), priority)
+                if (title.isNotBlank()) {
+                    val due = when (dueOpt) {
+                        1 -> Calendar.getInstance().apply {
+                            set(Calendar.HOUR_OF_DAY, 21); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0)
+                        }.timeInMillis
+                        2 -> Calendar.getInstance().apply {
+                            add(Calendar.DAY_OF_YEAR, 1); set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0)
+                        }.timeInMillis
+                        3 -> Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 7) }.timeInMillis
+                        else -> 0L
+                    }
+                    onSave(title.trim(), due, priority)
+                }
             }) { Text("افزودن", color = Saffron, fontWeight = FontWeight.Bold) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } })
@@ -382,8 +405,8 @@ private fun pickMemory(notes: List<Note>): Note? {
     val sameDayPastYears = candidates.filter {
         val c = Calendar.getInstance().apply { timeInMillis = it.createdAt }
         c.get(Calendar.MONTH) == now.get(Calendar.MONTH) &&
-        c.get(Calendar.DAY_OF_MONTH) == now.get(Calendar.DAY_OF_MONTH) &&
-        c.get(Calendar.YEAR) < now.get(Calendar.YEAR)
+                c.get(Calendar.DAY_OF_MONTH) == now.get(Calendar.DAY_OF_MONTH) &&
+                c.get(Calendar.YEAR) < now.get(Calendar.YEAR)
     }
     val oldNotes = candidates.filter { System.currentTimeMillis() - it.createdAt > 45L * 24 * 3600 * 1000 }
     return sameDayPastYears.ifEmpty { oldNotes }.randomOrNull()
@@ -397,7 +420,7 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
 
 @Composable
 private fun HomeHeader(count: Int, onStats: () -> Unit, onBackup: () -> Unit, onRestore: () -> Unit) {
-    Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 4.dp)) {
+    Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(52.dp).clip(CircleShape).background(Saffron), contentAlignment = Alignment.Center) {
                 Text("ی", fontFamily = LalezarFont, fontSize = 30.sp, color = Ink)
