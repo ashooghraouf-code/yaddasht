@@ -29,7 +29,6 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE hasReminder = 1 AND reminderTime <= :currentTime AND isCompleted = 0")
     suspend fun getTasksWithDueReminders(currentTime: Long): List<Task>
 
-    // ✅ ضمیمه‌های وظایف
     @Query("SELECT * FROM task_attachments WHERE taskId = :taskId ORDER BY id ASC")
     fun observeTaskAttachments(taskId: Long): Flow<List<TaskAttachment>>
 
