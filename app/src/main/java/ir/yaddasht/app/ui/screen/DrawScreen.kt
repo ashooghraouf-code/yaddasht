@@ -32,13 +32,18 @@ import ir.yaddasht.app.data.Attachment
 import ir.yaddasht.app.data.NoteDao
 import ir.yaddasht.app.ui.theme.*
 import ir.yaddasht.app.util.AttachmentStore
+import ir.yaddasht.app.util.fa
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
-private data class DrawStrokeData(val points: List<androidx.compose.ui.geometry.Offset>, val color: Color, val width: Float)
+private data class DrawStrokeData(
+    val points: List<androidx.compose.ui.geometry.Offset>,
+    val color: Color,
+    val width: Float
+)
 
 @Composable
 fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
@@ -49,30 +54,32 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
     var brushColor by remember { mutableStateOf(Color(0xFF22302B)) }
     var brushWidth by remember { mutableFloatStateOf(7f) }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+
     val brushColors = listOf(
         Color(0xFF22302B), Color(0xFFC64B2C), Color(0xFFD98A16),
         Color(0xFF2E7D52), Color(0xFF2B6CB0), Color(0xFFB83280), Color.White
     )
 
     Box(Modifier.fillMaxSize().background(PaperWhite)) {
-        Canvas(Modifier
-            .fillMaxSize()
-            .onSizeChanged { canvasSize = it }
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { currentPoints = listOf(it) },
-                    onDrag = { change, _ ->
-                        change.consume()
-                        currentPoints = currentPoints + change.position
-                    },
-                    onDragEnd = {
-                        if (currentPoints.size > 1)
-                            strokes = strokes + DrawStrokeData(currentPoints, brushColor, brushWidth)
-                        currentPoints = emptyList()
-                    },
-                    onDragCancel = { currentPoints = emptyList() }
-                )
-            }
+        Canvas(
+            Modifier
+                .fillMaxSize()
+                .onSizeChanged { canvasSize = it }
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { currentPoints = listOf(it) },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            currentPoints = currentPoints + change.position
+                        },
+                        onDragEnd = {
+                            if (currentPoints.size > 1)
+                                strokes = strokes + DrawStrokeData(currentPoints, brushColor, brushWidth)
+                            currentPoints = emptyList()
+                        },
+                        onDragCancel = { currentPoints = emptyList() }
+                    )
+                }
         ) {
             (strokes + DrawStrokeData(currentPoints, brushColor, brushWidth)).forEach { s ->
                 if (s.points.size > 1) {
@@ -87,82 +94,126 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
             }
         }
 
-        Row(Modifier.align(Alignment.TopCenter).fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+        // نوار بالا: با احترام به نوار وضعیت
+        Row(
+            Modifier.align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically) {
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             DrawButton("✕") { onBack() }
             DrawButton("↩") { strokes = strokes.dropLast(1) }
             DrawButton("🗑") { strokes = emptyList() }
             Spacer(Modifier.weight(1f))
-            Surface(onClick = {
-                if (strokes.isEmpty() || canvasSize == IntSize.Zero) {
-                    Toast.makeText(context, "اول یه چیزی بکش! 🖌️", Toast.LENGTH_SHORT).show()
-                    return@Surface
-                }
-                scope.launch(Dispatchers.IO) {
-                    val bmp = Bitmap.createBitmap(canvasSize.width, canvasSize.height, Bitmap.Config.ARGB_8888)
-                    val c = android.graphics.Canvas(bmp)
-                    c.drawColor(android.graphics.Color.WHITE)
-                    val paint = android.graphics.Paint().apply {
-                        isAntiAlias = true
-                        style = android.graphics.Paint.Style.STROKE
-                        strokeCap = android.graphics.Paint.Cap.ROUND
-                        strokeJoin = android.graphics.Paint.Join.ROUND
+            Surface(
+                onClick = {
+                    if (strokes.isEmpty() || canvasSize == IntSize.Zero) {
+                        Toast.makeText(context, "اول یه چیزی بکش! 🖌️", Toast.LENGTH_SHORT).show()
+                        return@Surface
                     }
-                    strokes.forEach { s ->
-                        paint.color = s.color.toArgb()
-                        paint.strokeWidth = s.width
-                        val p = android.graphics.Path()
-                        p.moveTo(s.points.first().x, s.points.first().y)
-                        for (i in 1 until s.points.size) p.lineTo(s.points[i].x, s.points[i].y)
-                        c.drawPath(p, paint)
+                    scope.launch(Dispatchers.IO) {
+                        val bmp = Bitmap.createBitmap(canvasSize.width, canvasSize.height, Bitmap.Config.ARGB_8888)
+                        val c = android.graphics.Canvas(bmp)
+                        c.drawColor(android.graphics.Color.WHITE)
+                        val paint = android.graphics.Paint().apply {
+                            isAntiAlias = true
+                            style = android.graphics.Paint.Style.STROKE
+                            strokeCap = android.graphics.Paint.Cap.ROUND
+                            strokeJoin = android.graphics.Paint.Join.ROUND
+                        }
+                        strokes.forEach { s ->
+                            paint.color = s.color.toArgb()
+                            paint.strokeWidth = s.width
+                            val p = android.graphics.Path()
+                            p.moveTo(s.points.first().x, s.points.first().y)
+                            for (i in 1 until s.points.size) p.lineTo(s.points[i].x, s.points[i].y)
+                            c.drawPath(p, paint)
+                        }
+                        val file = File(AttachmentStore.attachmentsDir(context), "DRAW_${System.currentTimeMillis()}.png")
+                        FileOutputStream(file).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                        dao.insertAttachment(
+                            Attachment(
+                                noteId = noteId,
+                                fileName = file.name,
+                                filePath = file.absolutePath,
+                                mimeType = "image/png",
+                                isImage = true
+                            )
+                        )
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(context, "نقاشی ضمیمه شد 🎨", Toast.LENGTH_SHORT).show()
+                            onBack()
+                        }
                     }
-                    val file = File(AttachmentStore.attachmentsDir(context), "DRAW_${System.currentTimeMillis()}.png")
-                    FileOutputStream(file).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                    dao.insertAttachment(Attachment(noteId = noteId, fileName = file.name, filePath = file.absolutePath, mimeType = "image/png", isImage = true))
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "نقاشی ضمیمه شد 🎨", Toast.LENGTH_SHORT).show()
-                        onBack()
-                    }
-                }
-            }, shape = RoundedCornerShape(16.dp), color = Saffron) {
-                Text("💾 ذخیره", Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
-                    color = Ink, fontFamily = LalezarFont, fontSize = 15.sp)
+                },
+                shape = RoundedCornerShape(16.dp),
+                color = Saffron
+            ) {
+                Text(
+                    "💾 ذخیره",
+                    Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+                    color = Ink,
+                    fontFamily = LalezarFont,
+                    fontSize = 15.sp
+                )
             }
         }
 
-        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-            .navigationBarsPadding()
-            .imePadding()
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-            .clip(RoundedCornerShape(26.dp))
-            .background(DeepGreen.copy(alpha = .97f))
-            .border(1.dp, LineGreen.copy(alpha = .6f), RoundedCornerShape(26.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp)) {
-
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically) {
+        // پنل پایین: شناور، بالاتر از navigation bar (بدون تداخل)
+        Column(
+            Modifier.align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .clip(RoundedCornerShape(26.dp))
+                .background(DeepGreen.copy(alpha = .97f))
+                .border(1.dp, LineGreen.copy(alpha = .6f), RoundedCornerShape(26.dp))
+                .padding(horizontal = 14.dp, vertical = 12.dp)
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 brushColors.forEach { c ->
-                    Box(Modifier.size(30.dp).clip(CircleShape).background(c)
-                        .border(if (brushColor == c) 3.dp else 1.dp,
-                            if (brushColor == c) Saffron else Color.Black.copy(alpha = .2f), CircleShape)
-                        .clickable { brushColor = c })
+                    Box(
+                        Modifier.size(30.dp)
+                            .clip(CircleShape)
+                            .background(c)
+                            .border(
+                                if (brushColor == c) 3.dp else 1.dp,
+                                if (brushColor == c) Saffron else Color.Black.copy(alpha = .2f),
+                                CircleShape
+                            )
+                            .clickable { brushColor = c }
+                    )
                 }
                 Spacer(Modifier.weight(1f))
-                Text(if (brushColor == Color.White) "پاک‌کن 🧽" else "قلم 🖌️",
-                    fontSize = 12.sp, color = MutedGreenText)
+                Text(
+                    if (brushColor == Color.White) "پاک‌کن 🧽" else "قلم 🖌️",
+                    fontSize = 12.sp,
+                    color = MutedGreenText
+                )
             }
-
             Spacer(Modifier.height(6.dp))
-
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("〰️", fontSize = 15.sp)
-                Slider(value = brushWidth, onValueChange = { brushWidth = it },
-                    valueRange = 2f..28f, modifier = Modifier.weight(1f),
-                    colors = SliderDefaults.colors(thumbColor = Saffron, activeTrackColor = Saffron))
-                Text("ضخامت", fontSize = 11.sp, color = Saffron, fontFamily = LalezarFont)
+                Slider(
+                    value = brushWidth,
+                    onValueChange = { brushWidth = it },
+                    valueRange = 2f..28f,
+                    modifier = Modifier.weight(1f),
+                    colors = SliderDefaults.colors(thumbColor = Saffron, activeTrackColor = Saffron)
+                )
+                Text(
+                    "ضخامت ${brushWidth.toInt().fa()}",
+                    fontSize = 11.sp,
+                    color = Saffron,
+                    fontFamily = LalezarFont
+                )
             }
         }
     }
@@ -170,7 +221,16 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
 
 @Composable
 private fun DrawButton(label: String, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(14.dp), color = DeepGreen.copy(alpha = .85f)) {
-        Text(label, Modifier.padding(horizontal = 14.dp, vertical = 7.dp), fontSize = 16.sp, color = PaperWhite)
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = DeepGreen.copy(alpha = .85f)
+    ) {
+        Text(
+            label,
+            Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+            fontSize = 16.sp,
+            color = PaperWhite
+        )
     }
 }
