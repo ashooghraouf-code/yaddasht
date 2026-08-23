@@ -11,6 +11,7 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 
 enum class ApiFormat { OPENAI, GEMINI, POLLINATIONS }
 
@@ -27,19 +28,19 @@ enum class AiProvider(
 ) {
     POLLINATIONS("Pollinations 🆓 (بدون کلید)", "https://text.pollinations.ai", "openai", ApiFormat.POLLINATIONS, true, false,
         "https://pollinations.ai", "",
-        "نیاز به هیچ ثبت‌نام و کلیدی ندارد!\nفقط همین گزینه را انتخاب و «ذخیره» را بزن.\n✅ کاملاً رایگان و قابل استفاده در ایران"),
+        "نیاز به هیچ ثبت‌نام و کلیدی ندارد!\nفقط انتخاب کن و «ذخیره» بزن.\n✅ اپ از مسیر ناشناسِ رایگان استفاده می‌کند (نه مسیر پولی)."),
     OPENROUTER("OpenRouter 🌐 (مدل رایگان)", "https://openrouter.ai/api/v1", "meta-llama/llama-3.1-8b-instruct:free", ApiFormat.OPENAI, true, true,
         "https://openrouter.ai", "https://openrouter.ai/keys",
         "۱) وارد سایت شو (ایمیل/گوگل)\n۲) از لینک Keys کلید بساز\n✅ مدل‌های با پسوند :free کاملاً رایگان‌اند"),
     GROQ("Groq ⚡ (سریع، سهمیه رایگان)", "https://api.groq.com/openai/v1", "llama-3.1-8b-instant", ApiFormat.OPENAI, true, true,
         "https://groq.com", "https://console.groq.com/keys",
         "۱) در console.groq.com ثبت‌نام کن\n۲) کلید بساز\n✅ سهمیهٔ رایگان روزانه"),
-    GITHUB("GitHub Models 🐙 (رایگان)", "https://models.inference.ai.azure.com", "gpt-4o-mini", ApiFormat.OPENAI, true, true,
+    GITHUB("GitHub Models 🐙 (معمولاً مسدود در ایران)", "https://models.inference.ai.azure.com", "gpt-4o-mini", ApiFormat.OPENAI, false, true,
         "https://github.com/marketplace/models", "https://github.com/settings/personal-access-tokens",
-        "۱) از لینک بالا یک Personal Access Token بساز\n۲) توکن را به‌جای کلید API وارد کن\n✅ با اکانت گیت‌هاب رایگان"),
+        "⚠️ دامنهٔ azure.com در بسیاری از شبکه‌های ایران مسدود است؛ فقط با DNS غیرایرانی قابل استفاده است."),
     DEEPSEEK("DeepSeek 🇨🇳 (API پولی!)", "https://api.deepseek.com", "deepseek-chat", ApiFormat.OPENAI, true, true,
         "https://www.deepseek.com", "https://platform.deepseek.com/api_keys",
-        "⚠️ مهم: چتِ سایت دیپ‌سیک رایگان است ولی API آن نیاز به شارژ دلاری دارد.\nخطای Insufficient Balance به همین دلیل است، نه باگ اپ!"),
+        "⚠️ چتِ سایت دیپ‌سیک رایگان است ولی API آن نیاز به شارژ دلاری دارد.\nخطای Insufficient Balance به همین دلیل است، نه باگ اپ!"),
     OPENAI("OpenAI (ChatGPT) 🇺🇸", "https://api.openai.com/v1", "gpt-4o-mini", ApiFormat.OPENAI, false, true,
         "https://openai.com", "https://platform.openai.com/api-keys",
         "۱) حساب بساز و کلید بگیر\n⚠️ ایران تحریم است؛ مسئولیت با کاربر"),
@@ -71,17 +72,17 @@ object AiAssistant {
     data class AnalysisResult(val success: Boolean, val content: String, val error: String? = null)
 
     suspend fun analyzeNote(context: Context, title: String, body: String): AnalysisResult = withContext(Dispatchers.IO) {
-        call(context, """شما دستیار هوشمند فارسی‌زبان اپ «چراغ راه» هستید. یادداشت زیر را تحلیل کن و با ایموجی و ساختار بنویس:
+        callWithFallback(context, """شما دستیار هوشمند فارسی‌زبان اپ «چراغ راه» هستید. یادداشت زیر را تحلیل کن و با ایموجی و ساختار بنویس:
 📌 خلاصه موضوع:
 🔑 نکات کلیدی:
 💡 پیشنهادها برای بهبود:
 
 عنوان: $title
-متن: $body""")
+متن: ${body.take(3000)}""")
     }
 
     suspend fun reportNote(context: Context, title: String, body: String): AnalysisResult = withContext(Dispatchers.IO) {
-        call(context, """یک گزارش تحلیلی کامل و ساختاریافته به فارسی برای یادداشت زیر بنویس:
+        callWithFallback(context, """یک گزارش تحلیلی کامل و ساختاریافته به فارسی برای یادداشت زیر بنویس:
 🧭 چشم‌انداز کلی:
 📈 نکات و داده‌های مهم:
 ⚠️ ابهام‌ها و کمبودها:
@@ -89,67 +90,117 @@ object AiAssistant {
 🎯 اولویت‌بندی اقدام‌ها:
 
 عنوان: $title
-متن: $body""")
+متن: ${body.take(3000)}""")
     }
 
     suspend fun askAboutNote(context: Context, title: String, body: String, history: List<Pair<String, String>>, question: String): AnalysisResult = withContext(Dispatchers.IO) {
-        val hist = if (history.isEmpty()) "" else history.joinToString("\n") { "پرسش: ${it.first}\nپاسخ: ${it.second}" }
-        call(context, """تو دستیار هوشمند اپ «چراغ راه» هستی. با توجه به متن یادداشت و گفتگوی قبلی، به پرسش جدید پاسخ فارسی و مفید بده. هیچ محدودیتی در تعداد پرسش‌ها نیست.
+        val hist = if (history.isEmpty()) "" else history.takeLast(6).joinToString("\n") { "پرسش: ${it.first}\nپاسخ: ${it.second.take(800)}" }
+        callWithFallback(context, """تو دستیار هوشمند اپ «چراغ راه» هستی. با توجه به متن یادداشت و گفتگوی قبلی، به پرسش جدید پاسخ فارسی و مفید بده.
 عنوان یادداشت: $title
-متن یادداشت: $body
+متن یادداشت: ${body.take(2500)}
 گفتگوی قبلی:
 $hist
 پرسش جدید: $question""")
     }
 
-    private fun openaiBody(prompt: String, model: String): String = JSONObject().apply {
-        put("model", model); put("temperature", 0.7); put("max_tokens", 2000)
-        put("messages", JSONArray().apply { put(JSONObject().apply { put("role", "user"); put("content", prompt) }) })
-    }.toString()
+    private fun isNetworkError(msg: String?): Boolean {
+        if (msg == null) return false
+        return msg.contains("Unable to resolve host", true) ||
+                msg.contains("No address associated", true) ||
+                msg.contains("failed to connect", true) ||
+                msg.contains("ConnectException", true) ||
+                msg.contains("SocketTimeoutException", true) ||
+                msg.contains("Network is unreachable", true) ||
+                msg.contains("Connection refused", true)
+    }
 
-    private fun geminiBody(prompt: String): String = JSONObject().apply {
-        put("contents", JSONArray().apply { put(JSONObject().apply { put("parts", JSONArray().apply { put(JSONObject().apply { put("text", prompt) }) }) }) })
-    }.toString()
+    private suspend fun callWithFallback(context: Context, prompt: String): AnalysisResult {
+        val primary = AiConfig.provider(context)
+        val first = attempt(context, primary, prompt)
+        if (first.success) return first
+        if (primary != AiProvider.POLLINATIONS && (isNetworkError(first.error) || first.error?.contains("402") == true || first.error?.contains("balance", true) == true)) {
+            val second = attempt(context, AiProvider.POLLINATIONS, prompt)
+            if (second.success) return second.copy(content = "🔄 سرویس انتخابی در دسترس نبود؛ به‌صورت خودکار از «Pollinations 🆓» استفاده شد.\n\n" + second.content)
+            return AnalysisResult(false, "", "سرویس اصلی و سرویس جایگزین هر دو در دسترس نیستند.\nخطای اول: ${first.error}\nخطای دوم: ${second.error}\n💡 DNS گوشی را روی ۱.۱.۱.۱ بگذار و دوباره امتحان کن.")
+        }
+        return first
+    }
 
-    private fun call(context: Context, prompt: String): AnalysisResult {
-        if (!AiConfig.isConfigured(context)) return AnalysisResult(false, "", "ابتدا از دکمهٔ ⚙️ یک سرویس‌دهنده انتخاب و ذخیره کن")
+    private fun readAll(conn: HttpURLConnection): String =
+        BufferedReader(InputStreamReader(conn.inputStream, Charsets.UTF_8)).use { it.readText() }
+
+    private fun readErr(conn: HttpURLConnection): String =
+        conn.errorStream?.let { BufferedReader(InputStreamReader(it, Charsets.UTF_8)).use { r -> r.readText() } } ?: "HTTP ${conn.responseCode}"
+
+    private fun friendly(err: String): String = when {
+        err.contains("Insufficient Balance", true) || err.contains("balance", true) ->
+            "💳 این سرویس پولی است و اعتبار ندارد. از ⚙️ گزینهٔ رایگان Pollinations یا OpenRouter را انتخاب کن."
+        err.contains("PAYMENT_REQUIRED", true) || err.contains("402") ->
+            "💳 این مسیر پولی شده است؛ اپ فقط باید از مسیر ناشناس استفاده کند (نسخهٔ جدید اپ این را اصلاح کرده)."
+        err.contains("401") -> "کلید API معتبر نیست (401)"
+        err.contains("403") || err.contains("not available", true) -> "این سرویس در منطقهٔ شما در دسترس نیست (403)"
+        err.contains("429") -> "صف شلوغ است؛ چند ثانیه صبر کن و دوباره امتحان کن (429)"
+        else -> err
+    }
+
+    private fun parseContent(raw: String): String = try {
+        JSONObject(raw).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content")
+    } catch (e: Exception) { raw }
+
+    private fun attempt(context: Context, provider: AiProvider, prompt: String): AnalysisResult {
+        if (provider.needsKey && AiConfig.provider(context) != provider)
+            return AnalysisResult(false, "", "برای ${provider.displayName} کلید لازم است")
         return try {
-            val provider = AiConfig.provider(context)
-            val key = AiConfig.apiKey(context)
-            val base = AiConfig.baseUrl(context).trimEnd('/')
-            val model = AiConfig.model(context)
+            val configured = AiConfig.provider(context) == provider
+            val key = if (configured) AiConfig.apiKey(context) else ""
+            val base = (if (configured) AiConfig.baseUrl(context) else provider.defaultBaseUrl).trimEnd('/')
+            val model = if (configured) AiConfig.model(context) else provider.defaultModel
+
+            if (provider.format == ApiFormat.POLLINATIONS) {
+                // ✅ مسیر ناشناسِ رایگان: POST به ریشه
+                val body = JSONObject().apply {
+                    put("model", model)
+                    put("messages", JSONArray().apply { put(JSONObject().apply { put("role", "user"); put("content", prompt) }) })
+                }.toString()
+                val conn = URL("$base/").openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.connectTimeout = 20000; conn.readTimeout = 90000; conn.doOutput = true
+                OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(body); it.flush() }
+                if (conn.responseCode == 200) return AnalysisResult(true, parseContent(readAll(conn)).trim())
+
+                // ✅ مسیر قدیمی GET (ناشناس)
+                val getUrl = "$base/" + URLEncoder.encode(prompt.take(1800), "UTF-8")
+                val c2 = URL(getUrl).openConnection() as HttpURLConnection
+                c2.requestMethod = "GET"
+                c2.connectTimeout = 20000; c2.readTimeout = 90000
+                if (c2.responseCode == 200) return AnalysisResult(true, readAll(c2).trim())
+
+                return AnalysisResult(false, "", friendly(readErr(c2)))
+            }
+
             val (urlStr, jsonBody, auth) = when (provider.format) {
-                ApiFormat.OPENAI -> Triple("$base/chat/completions", openaiBody(prompt, model), true)
-                ApiFormat.GEMINI -> Triple("$base/models/$model:generateContent?key=$key", geminiBody(prompt), false)
-                ApiFormat.POLLINATIONS -> Triple("$base/openai", openaiBody(prompt, model), false)
+                ApiFormat.OPENAI -> Triple("$base/chat/completions", JSONObject().apply {
+                    put("model", model); put("temperature", 0.7); put("max_tokens", 2000)
+                    put("messages", JSONArray().apply { put(JSONObject().apply { put("role", "user"); put("content", prompt) }) })
+                }.toString(), true)
+                ApiFormat.GEMINI -> Triple("$base/models/$model:generateContent?key=$key", JSONObject().apply {
+                    put("contents", JSONArray().apply { put(JSONObject().apply { put("parts", JSONArray().apply { put(JSONObject().apply { put("text", prompt) }) }) }) })
+                }.toString(), false)
+                else -> Triple("", "", false)
             }
             val conn = URL(urlStr).openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
             conn.setRequestProperty("Content-Type", "application/json")
             conn.setRequestProperty("Accept", "*/*")
             if (auth && key.isNotBlank()) conn.setRequestProperty("Authorization", "Bearer $key")
-            conn.connectTimeout = 30000; conn.readTimeout = 90000; conn.doOutput = true
+            conn.connectTimeout = 20000; conn.readTimeout = 90000; conn.doOutput = true
             OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(jsonBody); it.flush() }
-            if (conn.responseCode != 200) {
-                val err = conn.errorStream?.let { BufferedReader(InputStreamReader(it, Charsets.UTF_8)).use { r -> r.readText() } } ?: "HTTP ${conn.responseCode}"
-                val friendly = when {
-                    err.contains("Insufficient Balance", true) || err.contains("balance", true) ->
-                        "💳 این سرویس پولی است و اعتبار ندارد. از ⚙️ گزینهٔ رایگان Pollinations یا OpenRouter را انتخاب کن."
-                    err.contains("401") -> "کلید API معتبر نیست (401)"
-                    err.contains("403") || err.contains("not available", true) -> "این سرویس در منطقهٔ شما در دسترس نیست (403)"
-                    err.contains("429") -> "صف شلوغ است؛ چند ثانیه صبر کن و دوباره امتحان کن (429)"
-                    else -> err
-                }
-                return AnalysisResult(false, "", friendly)
-            }
-            val raw = BufferedReader(InputStreamReader(conn.inputStream, Charsets.UTF_8)).use { it.readText() }
-            val content = when (provider.format) {
-                ApiFormat.GEMINI -> JSONObject(raw).getJSONArray("candidates").getJSONObject(0)
-                    .getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
-                else -> try {
-                    JSONObject(raw).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content")
-                } catch (e: Exception) { raw }
-            }
+            if (conn.responseCode != 200) return AnalysisResult(false, "", friendly(readErr(conn)))
+            val raw = readAll(conn)
+            val content = if (provider.format == ApiFormat.GEMINI)
+                JSONObject(raw).getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
+            else parseContent(raw)
             AnalysisResult(true, content.trim())
         } catch (e: Exception) {
             AnalysisResult(false, "", e.message ?: "خطای شبکه؛ اینترنت را بررسی کن")
