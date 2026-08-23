@@ -26,25 +26,21 @@ object ReminderScheduler {
             val nm = context.getSystemService(NotificationManager::class.java)
             nm.deleteNotificationChannel("yaddasht_reminders")
             if (nm.getNotificationChannel(CHANNEL_ID) == null) {
-                val attrs = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build()
+                val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
                 val ch = NotificationChannel(CHANNEL_ID, "یادآورهای زنگ‌دار", NotificationManager.IMPORTANCE_HIGH).apply {
                     description = "زنگ گوشی و ویبره قوی برای یادآورها"
                     enableVibration(true)
                     vibrationPattern = longArrayOf(0, 800, 400, 800, 400, 800, 400, 800)
                     alarmSound(context)?.let { setSound(it, attrs) }
-                    setShowBadge(true)
-                    enableLights(true)
+                    setShowBadge(true); enableLights(true)
                 }
                 nm.createNotificationChannel(ch)
             }
         }
     }
 
-    fun schedule(context: Context, noteId: Long, title: String, timeMillis: Long) =
-        schedule(context, noteId, title, timeMillis, false)
+    fun schedule(context: Context, noteId: Long, title: String, timeMillis: Long) = schedule(context, noteId, title, timeMillis, false)
 
     fun schedule(context: Context, id: Long, title: String, timeMillis: Long, isTask: Boolean) {
         ensureChannel(context)
@@ -53,11 +49,9 @@ object ReminderScheduler {
             .putExtra(EXTRA_TITLE, title.ifBlank { if (isTask) "وظیفه" else "یادداشت" })
             .putExtra(EXTRA_IS_TASK, isTask)
         val code = if (isTask) id.toInt() + 1_000_000 else id.toInt()
-        val pi = PendingIntent.getBroadcast(context, code, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val pi = PendingIntent.getBroadcast(context, code, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val am = context.getSystemService(AlarmManager::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timeMillis, pi)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timeMillis, pi)
         else am.setExact(AlarmManager.RTC_WAKEUP, timeMillis, pi)
     }
 
@@ -65,11 +59,7 @@ object ReminderScheduler {
 
     fun cancel(context: Context, id: Long, isTask: Boolean) {
         val code = if (isTask) id.toInt() + 1_000_000 else id.toInt()
-        val pi = PendingIntent.getBroadcast(context, code, Intent(context, ReminderReceiver::class.java),
-            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)
-        if (pi != null) {
-            context.getSystemService(AlarmManager::class.java).cancel(pi)
-            pi.cancel()
-        }
+        val pi = PendingIntent.getBroadcast(context, code, Intent(context, ReminderReceiver::class.java), PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)
+        if (pi != null) { context.getSystemService(AlarmManager::class.java).cancel(pi); pi.cancel() }
     }
 }
