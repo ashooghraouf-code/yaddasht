@@ -14,13 +14,23 @@ import androidx.activity.enableEdgeToEdge
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -32,7 +42,12 @@ import ir.yaddasht.app.ui.screen.DrawScreen
 import ir.yaddasht.app.ui.screen.EditorScreen
 import ir.yaddasht.app.ui.screen.HomeScreen
 import ir.yaddasht.app.ui.screen.TaskEditorScreen
-import ir.yaddasht.app.ui.theme.*
+import ir.yaddasht.app.ui.theme.DeepGreen
+import ir.yaddasht.app.ui.theme.LalezarFont
+import ir.yaddasht.app.ui.theme.MutedGreenText
+import ir.yaddasht.app.ui.theme.PaperWhite
+import ir.yaddasht.app.ui.theme.Saffron
+import ir.yaddasht.app.ui.theme.YaddashtTheme
 import ir.yaddasht.app.util.NoteLock
 import ir.yaddasht.app.widget.NoteWidget
 import kotlinx.coroutines.Dispatchers
@@ -46,7 +61,6 @@ sealed class Screen {
     data class Editor(val noteId: Long) : Screen()
     data class Draw(val noteId: Long, val isTask: Boolean = false) : Screen()
     data class TaskEditor(val taskId: Long) : Screen()
-
     companion object {
         val SAVER: Saver<Screen, String> = Saver(
             save = { s ->
@@ -89,11 +103,9 @@ class MainActivity : FragmentActivity() {
                 lastHitTime = now
                 shakeHits++
                 if (shakeHits >= 4 && now - lastTrigger > 3000) {
-                    lastTrigger = now
-                    shakeHits = 0
+                    lastTrigger = now; shakeHits = 0
                     (getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator)?.let {
-                        if (Build.VERSION.SDK_INT >= 26)
-                            it.vibrate(VibrationEffect.createOneShot(70, VibrationEffect.DEFAULT_AMPLITUDE))
+                        if (Build.VERSION.SDK_INT >= 26) it.vibrate(VibrationEffect.createOneShot(70, VibrationEffect.DEFAULT_AMPLITUDE))
                     }
                     onShake?.invoke()
                 }
@@ -105,18 +117,11 @@ class MainActivity : FragmentActivity() {
     private fun showBiometric(onSuccess: () -> Unit) {
         val executor = ContextCompat.getMainExecutor(this)
         val prompt = BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                super.onAuthenticationSucceeded(result)
-                onSuccess()
-            }
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) { super.onAuthenticationSucceeded(result); onSuccess() }
         })
         val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("قفل چراغ راه 🔒")
-            .setSubtitle("با اثر انگشت یا رمز دستگاه باز کن")
-            .setAllowedAuthenticators(
-                BiometricManager.Authenticators.BIOMETRIC_WEAK or
-                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
-            )
+            .setTitle("قفل چراغ راه 🔒").setSubtitle("با اثر انگشت یا رمز دستگاه باز کن")
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
             .build()
         prompt.authenticate(info)
     }
@@ -125,30 +130,20 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
-
         setContent {
             YaddashtTheme {
                 val dao = remember { AppDatabase.get(applicationContext).dao() }
                 val taskDao = remember { AppDatabase.get(applicationContext).taskDao() }
                 var authRequired by remember { mutableStateOf(false) }
                 var authChecked by remember { mutableStateOf(false) }
-
                 LaunchedEffect(Unit) {
-                    val hasLocked = withContext(Dispatchers.IO) {
-                        dao.allNotesSync().any { NoteLock.isLocked(it.body) }
-                    }
+                    val hasLocked = withContext(Dispatchers.IO) { dao.allNotesSync().any { NoteLock.isLocked(it.body) } }
                     val canBio = BiometricManager.from(this@MainActivity).canAuthenticate(
-                        BiometricManager.Authenticators.BIOMETRIC_WEAK or
-                                BiometricManager.Authenticators.DEVICE_CREDENTIAL
-                    ) == BiometricManager.BIOMETRIC_SUCCESS
+                        BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS
                     if (hasLocked && canBio) authRequired = true
                     authChecked = true
                 }
-
-                LaunchedEffect(authRequired) {
-                    if (authRequired) showBiometric { authRequired = false }
-                }
-
+                LaunchedEffect(authRequired) { if (authRequired) showBiometric { authRequired = false } }
                 if (authRequired) {
                     LockScreen { showBiometric { authRequired = false } }
                 } else if (authChecked) {
@@ -162,43 +157,22 @@ class MainActivity : FragmentActivity() {
                             else -> Screen.Home
                         })
                     }
-
-                    LaunchedEffect(screen) {
-                        if (screen is Screen.Home) NoteWidget.forceUpdate(this@MainActivity)
-                    }
-
+                    LaunchedEffect(screen) { if (screen is Screen.Home) NoteWidget.forceUpdate(this@MainActivity) }
                     DisposableEffect(Unit) {
                         onShake = { screen = Screen.Editor(NEW_NOTE_ID) }
                         onDispose { onShake = null }
                     }
-
                     when (val s = screen) {
-                        is Screen.Home -> HomeScreen(
-                            dao = dao,
-                            taskDao = taskDao,
+                        is Screen.Home -> HomeScreen(dao = dao, taskDao = taskDao,
                             onOpenNote = { screen = Screen.Editor(it) },
                             onNewNote = { screen = Screen.Editor(NEW_NOTE_ID) },
-                            onOpenTask = { screen = Screen.TaskEditor(it) }
-                        )
-                        is Screen.Editor -> EditorScreen(
-                            dao = dao,
-                            noteId = s.noteId,
-                            onBack = { screen = Screen.Home },
-                            onOpenDraw = { screen = Screen.Draw(it, false) }
-                        )
-                        is Screen.Draw -> DrawScreen(
-                            dao = dao,
-                            noteId = s.noteId,
-                            isTask = s.isTask,
-                            taskDao = taskDao,
-                            onBack = { screen = if (s.isTask) Screen.TaskEditor(s.noteId) else Screen.Editor(s.noteId) }
-                        )
-                        is Screen.TaskEditor -> TaskEditorScreen(
-                            taskDao = taskDao,
-                            taskId = s.taskId,
-                            onBack = { screen = Screen.Home },
-                            onOpenDraw = { screen = Screen.Draw(it, true) }
-                        )
+                            onOpenTask = { screen = Screen.TaskEditor(it) })
+                        is Screen.Editor -> EditorScreen(dao = dao, noteId = s.noteId,
+                            onBack = { screen = Screen.Home }, onOpenDraw = { screen = Screen.Draw(it, false) })
+                        is Screen.Draw -> DrawScreen(dao = dao, noteId = s.noteId, isTask = s.isTask, taskDao = taskDao,
+                            onBack = { screen = if (s.isTask) Screen.TaskEditor(s.noteId) else Screen.Editor(s.noteId) })
+                        is Screen.TaskEditor -> TaskEditorScreen(taskDao = taskDao, taskId = s.taskId,
+                            onBack = { screen = Screen.Home }, onOpenDraw = { screen = Screen.Draw(it, true) })
                     }
                 }
             }
@@ -207,11 +181,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
-        sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
-            sensorManager?.registerListener(shakeListener, it, SensorManager.SENSOR_DELAY_UI)
-        }
+        sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let { sensorManager?.registerListener(shakeListener, it, SensorManager.SENSOR_DELAY_UI) }
     }
-
     override fun onPause() {
         super.onPause()
         sensorManager?.unregisterListener(shakeListener)
@@ -228,8 +199,7 @@ private fun LockScreen(onUnlock: () -> Unit) {
             Spacer(Modifier.height(6.dp))
             Text("یادداشت محرمانه داری؛ اول خودت را ثابت کن!", fontSize = 12.sp, color = MutedGreenText)
             Spacer(Modifier.height(20.dp))
-            Button(onClick = onUnlock,
-                colors = ButtonDefaults.buttonColors(containerColor = Saffron, contentColor = Ink)) {
+            Button(onClick = onUnlock, colors = ButtonDefaults.buttonColors(containerColor = Saffron, contentColor = Ink)) {
                 Text("باز کردن 🔓", fontFamily = LalezarFont, fontSize = 16.sp)
             }
         }
