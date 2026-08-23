@@ -8,12 +8,10 @@ object LocalEngine {
         "ما", "شما", "او", "آنها", "من", "تو", "چرا", "چگونه", "چه", "کی", "کجا", "یک", "دو", "سه",
         "روز", "زمان", "بعد", "قبل", "بین", "روی", "زیر", "بالای", "پیش", "پس", "اگر", "ولی", "اما",
         "چون", "زیرا", "همه", "هیچ", "بعضی", "چند", "هرگز", "هنوز", "الان", "امروز", "فردا", "دیروز",
-        "اینکه", "آنکه", "باشد", "باشه", "هستش", "داره", "دارم", "داري", "داری", "دارد", "میکنم", "میکند"
+        "اینکه", "آنکه", "باشد", "باشه", "داره", "دارم", "داری", "دارد", "میکنم", "میکند"
     )
 
-    private fun normalize(s: String): String = s
-        .replace('ي', 'ی').replace('ك', 'ک').replace('ة', 'ه')
-        .replace("‌", " ")
+    private fun normalize(s: String): String = s.replace('ي', 'ی').replace('ك', 'ک').replace('ة', 'ه').replace("‌", " ")
 
     private fun words(text: String): List<String> =
         normalize(text).split(Regex("[\\s\\p{P}]+")).map { it.trim() }.filter { it.length >= 3 }
@@ -31,18 +29,14 @@ object LocalEngine {
         val sents = sentences(text)
         if (sents.isEmpty()) return "متن کافی برای خلاصه وجود ندارد."
         val kw = keywords(text, 10).toSet()
-        val scored = sents.mapIndexed { i, s ->
-            val score = words(s).count { it in kw } + (if (i == 0) 2 else 0)
-            Triple(i, s, score)
-        }
-        return scored.sortedByDescending { it.third }.take(maxSentences)
-            .sortedBy { it.first }.joinToString("\n") { "• " + it.second }
+        return sents.mapIndexed { i, s -> Triple(i, s, s.split(Regex("\\s+")).count { it in kw } + (if (i == 0) 2 else 0)) }
+            .sortedByDescending { it.third }.take(maxSentences).sortedBy { it.first }
+            .joinToString("\n") { "• " + it.second }
     }
 
     private fun suggestions(text: String): String {
         val list = mutableListOf<String>()
-        val wc = words(text).size
-        if (wc > 300) list.add("یادداشت بلند است؛ آن را به بخش‌های کوچک‌تر تقسیم کن یا از حالت تمرکز ✒️ استفاده کن.")
+        if (words(text).size > 300) list.add("یادداشت بلند است؛ آن را به بخش‌های کوچک‌تر تقسیم کن یا از حالت تمرکز ✒️ استفاده کن.")
         if (text.contains("؟") || text.contains("?")) list.add("پرسش‌هایی داخل متن هست؛ می‌توانی برایشان وظیفه یا یادآور بسازی.")
         if (Regex("فردا|امروز|ساعت|صبح|عصر|هفته").containsMatchIn(text)) list.add("متن به زمان اشاره دارد؛ یک یادآور ⏰ تنظیم کن تا فراموش نشود.")
         if (text.contains("☐") || text.contains("☑")) list.add("چک‌لیست تشخیص داده شد؛ موارد انجام‌نشده را اولویت‌بندی کن.")
@@ -70,7 +64,7 @@ ${suggestions(body)}"""
 ${summarize(body, 2)}
 
 📈 داده‌های متن:
-• ${wc} کلمه و ${sc} جمله
+• $wc کلمه و $sc جمله
 • بلندترین جمله: ${(sentences(body).maxByOrNull { it.length } ?: "-").take(80)}
 
 🔑 کلیدواژه‌ها:
@@ -89,11 +83,25 @@ ${suggestions(body)}
     fun answer(question: String, body: String): String {
         val qk = keywords(question, 6)
         if (qk.isEmpty()) return "پرسش کلیدواژهٔ قابل‌جستجو ندارد؛ ساده‌تر بپرس."
-        val sents = sentences(body)
-        val best = sents.map { s -> Pair(s, qk.count { k -> s.contains(k) }) }.maxByOrNull { it.second }
+        val best = sentences(body).map { s -> Pair(s, qk.count { k -> s.contains(k) }) }.maxByOrNull { it.second }
         return if (best != null && best.second > 0)
             "بر اساس متن یادداشت:\n«${best.first}»\n\nکلیدواژه‌های یافت‌شده: ${qk.filter { k -> best.first.contains(k) }.joinToString("، ")}"
         else
-            "در متن این یادداشت پاسخ مستقیمی برای پرسش شما پیدا نشد.\nکلیدواژه‌های پرسش: ${qk.joinToString("، ")}\n💡 متن یادداشت را کامل‌تر کن یا از سرویس‌های آنلاین برای پاسخ عمیق‌تر استفاده کن."
+            "در متن این یادداشت پاسخ مستقیمی پیدا نشد.\nکلیدواژه‌های پرسش: ${qk.joinToString("، ")}\n💡 متن را کامل‌تر کن یا از سرویس آنلاین استفاده کن."
+    }
+
+    // ✍️ موتور ویرایشگر متن (آفلاین)
+    fun editText(text: String): String {
+        if (text.isBlank()) return "متنی برای ویرایش وجود ندارد."
+        var t = text
+            .replace('ي', 'ی').replace('ك', 'ک').replace('ة', 'ه')
+            .replace(Regex("[ \t]+"), " ")
+            .replace(Regex(" +([.,،؛:!؟?])"), "$1")
+            .replace(Regex("([.,،؛:!؟?])([^\\s.,،؛:!؟?])"), "$1 $2")
+            .replace(Regex("\\n{3,}"), "\n\n")
+        t = t.map { c -> if (c in '0'..'9') ('۰' + (c - '0')) else c }.joinToString("")
+        t = t.trim()
+        if (t.isNotEmpty() && !Regex("[.،؛:!؟?]").containsMatchIn(t.takeLast(1))) t += "."
+        return "✍️ متن ویراسته:\n\n$t"
     }
 }
