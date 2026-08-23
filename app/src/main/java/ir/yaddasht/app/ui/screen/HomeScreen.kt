@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -78,7 +77,8 @@ fun HomeScreen(
     dao: NoteDao,
     taskDao: TaskDao,
     onOpenNote: (Long) -> Unit,
-    onNewNote: () -> Unit
+    onNewNote: () -> Unit,
+    onOpenTask: (Long) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -99,11 +99,9 @@ fun HomeScreen(
             scope.launch(Dispatchers.IO) {
                 val count = BackupManager.restore(context, dao, uri)
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        context,
+                    Toast.makeText(context,
                         if (count > 0) "$count یادداشت بازیابی شد ✅" else "فایل پشتیبان معتبر نبود ❌",
-                        Toast.LENGTH_LONG
-                    ).show()
+                        Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -133,60 +131,40 @@ fun HomeScreen(
     val filteredTasks = tasks.filter { query.isBlank() || it.title.contains(query, true) }
     val memory = remember(notes) { pickMemory(notes) }
 
-    Scaffold(
-        containerColor = DeepGreen,
+    Scaffold(containerColor = DeepGreen,
         floatingActionButton = {
             if (tab == 0) NewNoteFab(onNewNote)
-            else ExtendedFloatingActionButton(
-                onClick = { showAddTask = true },
-                containerColor = Saffron,
-                contentColor = Ink
-            ) {
+            else ExtendedFloatingActionButton(onClick = { showAddTask = true },
+                containerColor = Saffron, contentColor = Ink) {
                 Icon(Icons.Filled.Add, "جدید")
                 Spacer(Modifier.width(8.dp))
                 Text("وظیفه جدید", fontFamily = LalezarFont, fontSize = 17.sp)
             }
-        }
-    ) { padding ->
+        }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             PaperDots()
             Column(Modifier.fillMaxSize()) {
-                HomeHeader(
-                    count = notes.size,
-                    onStats = { showStats = true },
+                HomeHeader(count = notes.size, onStats = { showStats = true },
                     onBackup = { doBackup() },
-                    onRestore = { restoreLauncher.launch(arrayOf("*/*")) }
-                )
+                    onRestore = { restoreLauncher.launch(arrayOf("*/*")) })
 
-                TabRow(
-                    selectedTabIndex = tab,
+                TabRow(selectedTabIndex = tab,
                     containerColor = Color.Transparent,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
-                ) {
-                    Tab(
-                        selected = tab == 0,
-                        onClick = { tab = 0 },
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)) {
+                    Tab(selected = tab == 0, onClick = { tab = 0 },
                         text = { Text("📝 یادداشت‌ها (${notes.size.fa()})", fontFamily = LalezarFont, fontSize = 15.sp) },
-                        selectedContentColor = Saffron,
-                        unselectedContentColor = MutedGreenText
-                    )
-                    Tab(
-                        selected = tab == 1,
-                        onClick = { tab = 1 },
+                        selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
+                    Tab(selected = tab == 1, onClick = { tab = 1 },
                         text = { Text("✅ وظایف (${tasks.count { !it.isCompleted }.fa()})", fontFamily = LalezarFont, fontSize = 15.sp) },
-                        selectedContentColor = Saffron,
-                        unselectedContentColor = MutedGreenText
-                    )
+                        selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
                 }
 
                 if (!hideMemory && memory != null && query.isBlank() && tab == 0) {
-                    Surface(
-                        onClick = { onOpenNote(memory.id) },
+                    Surface(onClick = { onOpenNote(memory.id) },
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
                         shape = RoundedCornerShape(16.dp),
                         color = Saffron.copy(alpha = .14f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Saffron.copy(alpha = .4f))
-                    ) {
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Saffron.copy(alpha = .4f))) {
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("⏳", fontSize = 22.sp)
                             Spacer(Modifier.width(10.dp))
@@ -242,17 +220,20 @@ fun HomeScreen(
                             contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 120.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            items(filteredTasks, key = { it.id }) { task ->
-                                TaskCard(task,
-                                    onToggle = {
-                                        scope.launch(Dispatchers.IO) {
-                                            taskDao.update(task.copy(isCompleted = !task.isCompleted))
-                                        }
-                                    },
-                                    onDelete = {
-                                        scope.launch(Dispatchers.IO) { taskDao.deleteById(task.id) }
-                                    })
-                                Spacer(Modifier.height(10.dp))
+                            filteredTasks.forEach { task ->
+                                item {
+                                    TaskCard(task,
+                                        onClick = { onOpenTask(task.id) },
+                                        onToggle = {
+                                            scope.launch(Dispatchers.IO) {
+                                                taskDao.update(task.copy(isCompleted = !task.isCompleted))
+                                            }
+                                        },
+                                        onDelete = {
+                                            scope.launch(Dispatchers.IO) { taskDao.deleteById(task.id) }
+                                        })
+                                    Spacer(Modifier.height(10.dp))
+                                }
                             }
                         }
                     }
@@ -294,12 +275,13 @@ fun HomeScreen(
 }
 
 @Composable
-private fun TaskCard(task: Task, onToggle: () -> Unit, onDelete: () -> Unit) {
+private fun TaskCard(task: Task, onClick: () -> Unit, onToggle: () -> Unit, onDelete: () -> Unit) {
     val tint = taskTint(task.dueDate, task.isCompleted)
     Column(Modifier.fillMaxWidth()
         .clip(RoundedCornerShape(18.dp))
         .background(DeepGreenSoft)
         .border(1.5.dp, tint.copy(alpha = .75f), RoundedCornerShape(18.dp))
+        .clickable { onClick() }
         .padding(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(checked = task.isCompleted, onCheckedChange = { onToggle() },
@@ -315,6 +297,7 @@ private fun TaskCard(task: Task, onToggle: () -> Unit, onDelete: () -> Unit) {
                     Text("📅 " + FaDate.full(task.dueDate), fontSize = 11.sp, color = tint,
                         fontWeight = FontWeight.Bold)
                 }
+                Text("برای ویرایش کامل ضربه بزن ✏️", fontSize = 9.sp, color = MutedGreenText)
             }
             if (task.priority == Priority.HIGH && !task.isCompleted) Text("🔴", fontSize = 12.sp)
             IconButton(onClick = onDelete, modifier = Modifier.size(30.dp)) {
@@ -436,11 +419,10 @@ private fun HomeHeader(count: Int, onStats: () -> Unit, onBackup: () -> Unit, on
             IconButton(onClick = onStats) { Icon(Icons.Filled.BarChart, "آمار", tint = MutedGreenText) }
         }
         Spacer(Modifier.height(6.dp))
-        Text(todayFa(), fontSize = 13.sp, color = MutedGreenText, modifier = Modifier.padding(start = 2.dp))
+        Text(FaDate.full(System.currentTimeMillis()), fontSize = 13.sp, color = MutedGreenText,
+            modifier = Modifier.padding(start = 2.dp))
     }
 }
-
-private fun todayFa(): String = FaDate.full(System.currentTimeMillis())
 
 @Composable
 private fun StatsDialog(notes: List<Note>, attachTotal: Int, onDismiss: () -> Unit) {
