@@ -4,8 +4,6 @@ import java.util.Calendar
 
 object FaDate {
 
-    private fun toFa(n: Int): String = n.toString().map { ('۰' + (it - '0')) }.joinToString("")
-
     fun monthName(m: Int): String = when (m) {
         1 -> "فروردین"; 2 -> "اردیبهشت"; 3 -> "خرداد"; 4 -> "تیر"
         5 -> "مرداد"; 6 -> "شهریور"; 7 -> "مهر"; 8 -> "آبان"
@@ -13,7 +11,7 @@ object FaDate {
         else -> ""
     }
 
-    // ---------- شمسی به میلادی (الگوریتم تست‌شده: ۱۴۰۵/۶/۱ → 2026-08-23) ----------
+    // ---------- شمسی به میلادی (تست‌شده) ----------
     fun toGregorian(jy: Int, jm: Int, jd: Int): Triple<Int, Int, Int> {
         val jy2 = jy + 1595
         var days = -355668L + 365L * jy2 + (jy2 / 33) * 8 + ((jy2 % 33) + 3) / 4 + jd +
@@ -47,7 +45,7 @@ object FaDate {
         return c.timeInMillis
     }
 
-    // ---------- ✅ epoch اصلاح‌شده (دیگر یک ماه جلو نمی‌رود) ----------
+    // ---------- epoch اصلاح‌شده ----------
     fun epoch(jy: Int, jm: Int, jd: Int): Long {
         val (gy, gm, gd) = toGregorian(jy, jm, jd)
         return gregorianMillis(gy, gm, gd)
@@ -68,7 +66,7 @@ object FaDate {
         return c.timeInMillis
     }
 
-    // ---------- میلادی به شمسی (تست‌شده: 2026-08-23 → ۱۴۰۵/۶/۱) ----------
+    // ---------- میلادی به شمسی ----------
     fun jalali(millis: Long): Triple<Int, Int, Int> {
         val c = Calendar.getInstance()
         c.timeInMillis = millis
@@ -107,23 +105,7 @@ object FaDate {
             Calendar.THURSDAY -> "پنجشنبه"
             else -> "جمعه"
         }
-        return "$wd، ${toFa(jd)} ${monthName(jm)} ${toFa(jy)}"
-    }
-}
-
-// ---------- توابع کمکی فارسی ----------
-fun Int.fa(): String = this.toString().map { ('۰' + (it - '0')) }.joinToString("")
-
-fun String.faDigits(): String = this.map { if (it in '0'..'9') ('۰' + (it - '0')) else it }.joinToString("")
-
-fun relativeTimeFa(millis: Long): String {
-    val diff = System.currentTimeMillis() - millis
-    val min = diff / 60000
-    return when {
-        min < 1 -> "همین حالا"
-        min < 60 -> "${min.toInt().fa()} دقیقه پیش"
-        min < 1440 -> "${(min / 60).toInt().fa()} ساعت پیش"
-        min < 43200 -> "${(min / 1440).toInt().fa()} روز پیش"
-        else -> FaDate.jalali(millis).let { "${it.third.fa()} ${FaDate.monthName(it.second)}" }
+        // از Format.kt موجود در پروژه استفاده می‌شود
+        return "$wd، ${jd.fa()} ${monthName(jm)} ${jy.fa()}"
     }
 }
