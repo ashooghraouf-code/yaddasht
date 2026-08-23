@@ -42,7 +42,9 @@ import ir.yaddasht.app.ui.screen.DrawScreen
 import ir.yaddasht.app.ui.screen.EditorScreen
 import ir.yaddasht.app.ui.screen.HomeScreen
 import ir.yaddasht.app.ui.screen.TaskEditorScreen
+import ir.yaddasht.app.ui.theme.Brick
 import ir.yaddasht.app.ui.theme.DeepGreen
+import ir.yaddasht.app.ui.theme.Ink
 import ir.yaddasht.app.ui.theme.LalezarFont
 import ir.yaddasht.app.ui.theme.MutedGreenText
 import ir.yaddasht.app.ui.theme.PaperWhite
