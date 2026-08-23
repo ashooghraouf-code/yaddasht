@@ -13,7 +13,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-enum class ApiFormat { OPENAI, GEMINI, POLLINATIONS }
+enum class ApiFormat { OPENAI, GEMINI, POLLINATIONS, LOCAL }
 
 enum class AiProvider(
     val displayName: String,
@@ -28,7 +28,9 @@ enum class AiProvider(
 ) {
     POLLINATIONS("Pollinations 🆓 (بدون کلید)", "https://text.pollinations.ai", "openai", ApiFormat.POLLINATIONS, true, false,
         "https://pollinations.ai", "",
-        "نیاز به هیچ ثبت‌نام و کلیدی ندارد!\nفقط انتخاب کن و «ذخیره» بزن.\n✅ اپ از مسیر ناشناسِ رایگان استفاده می‌کند (نه مسیر پولی)."),
+        "نیاز به ثبت‌نام و کلید ندارد؛ اپ از مسیر ناشناسِ رایگان استفاده می‌کند."),
+    OFFLINE("📴 آفلاین (موتور داخلی)", "", "", ApiFormat.LOCAL, true, false, "", "",
+        "بدون اینترنت و بدون کلید!\nتحلیل سبک (خلاصه، کلیدواژه، پرسش‌وپاسخ متنی) روی خود گوشی انجام می‌شود.\n✅ مناسب قطع/مسدودیت شبکه؛ بدون هیچ دانلودی."),
     OPENROUTER("OpenRouter 🌐 (مدل رایگان)", "https://openrouter.ai/api/v1", "meta-llama/llama-3.1-8b-instruct:free", ApiFormat.OPENAI, true, true,
         "https://openrouter.ai", "https://openrouter.ai/keys",
         "۱) وارد سایت شو (ایمیل/گوگل)\n۲) از لینک Keys کلید بساز\n✅ مدل‌های با پسوند :free کاملاً رایگان‌اند"),
@@ -37,10 +39,10 @@ enum class AiProvider(
         "۱) در console.groq.com ثبت‌نام کن\n۲) کلید بساز\n✅ سهمیهٔ رایگان روزانه"),
     GITHUB("GitHub Models 🐙 (معمولاً مسدود در ایران)", "https://models.inference.ai.azure.com", "gpt-4o-mini", ApiFormat.OPENAI, false, true,
         "https://github.com/marketplace/models", "https://github.com/settings/personal-access-tokens",
-        "⚠️ دامنهٔ azure.com در بسیاری از شبکه‌های ایران مسدود است؛ فقط با DNS غیرایرانی قابل استفاده است."),
-    DEEPSEEK("DeepSeek 🇨🇳 (API پولی!)", "https://api.deepseek.com", "deepseek-chat", ApiFormat.OPENAI, true, true,
+        "⚠️ دامنهٔ azure.com در بسیاری از شبکه‌های ایران مسدود است؛ فقط با DNS غیرایرانی."),
+    DEEPSEEK("DeepSeek 🇨 (API پولی!)", "https://api.deepseek.com", "deepseek-chat", ApiFormat.OPENAI, true, true,
         "https://www.deepseek.com", "https://platform.deepseek.com/api_keys",
-        "⚠️ چتِ سایت دیپ‌سیک رایگان است ولی API آن نیاز به شارژ دلاری دارد.\nخطای Insufficient Balance به همین دلیل است، نه باگ اپ!"),
+        "⚠️ چتِ سایت رایگان است ولی API نیاز به شارژ دلاری دارد (خطای Insufficient Balance)."),
     OPENAI("OpenAI (ChatGPT) 🇺🇸", "https://api.openai.com/v1", "gpt-4o-mini", ApiFormat.OPENAI, false, true,
         "https://openai.com", "https://platform.openai.com/api-keys",
         "۱) حساب بساز و کلید بگیر\n⚠️ ایران تحریم است؛ مسئولیت با کاربر"),
@@ -61,7 +63,7 @@ object AiConfig {
     fun apiKey(context: Context): String = prefs(context).getString("api_key", "") ?: ""
     fun baseUrl(context: Context): String { val s = prefs(context).getString("base_url", "") ?: ""; return if (s.isNotBlank()) s else provider(context).defaultBaseUrl }
     fun model(context: Context): String { val s = prefs(context).getString("model", "") ?: ""; return if (s.isNotBlank()) s else provider(context).defaultModel }
-    fun isConfigured(context: Context): Boolean = provider(context) == AiProvider.POLLINATIONS || apiKey(context).isNotBlank()
+    fun isConfigured(context: Context): Boolean = !provider(context).needsKey || apiKey(context).isNotBlank()
     fun save(context: Context, p: AiProvider, key: String, url: String, model: String) {
         prefs(context).edit().putString("provider", p.name).putString("api_key", key.trim())
             .putString("base_url", url.trim()).putString("model", model.trim()).apply()
@@ -72,16 +74,18 @@ object AiAssistant {
     data class AnalysisResult(val success: Boolean, val content: String, val error: String? = null)
 
     suspend fun analyzeNote(context: Context, title: String, body: String): AnalysisResult = withContext(Dispatchers.IO) {
+        if (AiConfig.provider(context) == AiProvider.OFFLINE) return@withContext AnalysisResult(true, LocalEngine.analyze(title, body))
         callWithFallback(context, """شما دستیار هوشمند فارسی‌زبان اپ «چراغ راه» هستید. یادداشت زیر را تحلیل کن و با ایموجی و ساختار بنویس:
 📌 خلاصه موضوع:
 🔑 نکات کلیدی:
 💡 پیشنهادها برای بهبود:
 
 عنوان: $title
-متن: ${body.take(3000)}""")
+متن: ${body.take(3000)}""") { LocalEngine.analyze(title, body) }
     }
 
     suspend fun reportNote(context: Context, title: String, body: String): AnalysisResult = withContext(Dispatchers.IO) {
+        if (AiConfig.provider(context) == AiProvider.OFFLINE) return@withContext AnalysisResult(true, LocalEngine.report(title, body))
         callWithFallback(context, """یک گزارش تحلیلی کامل و ساختاریافته به فارسی برای یادداشت زیر بنویس:
 🧭 چشم‌انداز کلی:
 📈 نکات و داده‌های مهم:
@@ -90,17 +94,18 @@ object AiAssistant {
 🎯 اولویت‌بندی اقدام‌ها:
 
 عنوان: $title
-متن: ${body.take(3000)}""")
+متن: ${body.take(3000)}""") { LocalEngine.report(title, body) }
     }
 
     suspend fun askAboutNote(context: Context, title: String, body: String, history: List<Pair<String, String>>, question: String): AnalysisResult = withContext(Dispatchers.IO) {
+        if (AiConfig.provider(context) == AiProvider.OFFLINE) return@withContext AnalysisResult(true, LocalEngine.answer(question, body))
         val hist = if (history.isEmpty()) "" else history.takeLast(6).joinToString("\n") { "پرسش: ${it.first}\nپاسخ: ${it.second.take(800)}" }
         callWithFallback(context, """تو دستیار هوشمند اپ «چراغ راه» هستی. با توجه به متن یادداشت و گفتگوی قبلی، به پرسش جدید پاسخ فارسی و مفید بده.
 عنوان یادداشت: $title
 متن یادداشت: ${body.take(2500)}
 گفتگوی قبلی:
 $hist
-پرسش جدید: $question""")
+پرسش جدید: $question""") { LocalEngine.answer(question, body) }
     }
 
     private fun isNetworkError(msg: String?): Boolean {
@@ -114,14 +119,19 @@ $hist
                 msg.contains("Connection refused", true)
     }
 
-    private suspend fun callWithFallback(context: Context, prompt: String): AnalysisResult {
+    private fun isBlockedOrPaid(msg: String?): Boolean =
+        msg != null && (isNetworkError(msg) || msg.contains("402") || msg.contains("PAYMENT_REQUIRED", true) || msg.contains("balance", true))
+
+    private suspend fun callWithFallback(context: Context, prompt: String, offline: () -> String): AnalysisResult {
         val primary = AiConfig.provider(context)
         val first = attempt(context, primary, prompt)
         if (first.success) return first
-        if (primary != AiProvider.POLLINATIONS && (isNetworkError(first.error) || first.error?.contains("402") == true || first.error?.contains("balance", true) == true)) {
-            val second = attempt(context, AiProvider.POLLINATIONS, prompt)
-            if (second.success) return second.copy(content = "🔄 سرویس انتخابی در دسترس نبود؛ به‌صورت خودکار از «Pollinations 🆓» استفاده شد.\n\n" + second.content)
-            return AnalysisResult(false, "", "سرویس اصلی و سرویس جایگزین هر دو در دسترس نیستند.\nخطای اول: ${first.error}\nخطای دوم: ${second.error}\n💡 DNS گوشی را روی ۱.۱.۱.۱ بگذار و دوباره امتحان کن.")
+        if (isBlockedOrPaid(first.error)) {
+            if (primary != AiProvider.POLLINATIONS) {
+                val second = attempt(context, AiProvider.POLLINATIONS, prompt)
+                if (second.success) return second.copy(content = "🔄 سرویس انتخابی در دسترس نبود؛ به‌صورت خودکار از «Pollinations 🆓» استفاده شد.\n\n" + second.content)
+            }
+            return AnalysisResult(true, "📴 اینترنت/سرویس‌های آنلاین در دسترس نبودند؛ پاسخ توسط «موتور آفلاین داخلی» تولید شد:\n\n" + offline())
         }
         return first
     }
@@ -134,12 +144,12 @@ $hist
 
     private fun friendly(err: String): String = when {
         err.contains("Insufficient Balance", true) || err.contains("balance", true) ->
-            "💳 این سرویس پولی است و اعتبار ندارد. از ⚙️ گزینهٔ رایگان Pollinations یا OpenRouter را انتخاب کن."
+            "💳 این سرویس پولی است و اعتبار ندارد. از ⚙️ گزینهٔ رایگان Pollinations یا آفلاین را انتخاب کن."
         err.contains("PAYMENT_REQUIRED", true) || err.contains("402") ->
-            "💳 این مسیر پولی شده است؛ اپ فقط باید از مسیر ناشناس استفاده کند (نسخهٔ جدید اپ این را اصلاح کرده)."
+            "💳 این مسیر پولی شده؛ اپ از مسیر ناشناس/آفلاین استفاده می‌کند."
         err.contains("401") -> "کلید API معتبر نیست (401)"
         err.contains("403") || err.contains("not available", true) -> "این سرویس در منطقهٔ شما در دسترس نیست (403)"
-        err.contains("429") -> "صف شلوغ است؛ چند ثانیه صبر کن و دوباره امتحان کن (429)"
+        err.contains("429") -> "صف شلوغ است؛ چند ثانیه صبر کن (429)"
         else -> err
     }
 
@@ -157,7 +167,6 @@ $hist
             val model = if (configured) AiConfig.model(context) else provider.defaultModel
 
             if (provider.format == ApiFormat.POLLINATIONS) {
-                // ✅ مسیر ناشناسِ رایگان: POST به ریشه
                 val body = JSONObject().apply {
                     put("model", model)
                     put("messages", JSONArray().apply { put(JSONObject().apply { put("role", "user"); put("content", prompt) }) })
@@ -169,13 +178,11 @@ $hist
                 OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(body); it.flush() }
                 if (conn.responseCode == 200) return AnalysisResult(true, parseContent(readAll(conn)).trim())
 
-                // ✅ مسیر قدیمی GET (ناشناس)
                 val getUrl = "$base/" + URLEncoder.encode(prompt.take(1800), "UTF-8")
                 val c2 = URL(getUrl).openConnection() as HttpURLConnection
                 c2.requestMethod = "GET"
                 c2.connectTimeout = 20000; c2.readTimeout = 90000
                 if (c2.responseCode == 200) return AnalysisResult(true, readAll(c2).trim())
-
                 return AnalysisResult(false, "", friendly(readErr(c2)))
             }
 
