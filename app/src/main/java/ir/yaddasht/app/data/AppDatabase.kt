@@ -32,11 +32,7 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile private var INSTANCE: AppDatabase? = null
         fun get(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "yaddasht_database"
-                )
+                val instance = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "yaddasht_database")
                     .addMigrations(MIGRATION_2_4, MIGRATION_3_4)
                     .fallbackToDestructiveMigration()
                     .build()
