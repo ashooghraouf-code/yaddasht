@@ -32,7 +32,6 @@ import ir.yaddasht.app.data.Attachment
 import ir.yaddasht.app.data.NoteDao
 import ir.yaddasht.app.ui.theme.*
 import ir.yaddasht.app.util.AttachmentStore
-import ir.yaddasht.app.util.fa
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -88,7 +87,6 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
             }
         }
 
-        // ✅ نوار بالا: با احترام به نوار وضعیت گوشی
         Row(Modifier.align(Alignment.TopCenter).fillMaxWidth()
             .statusBarsPadding()
             .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -119,6 +117,7 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
                         val p = android.graphics.Path()
                         p.moveTo(s.points.first().x, s.points.first().y)
                         for (i in 1 until s.points.size) p.lineTo(s.points[i].x, s.points[i].y)
+                        c.drawPath(p, paint)
                     }
                     val file = File(AttachmentStore.attachmentsDir(context), "DRAW_${System.currentTimeMillis()}.png")
                     FileOutputStream(file).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
@@ -134,7 +133,6 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
             }
         }
 
-        // ✅ پنل پایین: شناور، گوشه‌گرد و بالاتر از نوار ناوبری گوشی (بدون تداخل)
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
             .navigationBarsPadding()
             .imePadding()
@@ -164,8 +162,7 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
                 Slider(value = brushWidth, onValueChange = { brushWidth = it },
                     valueRange = 2f..28f, modifier = Modifier.weight(1f),
                     colors = SliderDefaults.colors(thumbColor = Saffron, activeTrackColor = Saffron))
-                Text("ضخامت ${brushWidth.toInt().fa()}",
-                    fontSize = 11.sp, color = Saffron, fontFamily = LalezarFont)
+                Text("ضخامت", fontSize = 11.sp, color = Saffron, fontFamily = LalezarFont)
             }
         }
     }
