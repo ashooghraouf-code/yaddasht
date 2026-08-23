@@ -15,7 +15,9 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -29,6 +31,7 @@ import ir.yaddasht.app.data.AppDatabase
 import ir.yaddasht.app.ui.screen.DrawScreen
 import ir.yaddasht.app.ui.screen.EditorScreen
 import ir.yaddasht.app.ui.screen.HomeScreen
+import ir.yaddasht.app.ui.screen.TaskEditorScreen
 import ir.yaddasht.app.ui.theme.*
 import ir.yaddasht.app.util.NoteLock
 import ir.yaddasht.app.widget.NoteWidget
@@ -41,7 +44,8 @@ const val NEW_NOTE_ID = -1L
 sealed class Screen {
     data object Home : Screen()
     data class Editor(val noteId: Long) : Screen()
-    data class Draw(val noteId: Long) : Screen()
+    data class Draw(val noteId: Long, val isTask: Boolean = false) : Screen()
+    data class TaskEditor(val taskId: Long) : Screen()
 
     companion object {
         val SAVER: Saver<Screen, String> = Saver(
@@ -49,13 +53,18 @@ sealed class Screen {
                 when (s) {
                     is Home -> "home"
                     is Editor -> "e:${s.noteId}"
-                    is Draw -> "d:${s.noteId}"
+                    is Draw -> "d:${s.noteId}:${if (s.isTask) 1 else 0}"
+                    is TaskEditor -> "t:${s.taskId}"
                 }
             },
             restore = { str ->
                 when {
                     str.startsWith("e:") -> Editor(str.removePrefix("e:").toLongOrNull() ?: NEW_NOTE_ID)
-                    str.startsWith("d:") -> Draw(str.removePrefix("d:").toLongOrNull() ?: NEW_NOTE_ID)
+                    str.startsWith("d:") -> {
+                        val parts = str.removePrefix("d:").split(":")
+                        Draw(parts.getOrNull(0)?.toLongOrNull() ?: NEW_NOTE_ID, parts.getOrNull(1) == "1")
+                    }
+                    str.startsWith("t:") -> TaskEditor(str.removePrefix("t:").toLongOrNull() ?: 0L)
                     else -> Home
                 }
             }
@@ -144,8 +153,10 @@ class MainActivity : FragmentActivity() {
                     LockScreen { showBiometric { authRequired = false } }
                 } else if (authChecked) {
                     val openNoteId = remember { intent.getLongExtra("note_id", 0L) }
+                    val isTaskExtra = remember { intent.getBooleanExtra("is_task", false) }
                     var screen by rememberSaveable(stateSaver = Screen.SAVER) {
                         mutableStateOf<Screen>(when {
+                            isTaskExtra && openNoteId > 0 -> Screen.TaskEditor(openNoteId)
                             openNoteId == NEW_NOTE_ID -> Screen.Editor(NEW_NOTE_ID)
                             openNoteId > 0 -> Screen.Editor(openNoteId)
                             else -> Screen.Home
@@ -166,18 +177,27 @@ class MainActivity : FragmentActivity() {
                             dao = dao,
                             taskDao = taskDao,
                             onOpenNote = { screen = Screen.Editor(it) },
-                            onNewNote = { screen = Screen.Editor(NEW_NOTE_ID) }
+                            onNewNote = { screen = Screen.Editor(NEW_NOTE_ID) },
+                            onOpenTask = { screen = Screen.TaskEditor(it) }
                         )
                         is Screen.Editor -> EditorScreen(
                             dao = dao,
                             noteId = s.noteId,
                             onBack = { screen = Screen.Home },
-                            onOpenDraw = { screen = Screen.Draw(it) }
+                            onOpenDraw = { screen = Screen.Draw(it, false) }
                         )
                         is Screen.Draw -> DrawScreen(
                             dao = dao,
                             noteId = s.noteId,
-                            onBack = { screen = Screen.Editor(s.noteId) }
+                            isTask = s.isTask,
+                            taskDao = taskDao,
+                            onBack = { screen = if (s.isTask) Screen.TaskEditor(s.noteId) else Screen.Editor(s.noteId) }
+                        )
+                        is Screen.TaskEditor -> TaskEditorScreen(
+                            taskDao = taskDao,
+                            taskId = s.taskId,
+                            onBack = { screen = Screen.Home },
+                            onOpenDraw = { screen = Screen.Draw(it, true) }
                         )
                     }
                 }
