@@ -17,11 +17,9 @@ data class Note(
     val updatedAt: Long = System.currentTimeMillis()
 )
 
-@Entity(
-    tableName = "attachments",
+@Entity(tableName = "attachments",
     foreignKeys = [ForeignKey(entity = Note::class, parentColumns = ["id"], childColumns = ["noteId"], onDelete = ForeignKey.CASCADE)],
-    indices = [Index("noteId")]
-)
+    indices = [Index("noteId")])
 data class Attachment(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val noteId: Long,
