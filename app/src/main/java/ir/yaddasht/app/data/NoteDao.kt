@@ -9,9 +9,6 @@ interface NoteDao {
     fun observeNotes(): Flow<List<Note>>
 
     @Query("SELECT * FROM notes ORDER BY updatedAt DESC")
-    fun getAllNotes(): Flow<List<Note>>
-
-    @Query("SELECT * FROM notes ORDER BY updatedAt DESC")
     fun allNotesSync(): List<Note>
 
     @Query("SELECT * FROM notes WHERE id = :id")
