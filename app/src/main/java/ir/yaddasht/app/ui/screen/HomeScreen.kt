@@ -121,6 +121,7 @@ private fun taskTint(due: Long, completed: Boolean): Color {
     return if (t < .5f) lerp(red, amber, t / .5f) else lerp(amber, green, (t - .5f) / .5f)
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     dao: NoteDao,
@@ -285,7 +286,6 @@ fun HomeScreen(
                             }
                             Spacer(Modifier.height(6.dp))
 
-                            // راهنما
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                                 LegendItem(Color(0xFFE5484D), "وظیفه نزدیک")
                                 LegendItem(Color(0xFF46A758), "وظیفه دور")
@@ -316,37 +316,32 @@ fun HomeScreen(
                                                     onClick = { calDay = d },
                                                     onLongClick = {
                                                         calDay = d
-                                                        val m = dayMillis(calJy, calJm, d)
-                                                        newTaskOnDate = m
+                                                        newTaskOnDate = dayMillis(calJy, calJm, d)
                                                     }
                                                 )
                                                 .padding(3.dp)) {
                                                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
                                                     Text(d.fa(), fontSize = 12.sp, color = if (isToday) Saffron else PaperWhite,
                                                         fontWeight = if (isToday || isSel) FontWeight.Bold else FontWeight.Normal)
-                                                    // نوارهای رنگی تفکیکی
                                                     val taskItems = dayItems.filter { it.first.startsWith("task:") }
                                                     val noteItems = dayItems.filter { it.first.startsWith("note:") }
                                                     taskItems.take(2).forEach { item ->
                                                         Box(Modifier.fillMaxWidth().height(6.dp).padding(top = 2.dp).clip(RoundedCornerShape(3.dp))
                                                             .background(taskTint(item.second, item.third)))
                                                     }
-                                                    noteItems.take(2 - taskItems.size.coerceAtMost(2)).forEach { _ ->
+                                                    noteItems.take((2 - taskItems.size.coerceAtMost(2)).coerceAtLeast(0)).forEach { _ ->
                                                         Box(Modifier.fillMaxWidth().height(6.dp).padding(top = 2.dp).clip(RoundedCornerShape(3.dp))
                                                             .background(Saffron))
                                                     }
                                                     if (dayItems.size > 2) Text("+${(dayItems.size - 2).fa()}", fontSize = 8.sp, color = MutedGreenText)
                                                 }
-                                                // دکمه + کوچک گوشه
-                                                if (dayItems.isNotEmpty() || isSel || isToday) {
-                                                    Box(Modifier.align(Alignment.BottomEnd).size(18.dp)
-                                                        .clip(CircleShape).background(Saffron)
-                                                        .clickable {
-                                                            calDay = d
-                                                            newTaskOnDate = dayMillis(calJy, calJm, d)
-                                                        }, contentAlignment = Alignment.Center) {
-                                                        Text("+", fontSize = 12.sp, color = Ink, fontWeight = FontWeight.Bold)
-                                                    }
+                                                Box(Modifier.align(Alignment.BottomEnd).size(18.dp)
+                                                    .clip(CircleShape).background(Saffron)
+                                                    .clickable {
+                                                        calDay = d
+                                                        newTaskOnDate = dayMillis(calJy, calJm, d)
+                                                    }, contentAlignment = Alignment.Center) {
+                                                    Text("+", fontSize = 12.sp, color = Ink, fontWeight = FontWeight.Bold)
                                                 }
                                             }
                                         }
@@ -413,7 +408,6 @@ fun HomeScreen(
             Toast.makeText(context, "وظیفه اضافه شد ✅", Toast.LENGTH_SHORT).show()
         })
 
-    // ✅ دیالوگ افزودن وظیفه روی تاریخ مشخص (با کلیک طولانی یا دکمه +)
     if (newTaskOnDate > 0) {
         AddTaskDialog(
             initialDate = newTaskOnDate,
@@ -473,7 +467,6 @@ private fun TaskCard(task: Task, onClick: () -> Unit, onToggle: () -> Unit, onDe
     }
 }
 
-// ✅ دیالوگ بهبودیافته با قابلیت دریافت تاریخ اولیه
 @Composable
 private fun AddTaskDialog(initialDate: Long = 0L, onDismiss: () -> Unit, onSave: (String, Long, Priority) -> Unit) {
     var title by remember { mutableStateOf("") }
@@ -488,7 +481,6 @@ private fun AddTaskDialog(initialDate: Long = 0L, onDismiss: () -> Unit, onSave:
                 OutlinedTextField(title, { title = it }, label = { Text("عنوان وظیفه") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(12.dp))
 
-                // نمایش تاریخ انتخاب‌شده + دکمه تقویم
                 Surface(onClick = { showCalendar = true },
                     shape = RoundedCornerShape(12.dp),
                     color = DeepGreenSoft,
@@ -545,7 +537,6 @@ private fun AddTaskDialog(initialDate: Long = 0L, onDismiss: () -> Unit, onSave:
     if (showCalendar) {
         ShamsiCalendarPickerDialog(
             onConfirm = { millis ->
-                // ساعت پیش‌فرض ۲۱:۰۰ روی تاریخ انتخاب‌شده
                 val finalTime = millis + 21L * 3600_000
                 dueDate = finalTime
                 showCalendar = false
