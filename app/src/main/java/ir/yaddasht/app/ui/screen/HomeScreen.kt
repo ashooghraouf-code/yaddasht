@@ -9,14 +9,27 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
@@ -26,9 +39,30 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,7 +81,18 @@ import ir.yaddasht.app.data.NoteDao
 import ir.yaddasht.app.data.Priority
 import ir.yaddasht.app.data.Task
 import ir.yaddasht.app.data.TaskDao
-import ir.yaddasht.app.ui.theme.*
+import ir.yaddasht.app.ui.theme.Brick
+import ir.yaddasht.app.ui.theme.DeepGreen
+import ir.yaddasht.app.ui.theme.DeepGreenSoft
+import ir.yaddasht.app.ui.theme.Ink
+import ir.yaddasht.app.ui.theme.InkSoft
+import ir.yaddasht.app.ui.theme.LalezarFont
+import ir.yaddasht.app.ui.theme.LineGreen
+import ir.yaddasht.app.ui.theme.MutedGreenText
+import ir.yaddasht.app.ui.theme.PaperWhite
+import ir.yaddasht.app.ui.theme.Saffron
+import ir.yaddasht.app.ui.theme.VazirFont
+import ir.yaddasht.app.ui.theme.paperColor
 import ir.yaddasht.app.util.BackupManager
 import ir.yaddasht.app.util.Checklist
 import ir.yaddasht.app.util.FaDate
@@ -68,7 +113,9 @@ private fun taskTint(due: Long, completed: Boolean): Color {
     val now = System.currentTimeMillis()
     val days = (due - now).toFloat() / 86_400_000f
     val t = days.coerceIn(0f, 7f) / 7f
-    val red = Color(0xFFE5484D); val amber = Color(0xFFF5A524); val green = Color(0xFF46A758)
+    val red = Color(0xFFE5484D)
+    val amber = Color(0xFFF5A524)
+    val green = Color(0xFF46A758)
     return if (t < .5f) lerp(red, amber, t / .5f) else lerp(amber, green, (t - .5f) / .5f)
 }
 
@@ -94,7 +141,6 @@ fun HomeScreen(
     var hideMemory by rememberSaveable { mutableStateOf(false) }
     var showAddTask by remember { mutableStateOf(false) }
 
-    // وضعیت تقویم
     val (tjy, tjm, tjd) = FaDate.jalali(System.currentTimeMillis())
     var calJy by rememberSaveable { mutableIntStateOf(tjy) }
     var calJm by rememberSaveable { mutableIntStateOf(tjm) }
@@ -114,7 +160,10 @@ fun HomeScreen(
     fun doBackup() {
         scope.launch(Dispatchers.IO) {
             val allNotes = dao.allNotesSync()
-            if (allNotes.isEmpty()) { withContext(Dispatchers.Main) { Toast.makeText(context, "یادداشتی برای پشتیبان نیست", Toast.LENGTH_SHORT).show() }; return@launch }
+            if (allNotes.isEmpty()) {
+                withContext(Dispatchers.Main) { Toast.makeText(context, "یادداشتی برای پشتیبان نیست", Toast.LENGTH_SHORT).show() }
+                return@launch
+            }
             val json = BackupManager.buildBackup(allNotes, dao.allAttachments().groupBy { it.noteId })
             val file = BackupManager.exportBackupFile(context, json)
             withContext(Dispatchers.Main) { shareBackupFile(context, file) }
@@ -127,7 +176,6 @@ fun HomeScreen(
     val filteredTasks = tasks.filter { query.isBlank() || it.title.contains(query, true) }
     val memory = remember(notes) { pickMemory(notes) }
 
-    // وظایف هر روز ماه جاری
     val tasksByDay = remember(tasks, calJy, calJm) {
         tasks.filter { it.dueDate > 0 }.groupBy { val (a, b, c) = FaDate.jalali(it.dueDate); Triple(a, b, c) }
     }
@@ -137,7 +185,8 @@ fun HomeScreen(
             when (tab) {
                 0 -> NewNoteFab(onNewNote)
                 else -> ExtendedFloatingActionButton(onClick = { showAddTask = true }, containerColor = Saffron, contentColor = Ink) {
-                    Icon(Icons.Filled.Add, "جدید"); Spacer(Modifier.width(8.dp))
+                    Icon(Icons.Filled.Add, "جدید")
+                    Spacer(Modifier.width(8.dp))
                     Text("وظیفه جدید", fontFamily = LalezarFont, fontSize = 17.sp)
                 }
             }
@@ -164,7 +213,8 @@ fun HomeScreen(
                         shape = RoundedCornerShape(16.dp), color = Saffron.copy(alpha = .14f),
                         border = androidx.compose.foundation.BorderStroke(1.dp, Saffron.copy(alpha = .4f))) {
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("⏳", fontSize = 22.sp); Spacer(Modifier.width(10.dp))
+                            Text("⏳", fontSize = 22.sp)
+                            Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
                                 Text("خاطره‌ای از گذشته", fontFamily = LalezarFont, fontSize = 14.sp, color = Saffron)
                                 Text(memory.title.ifBlank { "بدون عنوان" }, fontSize = 12.sp, color = PaperWhite, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -211,15 +261,14 @@ fun HomeScreen(
                         }
                     }
                     else -> {
-                        // 🗓️ نمای تقویم دیواری با باکس روز
-                        Column(Modifier.fillMaxSize().verticalScrollCompat().padding(horizontal = 14.dp)) {
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp)) {
                             Spacer(Modifier.height(8.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 IconButton(onClick = { if (calJm > 1) calJm-- else { calJm = 12; calJy-- } }) { Icon(Icons.Filled.ChevronRight, "قبل", tint = Saffron) }
                                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("${FaDate.monthName(calJm)} ${calJy.fa()}", fontFamily = LalezarFont, fontSize = 20.sp, color = PaperWhite)
-                                    Text("🌙 ${hijriFa(dayMillis(calJy, calJm, calDay))}  •  میلادی: ${gregorianFa(dayMillis(calJy, calJm, calDay))}",
-                                        fontSize = 10.sp, color = MutedGreenText)
+                                    val infoMillis = dayMillis(calJy, calJm, calDay)
+                                    Text("🌙 ${hijriFa(infoMillis)} • میلادی: ${gregorianFa(infoMillis)}", fontSize = 10.sp, color = MutedGreenText)
                                 }
                                 IconButton(onClick = { if (calJm < 12) calJm++ else { calJm = 1; calJy++ } }) { Icon(Icons.Filled.ChevronLeft, "بعد", tint = Saffron) }
                             }
@@ -293,15 +342,15 @@ fun HomeScreen(
                 TextButton(onClick = {
                     noteToDelete = null
                     scope.launch(Dispatchers.IO) {
-                        val atts = dao.attachmentsByNote(note.id); dao.deleteById(note.id); atts.forEach { File(it.filePath).delete() }
+                        val atts = dao.attachmentsByNote(note.id)
+                        dao.deleteById(note.id)
+                        atts.forEach { File(it.filePath).delete() }
                     }
                 }) { Text("حذف", color = Brick, fontWeight = FontWeight.Bold) }
             },
             dismissButton = { TextButton(onClick = { noteToDelete = null }) { Text("انصراف") } })
     }
 }
-
-private fun Modifier.verticalScrollCompat() = this.then(androidx.compose.foundation.verticalScroll(androidx.compose.foundation.rememberScrollState()))
 
 @Composable
 private fun TaskCard(task: Task, onClick: () -> Unit, onToggle: () -> Unit, onDelete: () -> Unit) {
@@ -336,8 +385,10 @@ private fun AddTaskDialog(onDismiss: () -> Unit, onSave: (String, Long, Priority
                 OutlinedTextField(title, { title = it }, label = { Text("عنوان وظیفه") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    DueChip("بدون تاریخ", dueOpt == 0) { dueOpt = 0 }; DueChip("امروز", dueOpt == 1) { dueOpt = 1 }
-                    DueChip("فردا", dueOpt == 2) { dueOpt = 2 }; DueChip("هفته بعد", dueOpt == 3) { dueOpt = 3 }
+                    DueChip("بدون تاریخ", dueOpt == 0) { dueOpt = 0 }
+                    DueChip("امروز", dueOpt == 1) { dueOpt = 1 }
+                    DueChip("فردا", dueOpt == 2) { dueOpt = 2 }
+                    DueChip("هفته بعد", dueOpt == 3) { dueOpt = 3 }
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -363,14 +414,16 @@ private fun AddTaskDialog(onDismiss: () -> Unit, onSave: (String, Long, Priority
         dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } })
 }
 
-@Composable private fun DueChip(label: String, selected: Boolean, onClick: () -> Unit) {
+@Composable
+private fun DueChip(label: String, selected: Boolean, onClick: () -> Unit) {
     Surface(onClick = onClick, shape = RoundedCornerShape(10.dp), color = if (selected) Saffron else DeepGreenSoft,
         border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) Saffron else LineGreen)) {
         Text(label, Modifier.padding(horizontal = 10.dp, vertical = 6.dp), fontSize = 11.sp, color = if (selected) Ink else PaperWhite)
     }
 }
 
-@Composable private fun EmptyTasksState() {
+@Composable
+private fun EmptyTasksState() {
     Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Box(Modifier.size(110.dp).clip(CircleShape).border(2.dp, Saffron.copy(alpha = .5f), CircleShape), contentAlignment = Alignment.Center) { Text("✅", fontSize = 46.sp) }
         Spacer(Modifier.height(20.dp))
@@ -395,7 +448,8 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
     scope.launch(Dispatchers.IO) { dao.update(note.copy(pinned = !note.pinned, updatedAt = System.currentTimeMillis())) }
 }
 
-@Composable private fun HomeHeader(count: Int, onStats: () -> Unit, onBackup: () -> Unit, onRestore: () -> Unit) {
+@Composable
+private fun HomeHeader(count: Int, onStats: () -> Unit, onBackup: () -> Unit, onRestore: () -> Unit) {
     Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(52.dp).clip(CircleShape).background(Saffron), contentAlignment = Alignment.Center) { Text("ی", fontFamily = LalezarFont, fontSize = 30.sp, color = Ink) }
@@ -413,54 +467,75 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
     }
 }
 
-@Composable private fun StatsDialog(notes: List<Note>, attachTotal: Int, onDismiss: () -> Unit) {
+@Composable
+private fun StatsDialog(notes: List<Note>, attachTotal: Int, onDismiss: () -> Unit) {
     val unlocked = notes.filterNot { NoteLock.isLocked(it.body) }
     val totalWords = unlocked.sumOf { it.body.split(Regex("\\s+")).count(String::isNotBlank) }
     val thisWeek = notes.count { System.currentTimeMillis() - it.updatedAt < 7L * 24 * 3600 * 1000 }
+    val longest = unlocked.maxByOrNull { it.body.length }
     AlertDialog(onDismissRequest = onDismiss,
         title = { Text("📊 آمار دفترچه", fontFamily = LalezarFont, fontSize = 20.sp) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatRow("کل یادداشت‌ها", notes.size.fa()); StatRow("کلمه‌های نوشته‌شده", totalWords.fa())
-                StatRow("ویرایش در این هفته", thisWeek.fa()); StatRow("ضمیمه‌ها", attachTotal.fa())
-                StatRow("سنجاق‌شده", notes.count { it.pinned }.fa()); StatRow("قفل‌شده 🔒", notes.count { NoteLock.isLocked(it.body) }.fa())
+                StatRow("کل یادداشت‌ها", notes.size.fa())
+                StatRow("کلمه‌های نوشته‌شده", totalWords.fa())
+                StatRow("ویرایش در این هفته", thisWeek.fa())
+                StatRow("ضمیمه‌ها", attachTotal.fa())
+                StatRow("سنجاق‌شده", notes.count { it.pinned }.fa())
+                StatRow("قفل‌شده 🔒", notes.count { NoteLock.isLocked(it.body) }.fa())
+                StatRow("چک‌لیست فعال", notes.count { Checklist.isChecklist(it.body) }.fa())
+                if (longest != null && longest.body.length > 50) {
+                    StatRow("بلندترین یادداشت", "${longest.body.length.fa()} حرف")
+                }
             }
         },
         confirmButton = { TextButton(onDismiss) { Text("بستن", color = Saffron, fontWeight = FontWeight.Bold) } })
 }
 
-@Composable private fun StatRow(label: String, value: String) {
+@Composable
+private fun StatRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, fontSize = 13.sp, color = MutedGreenText, modifier = Modifier.weight(1f))
         Text(value, fontFamily = LalezarFont, fontSize = 18.sp, color = Saffron)
     }
 }
 
-@Composable private fun SearchBox(query: String, onQueryChange: (String) -> Unit, modifier: Modifier = Modifier) {
+@Composable
+private fun SearchBox(query: String, onQueryChange: (String) -> Unit, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(DeepGreenSoft).border(1.dp, LineGreen, RoundedCornerShape(16.dp)).padding(horizontal = 14.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Default.Search, null, tint = Saffron); Spacer(Modifier.width(10.dp))
+        Icon(Icons.Default.Search, null, tint = Saffron)
+        Spacer(Modifier.width(10.dp))
         TextField(value = query, onValueChange = onQueryChange, placeholder = { Text("جستجو در یادداشت‌ها و وظایف…", color = MutedGreenText) },
             colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
             textStyle = androidx.compose.ui.text.TextStyle(color = PaperWhite, fontSize = 14.sp), singleLine = true, modifier = Modifier.fillMaxWidth())
     }
 }
 
-@Composable private fun PaperDots() {
+@Composable
+private fun PaperDots() {
     Canvas(Modifier.fillMaxSize()) {
-        val step = 30.dp.toPx(); var y = step / 2; var row = 0
+        val step = 30.dp.toPx()
+        var y = step / 2
+        var row = 0
         while (y < size.height) {
             var x = if (row % 2 == 0) step / 2 else step
-            while (x < size.width) { drawCircle(Saffron.copy(alpha = 0.07f), radius = 1.1.dp.toPx(), center = androidx.compose.ui.geometry.Offset(x, y)); x += step }
-            y += step; row++
+            while (x < size.width) {
+                drawCircle(Saffron.copy(alpha = 0.07f), radius = 1.1.dp.toPx(), center = androidx.compose.ui.geometry.Offset(x, y))
+                x += step
+            }
+            y += step
+            row++
         }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
-@Composable private fun NoteCard(note: Note, attachCount: Int, onClick: () -> Unit, onLongClick: () -> Unit, onDelete: () -> Unit) {
+@Composable
+private fun NoteCard(note: Note, attachCount: Int, onClick: () -> Unit, onLongClick: () -> Unit, onDelete: () -> Unit) {
     val angle = remember(note.id) { ((note.id % 3) - 1) * 1.3f }
-    val locked = NoteLock.isLocked(note.body); val checklist = Checklist.isChecklist(note.body)
+    val locked = NoteLock.isLocked(note.body)
+    val checklist = Checklist.isChecklist(note.body)
     val hasReminder = note.reminderAt > System.currentTimeMillis()
     Box(Modifier.padding(5.dp).fillMaxWidth().graphicsLayer { rotationZ = angle; shadowElevation = 9f; shape = RoundedCornerShape(18.dp); clip = true }) {
         Column(Modifier.clip(RoundedCornerShape(18.dp)).background(paperColor(note.color)).combinedClickable(onClick = onClick, onLongClick = onLongClick).padding(12.dp)) {
@@ -490,16 +565,32 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
     }
 }
 
-@Composable private fun SectionLabel(text: String) {
+@Composable
+private fun SectionLabel(text: String) {
     Text(text, fontFamily = LalezarFont, fontSize = 16.sp, color = Saffron, modifier = Modifier.padding(start = 6.dp, top = 8.dp, bottom = 2.dp))
 }
 
-@Composable private fun NewNoteFab(onNewNote: () -> Unit) {
+@Composable
+private fun NewNoteFab(onNewNote: () -> Unit) {
     ExtendedFloatingActionButton(onClick = onNewNote, containerColor = Saffron, contentColor = Ink) {
-        Icon(Icons.Filled.Add, "جدید"); Spacer(Modifier.width(8.dp)); Text("یادداشت جدید", fontFamily = LalezarFont, fontSize = 17.sp)
+        Icon(Icons.Filled.Add, "جدید")
+        Spacer(Modifier.width(8.dp))
+        Text("یادداشت جدید", fontFamily = LalezarFont, fontSize = 17.sp)
     }
 }
 
-@Composable private fun EmptyState() {
+@Composable
+private fun EmptyState() {
     Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Box(Modifier.size(110.dp).clip(CircleShape).border(2.dp, Saffron.copy(alpha = .5f
+        Box(Modifier.size(110.dp).clip(CircleShape).border(2.dp, Saffron.copy(alpha = .5f), CircleShape), contentAlignment = Alignment.Center) { Text("✍️", fontSize = 46.sp) }
+        Spacer(Modifier.height(20.dp))
+        Text("دفترچه‌ات خالی است", fontFamily = LalezarFont, fontSize = 26.sp, color = PaperWhite)
+        Spacer(Modifier.height(8.dp))
+        Text("یادداشت بنویس، صدا ضبط کن، نقاشی بکش، چک‌لیست بساز و رویشان قفل بگذار ✨", fontSize = 13.sp, color = MutedGreenText, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
+private fun CenterMessage(text: String) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(text, fontSize = 15.sp, color = MutedGreenText) }
+}
