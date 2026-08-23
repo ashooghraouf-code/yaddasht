@@ -54,7 +54,6 @@ import ir.yaddasht.app.ai.AiConfig
 import ir.yaddasht.app.ai.AiProvider
 import ir.yaddasht.app.ui.theme.Brick
 import ir.yaddasht.app.ui.theme.DeepGreenSoft
-import ir.yaddasht.app.ui.theme.Ink
 import ir.yaddasht.app.ui.theme.InkSoft
 import ir.yaddasht.app.ui.theme.LalezarFont
 import ir.yaddasht.app.ui.theme.LineGreen
@@ -140,7 +139,7 @@ private fun AiMainDialog(title: String, content: String, onOpenGateway: () -> Un
                         Surface(onClick = { mode = m }, shape = RoundedCornerShape(10.dp),
                             color = if (mode == m) Saffron else DeepGreenSoft.copy(alpha = .25f)) {
                             Text(m.label, Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                fontSize = 13.sp, color = if (mode == m) ReadableInk else ReadableInk.copy(alpha = .75f), fontWeight = FontWeight.Bold)
+                                fontSize = 13.sp, color = ReadableInk, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -157,31 +156,27 @@ private fun AiMainDialog(title: String, content: String, onOpenGateway: () -> Un
                         } else {
                             val r = result
                             if (r != null && r.success) {
-                                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                    .background(AnswerBg)
-                                    .border(1.dp, LineGreen.copy(alpha = .5f), RoundedCornerShape(12.dp))
-                                    .padding(12.dp)) {
+                                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(AnswerBg)
+                                    .border(1.dp, LineGreen.copy(alpha = .5f), RoundedCornerShape(12.dp)).padding(12.dp)) {
                                     Text(r.content, fontSize = 14.sp, color = ReadableInk, lineHeight = 26.sp, fontFamily = VazirFont)
                                 }
                             } else {
-                                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFFFDEAE5))
-                                    .border(1.dp, Brick.copy(alpha = .5f), RoundedCornerShape(12.dp))
-                                    .padding(12.dp)) {
+                                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFFFDEAE5))
+                                    .border(1.dp, Brick.copy(alpha = .5f), RoundedCornerShape(12.dp)).padding(12.dp)) {
                                     Text("❌ ${r?.error ?: "خطا"}", fontSize = 13.sp, color = Color(0xFFB3341E), lineHeight = 22.sp)
                                 }
                             }
                         }
                     } else {
-                        if (history.isEmpty()) Text("پرسش خود را دربارهٔ این یادداشت بنویسید؛ پاسخ با توجه به متن یادداشت داده می‌شود. 💬",
+                        if (history.isEmpty()) Text("پرسش خود را دربارهٔ این یادداشت بنویس؛ پاسخ با توجه به متن یادداشت داده می‌شود. 💬",
                             fontSize = 13.sp, color = ReadableInk.copy(alpha = .8f), lineHeight = 22.sp)
                         history.forEach { (q, a) ->
                             Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(QuestionBg).padding(10.dp)) {
                                 Text("پرسش: $q", fontSize = 13.sp, color = ReadableInk, fontWeight = FontWeight.Bold, lineHeight = 22.sp)
                             }
                             Spacer(Modifier.height(4.dp))
-                            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                                .background(AnswerBg).border(1.dp, LineGreen.copy(alpha = .5f), RoundedCornerShape(10.dp)).padding(10.dp)) {
+                            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(AnswerBg)
+                                .border(1.dp, LineGreen.copy(alpha = .5f), RoundedCornerShape(10.dp)).padding(10.dp)) {
                                 Text(a, fontSize = 14.sp, color = ReadableInk, lineHeight = 26.sp, fontFamily = VazirFont)
                             }
                             Spacer(Modifier.height(8.dp))
@@ -218,6 +213,12 @@ fun AiGatewayDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
     var url by remember { mutableStateOf(AiConfig.baseUrl(context)) }
     var model by remember { mutableStateOf(AiConfig.model(context)) }
 
+    val canSave = when (provider) {
+        AiProvider.POLLINATIONS -> true
+        AiProvider.CUSTOM -> key.isNotBlank() && url.isNotBlank()
+        else -> key.isNotBlank()
+    }
+
     AlertDialog(onDismissRequest = onDismiss,
         title = { Text("🌐 درگاه هوش مصنوعی", fontFamily = LalezarFont, fontSize = 20.sp, color = ReadableInk) },
         text = {
@@ -232,8 +233,11 @@ fun AiGatewayDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
                         Spacer(Modifier.width(4.dp))
                         Column {
                             Text(p.displayName, fontSize = 14.sp, color = ReadableInk, fontWeight = if (provider == p) FontWeight.Bold else FontWeight.Normal)
-                            Text(if (p.availableInIran) "✅ در دسترس برای ایران" else "⚠️ ایران را تحریم کرده است",
-                                fontSize = 11.sp, color = Brick, fontWeight = FontWeight.Bold)
+                            Text(when {
+                                !p.needsKey -> "🆓 رایگان، بدون کلید"
+                                p.availableInIran -> "✅ در دسترس برای ایران"
+                                else -> "⚠️ ایران را تحریم کرده است"
+                            }, fontSize = 11.sp, color = Brick, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -241,22 +245,24 @@ fun AiGatewayDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
                 Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(AnswerBg)
                     .border(1.dp, LineGreen.copy(alpha = .5f), RoundedCornerShape(12.dp)).padding(10.dp)) {
                     Column {
-                        Text("📘 آموزش قدم‌به‌قدم دریافت کلید:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = ReadableInk)
+                        Text("📘 آموزش قدم‌به‌قدم:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = ReadableInk)
                         Spacer(Modifier.height(4.dp))
                         Text(provider.helpFa, fontSize = 12.sp, color = ReadableInk, lineHeight = 20.sp)
                         if (provider.keyUrl.isNotBlank()) {
                             Spacer(Modifier.height(6.dp))
-                            Text("🔗 لینک دریافت کلید (نگه‌دارید و کپی کنید):", fontSize = 11.sp, color = ReadableInk.copy(alpha = .8f))
+                            Text("🔗 لینک دریافت کلید (نگه‌دار و کپی کن):", fontSize = 11.sp, color = ReadableInk.copy(alpha = .8f))
                             SelectionContainer { Text(provider.keyUrl, fontSize = 12.sp, color = Color(0xFF8A5A00), fontWeight = FontWeight.Bold) }
                             Text("🌐 سایت: ${provider.siteUrl}", fontSize = 11.sp, color = ReadableInk.copy(alpha = .8f))
                         }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                Text("۲) کلید API:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = ReadableInk)
-                OutlinedTextField(value = key, onValueChange = { key = it }, label = { Text("API Key") },
-                    leadingIcon = { Icon(Icons.Filled.Key, null, tint = Saffron, modifier = Modifier.size(18.dp)) },
-                    singleLine = true, modifier = Modifier.fillMaxWidth())
+                if (provider.needsKey) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("۲) کلید API:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = ReadableInk)
+                    OutlinedTextField(value = key, onValueChange = { key = it }, label = { Text("API Key") },
+                        leadingIcon = { Icon(Icons.Filled.Key, null, tint = Saffron, modifier = Modifier.size(18.dp)) },
+                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                }
                 if (provider == AiProvider.CUSTOM) {
                     Spacer(Modifier.height(6.dp))
                     OutlinedTextField(value = url, onValueChange = { url = it }, label = { Text("Base URL") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -269,9 +275,8 @@ fun AiGatewayDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(enabled = key.isNotBlank() && (provider != AiProvider.CUSTOM || url.isNotBlank()),
-                onClick = { AiConfig.save(context, provider, key, url, model); onSaved() }) {
-                Text("ذخیره ✅", color = if (key.isNotBlank()) Saffron else Brick, fontWeight = FontWeight.Bold)
+            TextButton(enabled = canSave, onClick = { AiConfig.save(context, provider, key, url, model); onSaved() }) {
+                Text("ذخیره ✅", color = if (canSave) Saffron else Brick, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف", color = ReadableInk) } })
