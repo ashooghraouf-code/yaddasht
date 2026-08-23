@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
@@ -22,7 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import ir.yaddasht.app.ui.theme.*
+import ir.yaddasht.app.ui.theme.Saffron
+import ir.yaddasht.app.ui.theme.Ink
+import ir.yaddasht.app.ui.theme.LalezarFont
 import ir.yaddasht.app.util.FaDate
 import ir.yaddasht.app.util.fa
 import java.util.Calendar
@@ -31,7 +34,6 @@ import java.util.TimeZone
 
 val WeekDaysFa = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
 
-// ✅ ساخت میلی‌ثانیه از تاریخ شمسی — بدون باگ (ماه میلادی از ۰)
 fun dayMillis(jy: Int, jm: Int, jd: Int): Long {
     val (gy, gm, gd) = FaDate.toGregorian(jy, jm, jd)
     val c = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tehran"))
@@ -41,7 +43,6 @@ fun dayMillis(jy: Int, jm: Int, jd: Int): Long {
     return c.timeInMillis
 }
 
-// ✅ روز هفتهٔ اول ماه (شنبه = ۰)
 fun firstDowIndex(jy: Int, jm: Int): Int {
     val (gy, gm, gd) = FaDate.toGregorian(jy, jm, 1)
     val c = Calendar.getInstance()
@@ -50,7 +51,6 @@ fun firstDowIndex(jy: Int, jm: Int): Int {
     return c.get(Calendar.DAY_OF_WEEK) % 7
 }
 
-// ✅ تاریخ قمری به فارسی (تقویم دیواری شمسی-قمری)
 fun hijriFa(millis: Long): String = try {
     val fmt = android.icu.text.SimpleDateFormat("d MMMM y", android.icu.util.ULocale("fa@calendar=islamic"))
     fmt.format(Date(millis))
@@ -62,13 +62,13 @@ fun gregorianFa(millis: Long): String {
     return "${c.get(Calendar.YEAR)}/${(c.get(Calendar.MONTH) + 1).toString().padStart(2, '0')}/${c.get(Calendar.DAY_OF_MONTH).toString().padStart(2, '0')}"
 }
 
-// 🗓️ تقویم دیواری برای انتخاب تاریخ
 @Composable
 fun ShamsiCalendarPickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) {
     val (jy0, jm0, jd0) = FaDate.jalali(System.currentTimeMillis())
     var jy by remember { mutableIntStateOf(jy0) }
     var jm by remember { mutableIntStateOf(jm0) }
     var selDay by remember { mutableIntStateOf(0) }
+    val onSurface = MaterialTheme.colorScheme.onSurface
 
     AlertDialog(onDismissRequest = onDismiss,
         title = { Text("📅 تقویم یادآور", fontFamily = LalezarFont, fontSize = 20.sp) },
@@ -79,17 +79,17 @@ fun ShamsiCalendarPickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit)
                         Icon(Icons.Filled.ChevronRight, "قبل", tint = Saffron)
                     }
                     Text("${FaDate.monthName(jm)} ${jy.fa()}", fontFamily = LalezarFont, fontSize = 18.sp,
-                        color = MaterialThemeColorsOnSurface(), modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                        color = onSurface, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                     IconButton(onClick = { if (jm < 12) jm++ else { jm = 1; if (jy < jy0 + 3) jy++ } }) {
                         Icon(Icons.Filled.ChevronLeft, "بعد", tint = Saffron)
                     }
                 }
                 val infoMillis = dayMillis(jy, jm, if (selDay > 0) selDay else 1)
                 val hijri = hijriFa(infoMillis)
-                if (hijri.isNotBlank()) Text("🌙 $hijri", fontSize = 11.sp,
-                    color = MaterialThemeColorsOnSurface().copy(alpha = .7f), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-                Text("میلادی: ${gregorianFa(infoMillis)}", fontSize = 10.sp,
-                    color = MaterialThemeColorsOnSurface().copy(alpha = .5f), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                if (hijri.isNotBlank()) Text("🌙 $hijri", fontSize = 11.sp, color = onSurface.copy(alpha = .7f),
+                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                Text("میلادی: ${gregorianFa(infoMillis)}", fontSize = 10.sp, color = onSurface.copy(alpha = .5f),
+                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     WeekDaysFa.forEach { w ->
@@ -115,7 +115,7 @@ fun ShamsiCalendarPickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit)
                                     .clickable { selDay = d },
                                     contentAlignment = Alignment.Center) {
                                     Text(d.fa(), fontSize = 13.sp,
-                                        color = if (isSel) Ink else MaterialThemeColorsOnSurface(),
+                                        color = if (isSel) Ink else onSurface,
                                         fontWeight = if (isSel || isToday) FontWeight.Bold else FontWeight.Normal)
                                 }
                             }
@@ -133,6 +133,3 @@ fun ShamsiCalendarPickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit)
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } })
 }
-
-@Composable
-private fun MaterialThemeColorsOnSurface() = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
