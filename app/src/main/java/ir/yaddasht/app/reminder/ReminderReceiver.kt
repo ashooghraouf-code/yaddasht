@@ -18,8 +18,10 @@ class ReminderReceiver : BroadcastReceiver() {
         val open = Intent(context, MainActivity::class.java)
             .putExtra("note_id", noteId)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        val pi = PendingIntent.getActivity(context, noteId.toInt(), open,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val pi = PendingIntent.getActivity(
+            context, noteId.toInt(), open,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
         val notification = NotificationCompat.Builder(context, ReminderScheduler.CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
@@ -30,9 +32,14 @@ class ReminderReceiver : BroadcastReceiver() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
             .setContentIntent(pi)
-            .setVibrate(longArrayOf(0, 600, 250, 600))
+            .setVibrate(longArrayOf(0, 800, 400, 800, 400, 800))
+            .setDefaults(Notification.DEFAULT_ALL)
             .build()
-        notification.flags = notification.flags or Notification.FLAG_INSISTENT
+
+        // زنگ مداوم تا وقتی کاربر لمس کند
+        notification.flags = notification.flags or
+            Notification.FLAG_INSISTENT or
+            Notification.FLAG_SHOW_LIGHTS
 
         try {
             NotificationManagerCompat.from(context).notify(noteId.toInt(), notification)
