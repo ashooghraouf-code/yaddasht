@@ -22,7 +22,6 @@ object ReminderScheduler {
     fun ensureChannel(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java)
         val prefs = context.getSharedPreferences("reminder_prefs", Context.MODE_PRIVATE)
-        // یک‌بار کانال قدیمی را حذف و با صدای زنگ بازسازی می‌کنیم
         if (!prefs.getBoolean("channel_v2", false)) {
             nm.deleteNotificationChannel(CHANNEL_ID)
             val attrs = AudioAttributes.Builder()
