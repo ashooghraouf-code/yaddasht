@@ -15,14 +15,10 @@ class ReminderReceiver : BroadcastReceiver() {
         val title = intent.getStringExtra(ReminderScheduler.EXTRA_TITLE) ?: "یادداشت"
         val isTask = intent.getBooleanExtra(ReminderScheduler.EXTRA_IS_TASK, false)
         ReminderScheduler.ensureChannel(context)
-
         val open = Intent(context, MainActivity::class.java)
-            .putExtra("note_id", noteId)
-            .putExtra("is_task", isTask)
+            .putExtra("note_id", noteId).putExtra("is_task", isTask)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        val pi = PendingIntent.getActivity(context, noteId.toInt(), open,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-
+        val pi = PendingIntent.getActivity(context, noteId.toInt(), open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notification = NotificationCompat.Builder(context, ReminderScheduler.CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle(if (isTask) "✅ یادآور وظیفه: $title" else "⏰ یادآور: $title")
@@ -30,14 +26,10 @@ class ReminderReceiver : BroadcastReceiver() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setAutoCancel(true)
-            .setContentIntent(pi)
+            .setAutoCancel(true).setContentIntent(pi)
             .setVibrate(longArrayOf(0, 800, 400, 800, 400, 800, 400, 800))
-            .setDefaults(Notification.DEFAULT_ALL)
-            .build()
+            .setDefaults(Notification.DEFAULT_ALL).build()
         notification.flags = notification.flags or Notification.FLAG_INSISTENT or Notification.FLAG_SHOW_LIGHTS
-
-        try { NotificationManagerCompat.from(context).notify(noteId.toInt(), notification) }
-        catch (_: SecurityException) { }
+        try { NotificationManagerCompat.from(context).notify(noteId.toInt(), notification) } catch (_: SecurityException) { }
     }
 }
