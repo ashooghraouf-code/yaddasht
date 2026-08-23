@@ -8,37 +8,36 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.RingtoneManager
-import android.os.Build
 
 object ReminderScheduler {
-    // ✅ شناسه جدید کانال تا تنظیمات صدا روی همهٔ گوشی‌ها اعمال شود
-    const val CHANNEL_ID = "yaddasht_reminder_ring_v2"
+    const val CHANNEL_ID = "yaddasht_reminders"
     const val EXTRA_NOTE_ID = "note_id"
     const val EXTRA_TITLE = "title"
 
-    fun reminderSoundUri(context: Context) =
+    private fun reminderSound(context: Context) =
         RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
     fun ensureChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= 26) {
-            val nm = context.getSystemService(NotificationManager::class.java)
-            if (nm.getNotificationChannel(CHANNEL_ID) == null) {
-                val channel = NotificationChannel(
-                    CHANNEL_ID, "زنگ یادآور 🔔", NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = "پخش زنگ و لرزش برای یادآورها"
-                    enableVibration(true)
-                    enableLights(true)
-                    val attrs = AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .build()
-                    setSound(reminderSoundUri(context), attrs)
-                }
-                nm.createNotificationChannel(channel)
+        val nm = context.getSystemService(NotificationManager::class.java)
+        val prefs = context.getSharedPreferences("reminder_prefs", Context.MODE_PRIVATE)
+        // یک‌بار کانال قدیمی را حذف و با صدای زنگ بازسازی می‌کنیم
+        if (!prefs.getBoolean("channel_v2", false)) {
+            nm.deleteNotificationChannel(CHANNEL_ID)
+            val attrs = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            val ch = NotificationChannel(CHANNEL_ID, "یادآورهای یادداشت", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "زنگ و ویبره برای یادآورها"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 600, 250, 600)
+                reminderSound(context)?.let { setSound(it, attrs) }
+                setShowBadge(true)
             }
+            nm.createNotificationChannel(ch)
+            prefs.edit().putBoolean("channel_v2", true).apply()
         }
     }
 
