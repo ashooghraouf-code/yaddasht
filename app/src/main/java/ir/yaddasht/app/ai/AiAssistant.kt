@@ -26,11 +26,11 @@ enum class AiProvider(
     val keyUrl: String,
     val helpFa: String
 ) {
+    OFFLINE("موتور ویرایشگر ✍️ (آفلاین داخلی)", "", "", ApiFormat.LOCAL, true, false, "", "",
+        "بدون اینترنت و بدون کلید!\nتحلیل سبک، خلاصه‌سازی، کلیدواژه و «ویراستاری متن» روی خود گوشی.\n✅ پیشنهاد ما با توجه به قطعی/مسدودیت شبکه."),
     POLLINATIONS("Pollinations 🆓 (بدون کلید)", "https://text.pollinations.ai", "openai", ApiFormat.POLLINATIONS, true, false,
         "https://pollinations.ai", "",
         "نیاز به ثبت‌نام و کلید ندارد؛ اپ از مسیر ناشناسِ رایگان استفاده می‌کند."),
-    OFFLINE("📴 آفلاین (موتور داخلی)", "", "", ApiFormat.LOCAL, true, false, "", "",
-        "بدون اینترنت و بدون کلید!\nتحلیل سبک (خلاصه، کلیدواژه، پرسش‌وپاسخ متنی) روی خود گوشی انجام می‌شود.\n✅ مناسب قطع/مسدودیت شبکه؛ بدون هیچ دانلودی."),
     OPENROUTER("OpenRouter 🌐 (مدل رایگان)", "https://openrouter.ai/api/v1", "meta-llama/llama-3.1-8b-instruct:free", ApiFormat.OPENAI, true, true,
         "https://openrouter.ai", "https://openrouter.ai/keys",
         "۱) وارد سایت شو (ایمیل/گوگل)\n۲) از لینک Keys کلید بساز\n✅ مدل‌های با پسوند :free کاملاً رایگان‌اند"),
@@ -40,7 +40,7 @@ enum class AiProvider(
     GITHUB("GitHub Models 🐙 (معمولاً مسدود در ایران)", "https://models.inference.ai.azure.com", "gpt-4o-mini", ApiFormat.OPENAI, false, true,
         "https://github.com/marketplace/models", "https://github.com/settings/personal-access-tokens",
         "⚠️ دامنهٔ azure.com در بسیاری از شبکه‌های ایران مسدود است؛ فقط با DNS غیرایرانی."),
-    DEEPSEEK("DeepSeek 🇨 (API پولی!)", "https://api.deepseek.com", "deepseek-chat", ApiFormat.OPENAI, true, true,
+    DEEPSEEK("DeepSeek 🇨🇳 (API پولی!)", "https://api.deepseek.com", "deepseek-chat", ApiFormat.OPENAI, true, true,
         "https://www.deepseek.com", "https://platform.deepseek.com/api_keys",
         "⚠️ چتِ سایت رایگان است ولی API نیاز به شارژ دلاری دارد (خطای Insufficient Balance)."),
     OPENAI("OpenAI (ChatGPT) 🇺🇸", "https://api.openai.com/v1", "gpt-4o-mini", ApiFormat.OPENAI, false, true,
@@ -57,8 +57,8 @@ object AiConfig {
     private const val PREF = "ai_gateway_prefs"
     private fun prefs(context: Context): SharedPreferences = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
     fun provider(context: Context): AiProvider {
-        val name = prefs(context).getString("provider", AiProvider.POLLINATIONS.name) ?: AiProvider.POLLINATIONS.name
-        return AiProvider.entries.firstOrNull { it.name == name } ?: AiProvider.POLLINATIONS
+        val name = prefs(context).getString("provider", AiProvider.OFFLINE.name) ?: AiProvider.OFFLINE.name
+        return AiProvider.entries.firstOrNull { it.name == name } ?: AiProvider.OFFLINE
     }
     fun apiKey(context: Context): String = prefs(context).getString("api_key", "") ?: ""
     fun baseUrl(context: Context): String { val s = prefs(context).getString("base_url", "") ?: ""; return if (s.isNotBlank()) s else provider(context).defaultBaseUrl }
@@ -110,12 +110,9 @@ $hist
 
     private fun isNetworkError(msg: String?): Boolean {
         if (msg == null) return false
-        return msg.contains("Unable to resolve host", true) ||
-                msg.contains("No address associated", true) ||
-                msg.contains("failed to connect", true) ||
-                msg.contains("ConnectException", true) ||
-                msg.contains("SocketTimeoutException", true) ||
-                msg.contains("Network is unreachable", true) ||
+        return msg.contains("Unable to resolve host", true) || msg.contains("No address associated", true) ||
+                msg.contains("failed to connect", true) || msg.contains("ConnectException", true) ||
+                msg.contains("SocketTimeoutException", true) || msg.contains("Network is unreachable", true) ||
                 msg.contains("Connection refused", true)
     }
 
@@ -131,7 +128,7 @@ $hist
                 val second = attempt(context, AiProvider.POLLINATIONS, prompt)
                 if (second.success) return second.copy(content = "🔄 سرویس انتخابی در دسترس نبود؛ به‌صورت خودکار از «Pollinations 🆓» استفاده شد.\n\n" + second.content)
             }
-            return AnalysisResult(true, "📴 اینترنت/سرویس‌های آنلاین در دسترس نبودند؛ پاسخ توسط «موتور آفلاین داخلی» تولید شد:\n\n" + offline())
+            return AnalysisResult(true, "📴 اینترنت/سرویس‌های آنلاین در دسترس نبودند؛ پاسخ توسط «موتور ویرایشگر ✍️» تولید شد:\n\n" + offline())
         }
         return first
     }
@@ -144,9 +141,8 @@ $hist
 
     private fun friendly(err: String): String = when {
         err.contains("Insufficient Balance", true) || err.contains("balance", true) ->
-            "💳 این سرویس پولی است و اعتبار ندارد. از ⚙️ گزینهٔ رایگان Pollinations یا آفلاین را انتخاب کن."
-        err.contains("PAYMENT_REQUIRED", true) || err.contains("402") ->
-            "💳 این مسیر پولی شده؛ اپ از مسیر ناشناس/آفلاین استفاده می‌کند."
+            "💳 این سرویس پولی است و اعتبار ندارد. از ⚙️ گزینهٔ «موتور ویرایشگر ✍️» یا Pollinations را انتخاب کن."
+        err.contains("PAYMENT_REQUIRED", true) || err.contains("402") -> "💳 این مسیر پولی شده؛ اپ از مسیر ناشناس/آفلاین استفاده می‌کند."
         err.contains("401") -> "کلید API معتبر نیست (401)"
         err.contains("403") || err.contains("not available", true) -> "این سرویس در منطقهٔ شما در دسترس نیست (403)"
         err.contains("429") -> "صف شلوغ است؛ چند ثانیه صبر کن (429)"
@@ -177,11 +173,9 @@ $hist
                 conn.connectTimeout = 20000; conn.readTimeout = 90000; conn.doOutput = true
                 OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(body); it.flush() }
                 if (conn.responseCode == 200) return AnalysisResult(true, parseContent(readAll(conn)).trim())
-
                 val getUrl = "$base/" + URLEncoder.encode(prompt.take(1800), "UTF-8")
                 val c2 = URL(getUrl).openConnection() as HttpURLConnection
-                c2.requestMethod = "GET"
-                c2.connectTimeout = 20000; c2.readTimeout = 90000
+                c2.requestMethod = "GET"; c2.connectTimeout = 20000; c2.readTimeout = 90000
                 if (c2.responseCode == 200) return AnalysisResult(true, readAll(c2).trim())
                 return AnalysisResult(false, "", friendly(readErr(c2)))
             }
