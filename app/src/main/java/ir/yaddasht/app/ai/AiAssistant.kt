@@ -24,21 +24,21 @@ enum class AiProvider(
     val keyUrl: String,
     val helpFa: String
 ) {
-    DEEPSEEK("DeepSeek 🇨🇳 (پیشنهادی)", "https://api.deepseek.com", "deepseek-chat", ApiFormat.OPENAI, true,
-        "https://www.deepseek.com", "https://platform.deepseek.com/api_keys",
-        "۱) وارد siteUrl شوید و ثبت‌نام کنید\n۲) از لینک بالا (بخش API Keys) کلید بسازید\n۳) کلید با sk- شروع می‌شود؛ آن را کپی و در اپ بچسبانید\n✅ برای ایران در دسترس است + اعتبار رایگان"),
-    OPENROUTER("OpenRouter 🌐 (مدل رایگان)", "https://openrouter.ai/api/v1", "meta-llama/llama-3.1-8b-instruct:free", ApiFormat.OPENAI, true,
+    OPENROUTER("OpenRouter 🌐 (پیش‌فرض رایگان)", "https://openrouter.ai/api/v1", "meta-llama/llama-3.1-8b-instruct:free", ApiFormat.OPENAI, true,
         "https://openrouter.ai", "https://openrouter.ai/keys",
-        "۱) وارد سایت شوید (با ایمیل یا گوگل)\n۲) از لینک Keys یک کلید بسازید\n✅ مدل‌های با پسوند :free کاملاً رایگان‌اند"),
+        "۱) وارد سایت شوید (با ایمیل یا گوگل)\n۲) از لینک Keys یک کلید بسازید\n✅ مدل‌های با پسوند :free کاملاً رایگان‌اند و نیاز به شارژ ندارند"),
     GROQ("Groq ⚡ (خیلی سریع)", "https://api.groq.com/openai/v1", "llama-3.1-8b-instant", ApiFormat.OPENAI, true,
         "https://groq.com", "https://console.groq.com/keys",
         "۱) در console.groq.com ثبت‌نام کنید\n۲) از بخش API Keys کلید بسازید\n✅ سهمیهٔ رایگان روزانه دارد"),
+    DEEPSEEK("DeepSeek 🇨🇳 (نیاز به شارژ)", "https://api.deepseek.com", "deepseek-chat", ApiFormat.OPENAI, true,
+        "https://www.deepseek.com", "https://platform.deepseek.com/api_keys",
+        "۱) در platform.deepseek.com ثبت‌نام کنید\n۲) کلید بسازید و حساب را شارژ کنید\n⚠️ بدون اعتبار، خطای Insufficient Balance می‌دهد"),
     OPENAI("OpenAI (ChatGPT) 🇺🇸", "https://api.openai.com/v1", "gpt-4o-mini", ApiFormat.OPENAI, false,
         "https://openai.com", "https://platform.openai.com/api-keys",
-        "۱) در platform.openai.com حساب بسازید\n۲) از لینک بالا کلید API بگیرید\n⚠️ ایران را تحریم کرده؛ استفاده فقط طبق قوانین خود سرویس و با مسئولیت کاربر"),
+        "۱) در platform.openai.com حساب بسازید\n۲) کلید API بگیرید\n⚠️ ایران را تحریم کرده؛ استفاده فقط طبق قوانین خود سرویس و با مسئولیت کاربر"),
     GEMINI("Google Gemini 🇺🇸", "https://generativelanguage.googleapis.com/v1beta", "gemini-1.5-flash", ApiFormat.GEMINI, false,
         "https://ai.google.dev", "https://aistudio.google.com/app/apikey",
-        "۱) با حساب گوگل وارد AI Studio شوید\n۲) از لینک بالا Get API Key بزنید\n⚠️ خدمات گوگل برای ایران در دسترس نیست؛ مسئولیت با کاربر است"),
+        "۱) با حساب گوگل وارد AI Studio شوید\n۲) Get API Key بزنید\n⚠️ خدمات گوگل برای ایران در دسترس نیست؛ مسئولیت با کاربر است"),
     CUSTOM("🔧 سرویس سفارشی (سازگار با OpenAI)", "", "", ApiFormat.OPENAI, true, "", "",
         "آدرس پایه، نام مدل و کلید را دستی وارد کنید؛ برای هر سرور/سرویس سازگار با OpenAI");
 }
@@ -47,8 +47,8 @@ object AiConfig {
     private const val PREF = "ai_gateway_prefs"
     private fun prefs(context: Context): SharedPreferences = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
     fun provider(context: Context): AiProvider {
-        val name = prefs(context).getString("provider", AiProvider.DEEPSEEK.name) ?: AiProvider.DEEPSEEK.name
-        return AiProvider.entries.firstOrNull { it.name == name } ?: AiProvider.DEEPSEEK
+        val name = prefs(context).getString("provider", AiProvider.OPENROUTER.name) ?: AiProvider.OPENROUTER.name
+        return AiProvider.entries.firstOrNull { it.name == name } ?: AiProvider.OPENROUTER
     }
     fun apiKey(context: Context): String = prefs(context).getString("api_key", "") ?: ""
     fun baseUrl(context: Context): String { val s = prefs(context).getString("base_url", "") ?: ""; return if (s.isNotBlank()) s else provider(context).defaultBaseUrl }
@@ -86,8 +86,8 @@ object AiAssistant {
     }
 
     suspend fun askAboutNote(context: Context, title: String, body: String, history: List<Pair<String, String>>, question: String): AnalysisResult = withContext(Dispatchers.IO) {
-        val hist = history.takeLast(4).joinToString("\n") { "پرسش: ${it.first}\nپاسخ: ${it.second}" }
-        call(context, """تو دستیار هوشمند اپ «چراغ راه» هستی. با توجه به متن یادداشت، به پرسش کاربر پاسخ فارسی و مفید بده.
+        val hist = if (history.isEmpty()) "" else history.joinToString("\n") { "پرسش: ${it.first}\nپاسخ: ${it.second}" }
+        call(context, """تو دستیار هوشمند اپ «چراغ راه» هستی. با توجه به متن یادداشت و ادامهٔ گفتگوی قبلی، به پرسش جدید کاربر پاسخ فارسی و مفید بده. هیچ محدودیتی در تعداد پرسش‌ها وجود ندارد.
 عنوان یادداشت: $title
 متن یادداشت: $body
 گفتگوی قبلی:
@@ -104,7 +104,7 @@ $hist
             val model = AiConfig.model(context)
             val (urlStr, jsonBody, auth) = when (provider.format) {
                 ApiFormat.OPENAI -> Triple("$base/chat/completions", JSONObject().apply {
-                    put("model", model); put("temperature", 0.7); put("max_tokens", 1500)
+                    put("model", model); put("temperature", 0.7); put("max_tokens", 2000)
                     put("messages", JSONArray().apply { put(JSONObject().apply { put("role", "user"); put("content", prompt) }) })
                 }.toString(), true)
                 ApiFormat.GEMINI -> Triple("$base/models/$model:generateContent?key=$key", JSONObject().apply {
@@ -120,9 +120,11 @@ $hist
             if (conn.responseCode != 200) {
                 val err = conn.errorStream?.let { BufferedReader(InputStreamReader(it, Charsets.UTF_8)).use { r -> r.readText() } } ?: "HTTP ${conn.responseCode}"
                 val friendly = when {
+                    err.contains("Insufficient Balance", true) || err.contains("balance", true) ->
+                        "💳 اعتبار کلید شما تمام شده است. از دکمهٔ ⚙️ یک سرویس کاملاً رایگان مثل OpenRouter یا Groq انتخاب کنید."
                     err.contains("401") -> "کلید API معتبر نیست (401)"
                     err.contains("403") || err.contains("not available") -> "این سرویس در منطقهٔ شما در دسترس نیست (403)"
-                    err.contains("429") -> "سهمیهٔ رایگان تمام شده؛ کمی صبر کنید (429)"
+                    err.contains("429") -> "سهمیهٔ رایگان موقتاً تمام شده؛ چند دقیقه صبر کنید (429)"
                     else -> err
                 }
                 return AnalysisResult(false, "", friendly)
