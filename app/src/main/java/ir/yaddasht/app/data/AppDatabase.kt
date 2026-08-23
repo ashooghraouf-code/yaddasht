@@ -5,16 +5,30 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Note::class, Attachment::class], version = 2, exportSchema = false)
+@Database(
+    entities = [Note::class, Task::class, Attachment::class],
+    version = 3,
+    exportSchema = false
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): NoteDao
+    abstract fun taskDao(): TaskDao
+
     companion object {
-        @Volatile private var instance: AppDatabase? = null
-        fun get(context: Context): AppDatabase =
-            instance ?: synchronized(this) {
-                instance ?: Room.databaseBuilder(
-                    context.applicationContext, AppDatabase::class.java, "yaddasht.db"
-                ).fallbackToDestructiveMigration().build().also { instance = it }
+        @Volatile private var INSTANCE: AppDatabase? = null
+
+        fun get(context: Context): AppDatabase {
+            return INSTANCE ?: synchronized(this) {
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "yaddasht_database"
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
+                INSTANCE = instance
+                instance
             }
+        }
     }
 }
