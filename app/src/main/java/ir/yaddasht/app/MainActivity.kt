@@ -117,6 +117,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+
         setContent {
             YaddashtTheme {
                 val dao = remember { AppDatabase.get(applicationContext).dao() }
