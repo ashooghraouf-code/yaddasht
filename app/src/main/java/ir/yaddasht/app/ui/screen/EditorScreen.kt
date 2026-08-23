@@ -69,36 +69,9 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 private enum class LockMode { Set, Unlock }
-
-// ✅✅✅ تبدیل شمسی→میلادی استاندارد و تست‌شده (بدون وابستگی به FaDate) ✅✅✅
-// تست: 1405/05/29 → 2026/08/20 ✔
-private fun jalaliToGregorianSafe(jy: Int, jm: Int, jd: Int): Triple<Int, Int, Int> {
-    val jy2 = jy + 1595
-    var days = -355668L + 365L * jy2 + (jy2 / 33) * 8 + ((jy2 % 33) + 3) / 4 + jd +
-            (if (jm < 7) (jm - 1) * 31 else (jm - 7) * 30 + 186)
-    var gy = (400 * (days / 146097)).toInt()
-    days %= 146097
-    if (days > 36524) {
-        days--
-        gy += (100 * (days / 36524)).toInt()
-        days %= 36524
-        if (days >= 365) days++
-    }
-    gy += (4 * (days / 1461)).toInt()
-    days %= 1461
-    if (days > 365) {
-        gy += ((days - 1) / 365).toInt()
-        days = (days - 1) % 365
-    }
-    var gd = (days + 1).toInt()
-    val sal = intArrayOf(0, 31, if ((gy % 4 == 0 && gy % 100 != 0) || (gy % 400 == 0)) 29 else 28,
-        31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
-    var gm = 0
-    while (gm < 13 && gd > sal[gm]) { gd -= sal[gm]; gm++ }
-    return Triple(gy, gm, gd)
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -134,17 +107,14 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         if (noteId == NEW_NOTE_ID) realId = withContext(Dispatchers.IO) { dao.insert(Note()) }
         ready = true
     }
-
     LaunchedEffect(ready, realId) {
         if (!ready) return@LaunchedEffect
         dao.observeNote(realId).collect { n -> note = n; if (lastSaved == null) lastSaved = n }
     }
-
     LaunchedEffect(ready, realId) {
         if (!ready) return@LaunchedEffect
         dao.observeAttachments(realId).collect { attachments = it }
     }
-
     LaunchedEffect(ready) {
         if (!ready) return@LaunchedEffect
         snapshotFlow { note }.debounce(350).collect { n ->
@@ -156,7 +126,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             }
         }
     }
-
     LaunchedEffect(recorder != null) {
         if (recorder != null) while (true) { delay(1000); recordSeconds++ }
     }
@@ -186,15 +155,12 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         } else file?.delete()
         pendingCameraFile = null
     }
-
     val pickImages = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) {
         importUris(context, scope, dao, realId, it)
     }
-
     val pickDocs = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) {
         importUris(context, scope, dao, realId, it)
     }
-
     val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val text = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
@@ -204,13 +170,12 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             }
         }
     }
-
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     fun startRecording() {
         val file = AttachmentStore.createAudioFile(context)
         val r = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(context)
-                else @Suppress("DEPRECATION") MediaRecorder()
+        else @Suppress("DEPRECATION") MediaRecorder()
         try {
             r.setAudioSource(MediaRecorder.AudioSource.MIC)
             r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
@@ -311,7 +276,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                 ToolChip("✅", if (isChecklist) "خروج از چک‌لیست" else "چک‌لیست") {
                     if (!isLocked) note?.let { n ->
                         note = n.copy(body = if (isChecklist) Checklist.fromChecklist(n.body)
-                                             else Checklist.toChecklist(n.body))
+                        else Checklist.toChecklist(n.body))
                     }
                 }
                 ToolChip("🗣️", "دیکته") { if (!isLocked) launchSpeech() }
@@ -324,7 +289,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                     .clip(RoundedCornerShape(22.dp))
                     .background(paperColor(note?.color ?: 0))
                     .padding(16.dp)) {
-
                     val rem = note?.reminderAt ?: 0
                     if (rem > System.currentTimeMillis()) {
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
@@ -332,7 +296,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                             .padding(horizontal = 10.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically) {
                             Text("⏰ یادآور: " + FaDate.full(rem) + " – " +
-                                SimpleDateFormat("HH:mm", Locale.US).format(Date(rem)),
+                                    SimpleDateFormat("HH:mm", Locale.US).format(Date(rem)),
                                 fontSize = 12.sp, color = Ink, modifier = Modifier.weight(1f))
                             Icon(Icons.Filled.Close, "لغو یادآور", tint = Brick,
                                 modifier = Modifier.size(20.dp).clickable {
@@ -342,19 +306,12 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                         }
                         Spacer(Modifier.height(10.dp))
                     }
-
-                    TextField(
-                        value = note?.title.orEmpty(),
+                    TextField(value = note?.title.orEmpty(),
                         onValueChange = { note = note?.copy(title = it) },
                         placeholder = { Text("عنوان یادداشت…", fontFamily = LalezarFont, color = InkSoft, fontSize = 22.sp) },
                         textStyle = TextStyle(fontFamily = LalezarFont, fontSize = 26.sp, color = Ink),
-                        colors = transparentFieldColors(),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
+                        colors = transparentFieldColors(), singleLine = true, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(6.dp))
-
                     if (!isLocked && attachments.isNotEmpty()) {
                         AttachmentsSection(attachments,
                             onImageClick = { viewerImage = it },
@@ -366,18 +323,15 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                             })
                         Spacer(Modifier.height(10.dp))
                     }
-
                     when {
                         isLocked -> LockedBox { lockError = ""; pass1 = ""; lockMode = LockMode.Unlock }
                         isChecklist -> ChecklistEditor(note!!) { note = it }
-                        else -> TextField(
-                            value = note?.body.orEmpty(),
+                        else -> TextField(value = note?.body.orEmpty(),
                             onValueChange = { note = note?.copy(body = it) },
                             placeholder = { Text("اینجا بنویس… یا از «دیکته» و «چک‌لیست» استفاده کن", color = InkSoft, fontSize = 15.sp) },
                             textStyle = TextStyle(fontFamily = VazirFont, fontSize = 15.sp, color = Ink, lineHeight = 26.sp),
                             colors = transparentFieldColors(),
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp)
-                        )
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp))
                     }
                 }
                 Spacer(Modifier.height(24.dp))
@@ -395,11 +349,9 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                         }
                     }
                 }
-
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically) {
                         if (recorder != null) RecordStopPill(recordSeconds, ::stopRecording)
                         else AttachButton("صدا", Icons.Filled.Mic, Modifier.weight(1f), ::micClick)
@@ -411,8 +363,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                         }
                         AttachButton("گالری", Icons.Filled.Image, Modifier.weight(1f)) { pickImages.launch("image/*") }
                     }
-                    Row(Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically) {
                         AttachButton("فایل", Icons.Filled.AttachFile, Modifier.weight(1f)) { pickDocs.launch(arrayOf("*/*")) }
                         AttachButton("نقاشی", Icons.Filled.Brush, Modifier.weight(1f)) { onOpenDraw(realId) }
@@ -529,25 +480,21 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
 
     if (showTimePicker) {
         val timePickerState = rememberTimePickerState()
-        AlertDialog(
-            onDismissRequest = { showTimePicker = false },
+        AlertDialog(onDismissRequest = { showTimePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    val local = Calendar.getInstance().apply {
-                        timeInMillis = pickedDate
-                        set(Calendar.HOUR_OF_DAY, timePickerState.hour)
-                        set(Calendar.MINUTE, timePickerState.minute)
-                        set(Calendar.SECOND, 0)
-                        set(Calendar.MILLISECOND, 0)
-                    }
-                    if (local.timeInMillis > System.currentTimeMillis()) scheduleReminder(local.timeInMillis)
+                    // ✅ اصلاح نهایی تاریخ: pickedDate از timezone تهران ساخته شده
+                    // فقط ساعت و دقیقه را اضافه می‌کنیم (بدون Calendar)
+                    val hourMillis = timePickerState.hour.toLong() * 60 * 60 * 1000
+                    val minuteMillis = timePickerState.minute.toLong() * 60 * 1000
+                    val finalTime = pickedDate + hourMillis + minuteMillis
+                    if (finalTime > System.currentTimeMillis()) scheduleReminder(finalTime)
                     else Toast.makeText(context, "این زمان گذشته است!", Toast.LENGTH_SHORT).show()
                     showTimePicker = false
                 }) { Text("تنظیم ⏰", color = Saffron, fontWeight = FontWeight.Bold) }
             },
             dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("انصراف") } },
-            text = { TimePicker(timePickerState) }
-        )
+            text = { TimePicker(timePickerState) })
     }
 
     viewerImage?.let { att ->
@@ -568,11 +515,9 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     }
 
     if (showFocus && note != null && !isLocked) {
-        FocusModeOverlay(
-            body = note!!.body,
+        FocusModeOverlay(body = note!!.body,
             onChange = { note = note?.copy(body = it) },
-            onExit = { showFocus = false }
-        )
+            onExit = { showFocus = false })
     }
 }
 
@@ -583,8 +528,7 @@ private fun ShamsiDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> U
     var jm by remember { mutableIntStateOf(jm0) }
     var jd by remember { mutableIntStateOf(jd0) }
     if (jd > FaDate.monthLength(jy, jm)) jd = FaDate.monthLength(jy, jm)
-    // ✅ استفاده از تبدیل محلیِ تست‌شده (نه FaDate.toGregorian)
-    val (gy, gm, gd) = jalaliToGregorianSafe(jy, jm, jd)
+    val (gy, gm, gd) = FaDate.toGregorian(jy, jm, jd)
     AlertDialog(onDismissRequest = onDismiss,
         title = { Text("📅 انتخاب تاریخ یادآور", fontFamily = LalezarFont, fontSize = 20.sp) },
         text = {
@@ -607,11 +551,13 @@ private fun ShamsiDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> U
         },
         confirmButton = {
             TextButton(onClick = {
-                // ✅✅✅ اصلاح نهایی: بدون FaDate.epoch ✅✅✅
-                // ساخت میلی‌ثانیه مستقیم از میلادیِ درست (ماه Calendar از ۰ شروع می‌شود: gm - 1)
-                val cal = Calendar.getInstance()
+                // ✅✅✅ اصلاح قطعی تاریخ با timezone تهران ✅✅✅
+                val tz = TimeZone.getTimeZone("Asia/Tehran")
+                val cal = Calendar.getInstance(tz)
                 cal.clear()
+                // gm از 1 شروع می‌شود، Calendar از 0 => gm - 1
                 cal.set(gy, gm - 1, gd, 0, 0, 0)
+                cal.set(Calendar.MILLISECOND, 0)
                 onConfirm(cal.timeInMillis)
             }) { Text("ادامه", color = Saffron, fontWeight = FontWeight.Bold) }
         },
@@ -843,14 +789,11 @@ private fun FocusModeOverlay(body: String, onChange: (String) -> Unit, onExit: (
                     Text("✒️", fontSize = 20.sp)
                 }
                 Box(Modifier.fillMaxWidth().height(2.dp).background(Saffron.copy(alpha = .5f)))
-                TextField(
-                    value = body,
-                    onValueChange = onChange,
+                TextField(value = body, onValueChange = onChange,
                     textStyle = TextStyle(fontFamily = VazirFont, fontSize = 19.sp, color = Ink, lineHeight = 36.sp),
                     colors = transparentFieldColors(),
                     placeholder = { Text("فقط بنویس…", color = InkSoft.copy(alpha = .6f), fontSize = 18.sp) },
-                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 26.dp, vertical = 10.dp)
-                )
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 26.dp, vertical = 10.dp))
             }
         }
     }
