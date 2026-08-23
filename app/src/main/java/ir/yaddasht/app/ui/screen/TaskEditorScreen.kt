@@ -2,6 +2,7 @@ package ir.yaddasht.app.ui.screen
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaPlayer
@@ -23,6 +24,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -104,8 +106,27 @@ import ir.yaddasht.app.data.Task
 import ir.yaddasht.app.data.TaskAttachment
 import ir.yaddasht.app.data.TaskDao
 import ir.yaddasht.app.reminder.ReminderScheduler
-import ir.yaddasht.app.ui.theme.*
-import ir.yaddasht.app.util.*
+import ir.yaddasht.app.ui.theme.Brick
+import ir.yaddasht.app.ui.theme.DeepGreen
+import ir.yaddasht.app.ui.theme.DeepGreenSoft
+import ir.yaddasht.app.ui.theme.Ink
+import ir.yaddasht.app.ui.theme.InkSoft
+import ir.yaddasht.app.ui.theme.LalezarFont
+import ir.yaddasht.app.ui.theme.LineGreen
+import ir.yaddasht.app.ui.theme.PaperWhite
+import ir.yaddasht.app.ui.theme.Saffron
+import ir.yaddasht.app.ui.theme.VazirFont
+import ir.yaddasht.app.util.AttachmentStore
+import ir.yaddasht.app.util.Checklist
+import ir.yaddasht.app.util.FaDate
+import ir.yaddasht.app.util.NoteLock
+import ir.yaddasht.app.util.PdfExporter
+import ir.yaddasht.app.util.fa
+import ir.yaddasht.app.util.faDigits
+import ir.yaddasht.app.util.guessMimeType
+import ir.yaddasht.app.util.shareAttachment
+import ir.yaddasht.app.util.shareNoteText
+import ir.yaddasht.app.util.sharePdf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -169,7 +190,6 @@ fun TaskEditorScreen(taskDao: TaskDao, taskId: Long, onBack: () -> Unit, onOpenD
         if (recorder != null) while (true) { delay(1000); recordSeconds++ }
     }
 
-    // ✅ بدون updatedAt (چون در Task وجود ندارد)
     fun saveTask() {
         val t = task ?: return
         scope.launch(Dispatchers.IO) {
@@ -436,7 +456,6 @@ fun TaskEditorScreen(taskDao: TaskDao, taskId: Long, onBack: () -> Unit, onOpenD
         AlertDialog(onDismissRequest = { showTimePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    // ✅ جمع مستقیم میلی‌ثانیه (بدون Calendar) تا تاریخ جابجا نشود
                     val hourMillis = st.hour.toLong() * 60 * 60 * 1000
                     val minuteMillis = st.minute.toLong() * 60 * 1000
                     val finalTime = pickedDate + hourMillis + minuteMillis
@@ -454,7 +473,8 @@ fun TaskEditorScreen(taskDao: TaskDao, taskId: Long, onBack: () -> Unit, onOpenD
             Box(Modifier.fillMaxSize().background(Color(0xFF06100E))) {
                 AsyncImage(model = File(att.filePath), contentDescription = att.fileName,
                     contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
-                IconButton(onClick = { viewerImage = null }, modifier = Modifier.align(Alignment.TopStart).padding(10.dp)) {
+                IconButton(onClick = { viewerImage = null },
+                    modifier = Modifier.align(Alignment.TopStart).padding(10.dp)) {
                     Icon(Icons.Filled.Close, "بستن", tint = Color.White)
                 }
             }
@@ -493,7 +513,6 @@ private fun TShamsiDateDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) 
         },
         confirmButton = {
             TextButton(onClick = {
-                // ✅ اصلاح قطعی تاریخ: clear + gm-1 + timezone تهران
                 val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tehran"))
                 cal.clear()
                 cal.set(gy, gm - 1, gd, 0, 0, 0)
