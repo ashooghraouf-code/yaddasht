@@ -15,9 +15,7 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -44,6 +42,7 @@ sealed class Screen {
     data object Home : Screen()
     data class Editor(val noteId: Long) : Screen()
     data class Draw(val noteId: Long) : Screen()
+
     companion object {
         val SAVER: Saver<Screen, String> = Saver(
             save = { s ->
@@ -107,7 +106,7 @@ class MainActivity : FragmentActivity() {
             .setSubtitle("با اثر انگشت یا رمز دستگاه باز کن")
             .setAllowedAuthenticators(
                 BiometricManager.Authenticators.BIOMETRIC_WEAK or
-                BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
             )
             .build()
         prompt.authenticate(info)
@@ -131,7 +130,7 @@ class MainActivity : FragmentActivity() {
                     }
                     val canBio = BiometricManager.from(this@MainActivity).canAuthenticate(
                         BiometricManager.Authenticators.BIOMETRIC_WEAK or
-                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                                BiometricManager.Authenticators.DEVICE_CREDENTIAL
                     ) == BiometricManager.BIOMETRIC_SUCCESS
                     if (hasLocked && canBio) authRequired = true
                     authChecked = true
