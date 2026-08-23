@@ -1,7 +1,9 @@
 package ir.yaddasht.app.ui.screen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -58,6 +61,10 @@ import ir.yaddasht.app.ui.theme.LineGreen
 import ir.yaddasht.app.ui.theme.PaperWhite
 import ir.yaddasht.app.ui.theme.Saffron
 import ir.yaddasht.app.ui.theme.VazirFont
+
+private val ReadableInk = Color(0xFF1C2A22)
+private val AnswerBg = Color(0xFFFCF6E8)
+private val QuestionBg = Color(0xFFFFE9B8)
 
 private enum class AiMode(val label: String) { ANALYZE("📊 تحلیل"), REPORT("📋 گزارش"), CHAT("💬 پرسش‌وپاسخ") }
 
@@ -79,16 +86,18 @@ fun AiAnalysisDialog(title: String, content: String, isLocked: Boolean, onDismis
 @Composable
 private fun ConsentDialog(providerName: String, onAllow: () -> Unit, onDeny: () -> Unit) {
     AlertDialog(onDismissRequest = onDeny,
-        title = { Text("🔒 یادداشت محرمانه", fontFamily = LalezarFont, fontSize = 20.sp, color = Ink) },
+        title = { Text("🔒 یادداشت محرمانه", fontFamily = LalezarFont, fontSize = 20.sp, color = ReadableInk) },
         text = {
             Column {
-                Text("این یادداشت قفل است. متن آن تنها پس از اجازهٔ شما برای پردازش به سرویس «$providerName» ارسال می‌شود.", fontSize = 13.sp, color = Ink, lineHeight = 20.sp)
+                Text("این یادداشت قفل است. متن آن تنها پس از اجازهٔ شما برای پردازش به سرویس «$providerName» ارسال می‌شود.",
+                    fontSize = 14.sp, color = ReadableInk, lineHeight = 22.sp)
                 Spacer(Modifier.height(8.dp))
-                Text("⚠️ این پرسش هر بار نمایش داده می‌شود و هیچ اجازه‌ای ذخیره نمی‌گردد.", fontSize = 11.sp, color = Brick, fontWeight = FontWeight.Bold)
+                Text("⚠️ این پرسش هر بار نمایش داده می‌شود و هیچ اجازه‌ای ذخیره نمی‌گردد.",
+                    fontSize = 12.sp, color = Brick, fontWeight = FontWeight.Bold)
             }
         },
         confirmButton = { TextButton(onClick = onAllow) { Text("✅ اجازه می‌دهم", color = Saffron, fontWeight = FontWeight.Bold) } },
-        dismissButton = { TextButton(onClick = onDeny) { Text("انصراف", color = Ink) } })
+        dismissButton = { TextButton(onClick = onDeny) { Text("انصراف", color = ReadableInk) } })
 }
 
 @Composable
@@ -105,7 +114,7 @@ private fun AiMainDialog(title: String, content: String, onOpenGateway: () -> Un
         if (mode != AiMode.CHAT) {
             loading = true
             result = if (mode == AiMode.ANALYZE) AiAssistant.analyzeNote(context, title, content)
-                     else AiAssistant.reportNote(context, title, content)
+            else AiAssistant.reportNote(context, title, content)
             loading = false
         }
     }
@@ -122,16 +131,16 @@ private fun AiMainDialog(title: String, content: String, onOpenGateway: () -> Un
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("🤖", fontSize = 22.sp)
                     Spacer(Modifier.width(6.dp))
-                    Text("دستیار هوشمند", fontFamily = LalezarFont, fontSize = 18.sp, color = Ink, modifier = Modifier.weight(1f))
+                    Text("دستیار هوشمند", fontFamily = LalezarFont, fontSize = 18.sp, color = ReadableInk, modifier = Modifier.weight(1f))
                     IconButton(onClick = onOpenGateway, modifier = Modifier.size(30.dp)) { Icon(Icons.Filled.Settings, "درگاه", tint = Saffron, modifier = Modifier.size(17.dp)) }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(30.dp)) { Icon(Icons.Filled.Close, "بستن", tint = InkSoft, modifier = Modifier.size(17.dp)) }
                 }
-                Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     AiMode.entries.forEach { m ->
                         Surface(onClick = { mode = m }, shape = RoundedCornerShape(10.dp),
-                            color = if (mode == m) Saffron else DeepGreenSoft.copy(alpha = .3f)) {
+                            color = if (mode == m) Saffron else DeepGreenSoft.copy(alpha = .25f)) {
                             Text(m.label, Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                fontSize = 12.sp, color = if (mode == m) Ink else InkSoft, fontWeight = FontWeight.Bold)
+                                fontSize = 13.sp, color = if (mode == m) ReadableInk else ReadableInk.copy(alpha = .75f), fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -143,28 +152,43 @@ private fun AiMainDialog(title: String, content: String, onOpenGateway: () -> Un
                         if (loading) Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 CircularProgressIndicator(color = Saffron); Spacer(Modifier.height(10.dp))
-                                Text("در حال پردازش…", fontSize = 12.sp, color = InkSoft)
+                                Text("در حال پردازش…", fontSize = 13.sp, color = ReadableInk)
                             }
                         } else {
                             val r = result
-                            if (r != null && r.success) Text(r.content, fontSize = 13.sp, color = Ink, lineHeight = 22.sp)
-                            else Text("❌ ${r?.error ?: "خطا"}", fontSize = 12.sp, color = Brick)
+                            if (r != null && r.success) {
+                                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                    .background(AnswerBg)
+                                    .border(1.dp, LineGreen.copy(alpha = .5f), RoundedCornerShape(12.dp))
+                                    .padding(12.dp)) {
+                                    Text(r.content, fontSize = 14.sp, color = ReadableInk, lineHeight = 26.sp, fontFamily = VazirFont)
+                                }
+                            } else {
+                                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFFFDEAE5))
+                                    .border(1.dp, Brick.copy(alpha = .5f), RoundedCornerShape(12.dp))
+                                    .padding(12.dp)) {
+                                    Text("❌ ${r?.error ?: "خطا"}", fontSize = 13.sp, color = Color(0xFFB3341E), lineHeight = 22.sp)
+                                }
+                            }
                         }
                     } else {
-                        if (history.isEmpty()) Text("پرسش خود را دربارهٔ این یادداشت بنویسید؛ پاسخ با توجه به متن یادداشت داده می‌شود. 💬", fontSize = 12.sp, color = InkSoft)
+                        if (history.isEmpty()) Text("پرسش خود را دربارهٔ این یادداشت بنویسید؛ پاسخ با توجه به متن یادداشت داده می‌شود. 💬",
+                            fontSize = 13.sp, color = ReadableInk.copy(alpha = .8f), lineHeight = 22.sp)
                         history.forEach { (q, a) ->
-                            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Saffron.copy(alpha = .18f)).padding(8.dp)) {
-                                Text("پرسش: $q", fontSize = 12.sp, color = Ink, fontWeight = FontWeight.Bold)
+                            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(QuestionBg).padding(10.dp)) {
+                                Text("پرسش: $q", fontSize = 13.sp, color = ReadableInk, fontWeight = FontWeight.Bold, lineHeight = 22.sp)
                             }
                             Spacer(Modifier.height(4.dp))
-                            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(DeepGreenSoft.copy(alpha = .12f)).padding(8.dp)) {
-                                Text(a, fontSize = 12.sp, color = Ink, lineHeight = 20.sp)
+                            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                                .background(AnswerBg).border(1.dp, LineGreen.copy(alpha = .5f), RoundedCornerShape(10.dp)).padding(10.dp)) {
+                                Text(a, fontSize = 14.sp, color = ReadableInk, lineHeight = 26.sp, fontFamily = VazirFont)
                             }
                             Spacer(Modifier.height(8.dp))
                         }
                         if (pending != null) Row(verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(color = Saffron, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.width(6.dp)); Text("در حال پاسخ…", fontSize = 11.sp, color = InkSoft)
+                            Spacer(Modifier.width(6.dp)); Text("در حال پاسخ…", fontSize = 12.sp, color = ReadableInk)
                         }
                     }
                 }
@@ -172,13 +196,12 @@ private fun AiMainDialog(title: String, content: String, onOpenGateway: () -> Un
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(value = question, onValueChange = { question = it },
-                            placeholder = { Text("پرسش شما…", fontSize = 12.sp) },
+                            placeholder = { Text("پرسش شما…", fontSize = 13.sp) },
                             singleLine = true, modifier = Modifier.weight(1f))
                         Spacer(Modifier.width(6.dp))
-                        IconButton(onClick = {
-                            if (question.isNotBlank()) { pending = question.trim(); question = "" }
-                        }, modifier = Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(Saffron)) {
-                            Icon(Icons.Filled.Send, "ارسال", tint = Ink, modifier = Modifier.size(18.dp))
+                        IconButton(onClick = { if (question.isNotBlank()) { pending = question.trim(); question = "" } },
+                            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(Saffron)) {
+                            Icon(Icons.Filled.Send, "ارسال", tint = ReadableInk, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -196,10 +219,10 @@ fun AiGatewayDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
     var model by remember { mutableStateOf(AiConfig.model(context)) }
 
     AlertDialog(onDismissRequest = onDismiss,
-        title = { Text("🌐 درگاه هوش مصنوعی", fontFamily = LalezarFont, fontSize = 20.sp, color = Ink) },
+        title = { Text("🌐 درگاه هوش مصنوعی", fontFamily = LalezarFont, fontSize = 20.sp, color = ReadableInk) },
         text = {
             Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
-                Text("۱) سرویس‌دهنده:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Ink)
+                Text("۱) سرویس‌دهنده:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = ReadableInk)
                 AiProvider.entries.forEach { p ->
                     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
                         .clickable { provider = p; url = p.defaultBaseUrl; model = p.defaultModel }
@@ -208,27 +231,29 @@ fun AiGatewayDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
                             colors = RadioButtonDefaults.colors(selectedColor = Saffron))
                         Spacer(Modifier.width(4.dp))
                         Column {
-                            Text(p.displayName, fontSize = 13.sp, color = Ink, fontWeight = if (provider == p) FontWeight.Bold else FontWeight.Normal)
-                            Text(if (p.availableInIran) "✅ در دسترس برای ایران" else "⚠️ ایران را تحریم کرده است", fontSize = 10.sp, color = Brick, fontWeight = FontWeight.Bold)
+                            Text(p.displayName, fontSize = 14.sp, color = ReadableInk, fontWeight = if (provider == p) FontWeight.Bold else FontWeight.Normal)
+                            Text(if (p.availableInIran) "✅ در دسترس برای ایران" else "⚠️ ایران را تحریم کرده است",
+                                fontSize = 11.sp, color = Brick, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(DeepGreenSoft.copy(alpha = .12f)).padding(10.dp)) {
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(AnswerBg)
+                    .border(1.dp, LineGreen.copy(alpha = .5f), RoundedCornerShape(12.dp)).padding(10.dp)) {
                     Column {
-                        Text("📘 آموزش قدم‌به‌قدم دریافت کلید:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Ink)
+                        Text("📘 آموزش قدم‌به‌قدم دریافت کلید:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = ReadableInk)
                         Spacer(Modifier.height(4.dp))
-                        Text(provider.helpFa, fontSize = 11.sp, color = Ink, lineHeight = 18.sp)
+                        Text(provider.helpFa, fontSize = 12.sp, color = ReadableInk, lineHeight = 20.sp)
                         if (provider.keyUrl.isNotBlank()) {
                             Spacer(Modifier.height(6.dp))
-                            Text("🔗 لینک دریافت کلید (نگه‌دارید و کپی کنید):", fontSize = 10.sp, color = InkSoft)
-                            SelectionContainer { Text(provider.keyUrl, fontSize = 11.sp, color = Saffron, fontWeight = FontWeight.Bold) }
-                            Text("🌐 سایت: ${provider.siteUrl}", fontSize = 10.sp, color = InkSoft)
+                            Text("🔗 لینک دریافت کلید (نگه‌دارید و کپی کنید):", fontSize = 11.sp, color = ReadableInk.copy(alpha = .8f))
+                            SelectionContainer { Text(provider.keyUrl, fontSize = 12.sp, color = Color(0xFF8A5A00), fontWeight = FontWeight.Bold) }
+                            Text("🌐 سایت: ${provider.siteUrl}", fontSize = 11.sp, color = ReadableInk.copy(alpha = .8f))
                         }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                Text("۲) کلید API:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Ink)
+                Text("۲) کلید API:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = ReadableInk)
                 OutlinedTextField(value = key, onValueChange = { key = it }, label = { Text("API Key") },
                     leadingIcon = { Icon(Icons.Filled.Key, null, tint = Saffron, modifier = Modifier.size(18.dp)) },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -239,7 +264,8 @@ fun AiGatewayDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
                     OutlinedTextField(value = model, onValueChange = { model = it }, label = { Text("نام مدل") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 }
                 Spacer(Modifier.height(8.dp))
-                Text("⚖️ مسئولیت رعایت قوانین هر سرویس‌دهنده و مقررات منطقه‌ای با کاربر است.", fontSize = 10.sp, color = Brick, fontWeight = FontWeight.Bold)
+                Text("⚖️ مسئولیت رعایت قوانین هر سرویس‌دهنده و مقررات منطقه‌ای با کاربر است.",
+                    fontSize = 11.sp, color = Brick, fontWeight = FontWeight.Bold)
             }
         },
         confirmButton = {
@@ -248,5 +274,5 @@ fun AiGatewayDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
                 Text("ذخیره ✅", color = if (key.isNotBlank()) Saffron else Brick, fontWeight = FontWeight.Bold)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف", color = Ink) } })
+        dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف", color = ReadableInk) } })
 }
