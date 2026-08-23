@@ -32,6 +32,7 @@ import ir.yaddasht.app.data.Attachment
 import ir.yaddasht.app.data.NoteDao
 import ir.yaddasht.app.ui.theme.*
 import ir.yaddasht.app.util.AttachmentStore
+import ir.yaddasht.app.util.fa
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -87,10 +88,10 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
             }
         }
 
-        // ✅ نوار بالا: با فاصله از نوار وضعیت گوشی
+        // ✅ نوار بالا: با احترام به نوار وضعیت گوشی
         Row(Modifier.align(Alignment.TopCenter).fillMaxWidth()
             .statusBarsPadding()
-            .padding(14.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically) {
             DrawButton("✕") { onBack() }
@@ -119,7 +120,6 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
                         p.moveTo(s.points.first().x, s.points.first().y)
                         for (i in 1 until s.points.size) p.lineTo(s.points[i].x, s.points[i].y)
                     }
-                    c.drawPath(p, paint)
                     val file = File(AttachmentStore.attachmentsDir(context), "DRAW_${System.currentTimeMillis()}.png")
                     FileOutputStream(file).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
                     dao.insertAttachment(Attachment(noteId = noteId, fileName = file.name, filePath = file.absolutePath, mimeType = "image/png", isImage = true))
@@ -128,21 +128,26 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
                         onBack()
                     }
                 }
-            }, shape = RoundedCornerShape(14.dp), color = Saffron) {
+            }, shape = RoundedCornerShape(16.dp), color = Saffron) {
                 Text("💾 ذخیره", Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
                     color = Ink, fontFamily = LalezarFont, fontSize = 15.sp)
             }
         }
 
-        // ✅ نوار پایین: با فاصله از نوار ناوبری گوشی (دیگر تداخل ندارد)
+        // ✅ پنل پایین: شناور، گوشه‌گرد و بالاتر از نوار ناوبری گوشی (بدون تداخل)
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-            .background(DeepGreen.copy(alpha = .95f), RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
-            .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(16.dp)) {
+            .navigationBarsPadding()
+            .imePadding()
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .clip(RoundedCornerShape(26.dp))
+            .background(DeepGreen.copy(alpha = .97f))
+            .border(1.dp, LineGreen.copy(alpha = .6f), RoundedCornerShape(26.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp)) {
+
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 brushColors.forEach { c ->
-                    Box(Modifier.size(34.dp).clip(CircleShape).background(c)
+                    Box(Modifier.size(30.dp).clip(CircleShape).background(c)
                         .border(if (brushColor == c) 3.dp else 1.dp,
                             if (brushColor == c) Saffron else Color.Black.copy(alpha = .2f), CircleShape)
                         .clickable { brushColor = c })
@@ -151,12 +156,16 @@ fun DrawScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit) {
                 Text(if (brushColor == Color.White) "پاک‌کن 🧽" else "قلم 🖌️",
                     fontSize = 12.sp, color = MutedGreenText)
             }
+
+            Spacer(Modifier.height(6.dp))
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("〰️", fontSize = 15.sp)
                 Slider(value = brushWidth, onValueChange = { brushWidth = it },
-                    valueRange = 2f..28f,
-                    modifier = Modifier.weight(1f).height(44.dp),
+                    valueRange = 2f..28f, modifier = Modifier.weight(1f),
                     colors = SliderDefaults.colors(thumbColor = Saffron, activeTrackColor = Saffron))
+                Text("ضخامت ${brushWidth.toInt().fa()}",
+                    fontSize = 11.sp, color = Saffron, fontFamily = LalezarFont)
             }
         }
     }
