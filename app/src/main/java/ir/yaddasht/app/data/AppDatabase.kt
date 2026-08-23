@@ -19,26 +19,16 @@ private val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
-@Database(
-    entities = [Note::class, Task::class, Attachment::class, TaskAttachment::class],
-    version = 4,
-    exportSchema = false
-)
+@Database(entities = [Note::class, Task::class, Attachment::class, TaskAttachment::class], version = 4, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): NoteDao
     abstract fun taskDao(): TaskDao
-
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
-        fun get(context: Context): AppDatabase {
-            return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "yaddasht_database")
-                    .addMigrations(MIGRATION_2_4, MIGRATION_3_4)
-                    .fallbackToDestructiveMigration()
-                    .build()
-                INSTANCE = instance
-                instance
-            }
+        fun get(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
+            val i = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "yaddasht_database")
+                .addMigrations(MIGRATION_2_4, MIGRATION_3_4).fallbackToDestructiveMigration().build()
+            INSTANCE = i; i
         }
     }
 }
