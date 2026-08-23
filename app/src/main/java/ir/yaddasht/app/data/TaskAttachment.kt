@@ -1,3 +1,4 @@
+
 package ir.yaddasht.app.data
 
 import androidx.room.Entity
