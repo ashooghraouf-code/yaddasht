@@ -2,8 +2,6 @@ package ir.yaddasht.app.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import androidx.room.ForeignKey
-import androidx.room.Index
 
 @Entity(tableName = "notes")
 data class Note(
@@ -17,16 +15,7 @@ data class Note(
     val updatedAt: Long = System.currentTimeMillis()
 )
 
-@Entity(
-    tableName = "attachments",
-    foreignKeys = [ForeignKey(
-        entity = Note::class,
-        parentColumns = ["id"],
-        childColumns = ["noteId"],
-        onDelete = ForeignKey.CASCADE
-    )],
-    indices = [Index("noteId")]
-)
+@Entity(tableName = "attachments")
 data class Attachment(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val noteId: Long,
@@ -36,7 +25,4 @@ data class Attachment(
     val isImage: Boolean
 )
 
-data class AttachmentCount(
-    val noteId: Long,
-    val count: Int
-)
+data class AttachmentCount(val noteId: Long, val count: Int)
