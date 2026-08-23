@@ -1,19 +1,22 @@
 package ir.yaddasht.app.util
 
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import ir.yaddasht.app.util.FaDate
 
-fun String.faDigits(): String = map { c -> if (c in '0'..'9') ('۰' + (c - '0')) else c }.joinToString("")
-fun Int.fa(): String = toString().faDigits()
+fun Int.fa(): String = this.toString().map { ('۰' + (it - '0')) }.joinToString("")
 
-fun relativeTimeFa(ts: Long): String {
-    val minutes = (System.currentTimeMillis() - ts) / 60_000
+fun String.faDigits(): String = this.map { if (it in '0'..'9') ('۰' + (it - '0')) else it }.joinToString("")
+
+fun relativeTimeFa(millis: Long): String {
+    val diff = System.currentTimeMillis() - millis
+    val min = diff / 60000
     return when {
-        minutes < 1 -> "همین حالا"
-        minutes < 60 -> "${minutes.toInt().fa()} دقیقه پیش"
-        minutes < 24 * 60 -> "${(minutes / 60).toInt().fa()} ساعت پیش"
-        minutes < 7 * 24 * 60 -> "${(minutes / (24 * 60)).toInt().fa()} روز پیش"
-        else -> FaDate.short(ts)
+        min < 1 -> "همین حالا"
+        min < 60 -> "${min.toInt().fa()} دقیقه پیش"
+        min < 1440 -> "${(min / 60).toInt().fa()} ساعت پیش"
+        min < 43200 -> "${(min / 1440).toInt().fa()} روز پیش"
+        else -> {
+            val (jy, jm, jd) = FaDate.jalali(millis)
+            "${jd.fa()} ${FaDate.monthName(jm)}"
+        }
     }
 }
