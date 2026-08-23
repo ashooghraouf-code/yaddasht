@@ -3,6 +3,7 @@ package ir.yaddasht.app.ui.screen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
@@ -45,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +55,7 @@ import androidx.compose.ui.window.Dialog
 import ir.yaddasht.app.ai.AiAssistant
 import ir.yaddasht.app.ai.AiConfig
 import ir.yaddasht.app.ai.AiProvider
+import ir.yaddasht.app.ai.LocalEngine
 import ir.yaddasht.app.ui.theme.Brick
 import ir.yaddasht.app.ui.theme.DeepGreenSoft
 import ir.yaddasht.app.ui.theme.InkSoft
@@ -65,7 +69,18 @@ private val ReadableInk = Color(0xFF1C2A22)
 private val AnswerBg = Color(0xFFFCF6E8)
 private val QuestionBg = Color(0xFFFFE9B8)
 
-private enum class AiMode(val label: String) { ANALYZE("📊 تحلیل"), REPORT("📋 گزارش"), CHAT("💬 پرسش‌وپاسخ") }
+private enum class AiMode(val label: String) {
+    ANALYZE("📊 تحلیل"), REPORT("📋 گزارش"), CHAT("💬 پرسش‌وپاسخ"), EDIT("✍️ ویرایشگر")
+}
+
+@Composable
+private fun lightFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = ReadableInk, unfocusedTextColor = ReadableInk,
+    focusedContainerColor = Color.White, unfocusedContainerColor = Color.White,
+    focusedBorderColor = Saffron, unfocusedBorderColor = LineGreen,
+    focusedLabelColor = ReadableInk.copy(alpha = .7f), unfocusedLabelColor = ReadableInk.copy(alpha = .6f),
+    focusedLeadingIconColor = Saffron, unfocusedLeadingIconColor = Saffron
+)
 
 @Composable
 fun AiAnalysisDialog(title: String, content: String, isLocked: Boolean, onDismiss: () -> Unit) {
@@ -85,11 +100,12 @@ fun AiAnalysisDialog(title: String, content: String, isLocked: Boolean, onDismis
 @Composable
 private fun ConsentDialog(providerName: String, onAllow: () -> Unit, onDeny: () -> Unit) {
     AlertDialog(onDismissRequest = onDeny,
-        title = { Text("🔒 یادداشت محرمانه", fontFamily = LalezarFont, fontSize = 20.sp, color = ReadableInk) },
+        containerColor = PaperWhite, titleContentColor = ReadableInk, textContentColor = ReadableInk,
+        title = { Text("🔒 یادداشت محرمانه", fontFamily = LalezarFont, fontSize = 20.sp) },
         text = {
             Column {
                 Text("این یادداشت قفل است. متن آن تنها پس از اجازهٔ شما برای پردازش به سرویس «$providerName» ارسال می‌شود.",
-                    fontSize = 14.sp, color = ReadableInk, lineHeight = 22.sp)
+                    fontSize = 14.sp, lineHeight = 22.sp)
                 Spacer(Modifier.height(8.dp))
                 Text("⚠️ این پرسش هر بار نمایش داده می‌شود و هیچ اجازه‌ای ذخیره نمی‌گردد.",
                     fontSize = 12.sp, color = Brick, fontWeight = FontWeight.Bold)
@@ -110,12 +126,15 @@ private fun AiMainDialog(title: String, content: String, onOpenGateway: () -> Un
     var pending by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(mode) {
-        if (mode != AiMode.CHAT) {
-            loading = true
-            result = if (mode == AiMode.ANALYZE) AiAssistant.analyzeNote(context, title, content)
-            else AiAssistant.reportNote(context, title, content)
-            loading = false
+        if (mode == AiMode.CHAT) return@LaunchedEffect
+        loading = true
+        result = when (mode) {
+            AiMode.ANALYZE -> AiAssistant.analyzeNote(context, title, content)
+            AiMode.REPORT -> AiAssistant.reportNote(context, title, content)
+            AiMode.EDIT -> AiAssistant.AnalysisResult(true, LocalEngine.editText(content))
+            else -> null
         }
+        loading = false
     }
     LaunchedEffect(pending) {
         val q = pending ?: return@LaunchedEffect
@@ -134,7 +153,7 @@ private fun AiMainDialog(title: String, content: String, onOpenGateway: () -> Un
                     IconButton(onClick = onOpenGateway, modifier = Modifier.size(30.dp)) { Icon(Icons.Filled.Settings, "درگاه", tint = Saffron, modifier = Modifier.size(17.dp)) }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(30.dp)) { Icon(Icons.Filled.Close, "بستن", tint = InkSoft, modifier = Modifier.size(17.dp)) }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     AiMode.entries.forEach { m ->
                         Surface(onClick = { mode = m }, shape = RoundedCornerShape(10.dp),
                             color = if (mode == m) Saffron else DeepGreenSoft.copy(alpha = .25f)) {
@@ -158,7 +177,9 @@ private fun AiMainDialog(title: String, content: String, onOpenGateway: () -> Un
                             if (r != null && r.success) {
                                 Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(AnswerBg)
                                     .border(1.dp, LineGreen.copy(alpha = .5f), RoundedCornerShape(12.dp)).padding(12.dp)) {
-                                    Text(r.content, fontSize = 14.sp, color = ReadableInk, lineHeight = 26.sp, fontFamily = VazirFont)
+                                    SelectionContainer {
+                                        Text(r.content, fontSize = 14.sp, color = ReadableInk, lineHeight = 26.sp, fontFamily = VazirFont)
+                                    }
                                 }
                             } else {
                                 Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFFFDEAE5))
@@ -177,7 +198,7 @@ private fun AiMainDialog(title: String, content: String, onOpenGateway: () -> Un
                             Spacer(Modifier.height(4.dp))
                             Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(AnswerBg)
                                 .border(1.dp, LineGreen.copy(alpha = .5f), RoundedCornerShape(10.dp)).padding(10.dp)) {
-                                Text(a, fontSize = 14.sp, color = ReadableInk, lineHeight = 26.sp, fontFamily = VazirFont)
+                                SelectionContainer { Text(a, fontSize = 14.sp, color = ReadableInk, lineHeight = 26.sp, fontFamily = VazirFont) }
                             }
                             Spacer(Modifier.height(8.dp))
                         }
@@ -191,7 +212,9 @@ private fun AiMainDialog(title: String, content: String, onOpenGateway: () -> Un
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(value = question, onValueChange = { question = it },
-                            placeholder = { Text("پرسش شما…", fontSize = 13.sp) },
+                            label = { Text("پرسش شما…") },
+                            textStyle = TextStyle(fontSize = 14.sp, color = ReadableInk, fontFamily = VazirFont),
+                            colors = lightFieldColors(),
                             singleLine = true, modifier = Modifier.weight(1f))
                         Spacer(Modifier.width(6.dp))
                         IconButton(onClick = { if (question.isNotBlank()) { pending = question.trim(); question = "" } },
@@ -214,13 +237,14 @@ fun AiGatewayDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
     var model by remember { mutableStateOf(AiConfig.model(context)) }
 
     val canSave = when (provider) {
-        AiProvider.POLLINATIONS -> true
+        AiProvider.POLLINATIONS, AiProvider.OFFLINE -> true
         AiProvider.CUSTOM -> key.isNotBlank() && url.isNotBlank()
         else -> key.isNotBlank()
     }
 
     AlertDialog(onDismissRequest = onDismiss,
-        title = { Text("🌐 درگاه هوش مصنوعی", fontFamily = LalezarFont, fontSize = 20.sp, color = ReadableInk) },
+        containerColor = PaperWhite, titleContentColor = ReadableInk, textContentColor = ReadableInk,
+        title = { Text("🌐 درگاه هوش مصنوعی", fontFamily = LalezarFont, fontSize = 20.sp) },
         text = {
             Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
                 Text("۱) سرویس‌دهنده:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = ReadableInk)
@@ -261,13 +285,19 @@ fun AiGatewayDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
                     Text("۲) کلید API:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = ReadableInk)
                     OutlinedTextField(value = key, onValueChange = { key = it }, label = { Text("API Key") },
                         leadingIcon = { Icon(Icons.Filled.Key, null, tint = Saffron, modifier = Modifier.size(18.dp)) },
+                        textStyle = TextStyle(fontSize = 13.sp, color = ReadableInk),
+                        colors = lightFieldColors(),
                         singleLine = true, modifier = Modifier.fillMaxWidth())
                 }
                 if (provider == AiProvider.CUSTOM) {
                     Spacer(Modifier.height(6.dp))
-                    OutlinedTextField(value = url, onValueChange = { url = it }, label = { Text("Base URL") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = url, onValueChange = { url = it }, label = { Text("Base URL") },
+                        textStyle = TextStyle(fontSize = 13.sp, color = ReadableInk), colors = lightFieldColors(),
+                        singleLine = true, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(6.dp))
-                    OutlinedTextField(value = model, onValueChange = { model = it }, label = { Text("نام مدل") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = model, onValueChange = { model = it }, label = { Text("نام مدل") },
+                        textStyle = TextStyle(fontSize = 13.sp, color = ReadableInk), colors = lightFieldColors(),
+                        singleLine = true, modifier = Modifier.fillMaxWidth())
                 }
                 Spacer(Modifier.height(8.dp))
                 Text("⚖️ مسئولیت رعایت قوانین هر سرویس‌دهنده و مقررات منطقه‌ای با کاربر است.",
