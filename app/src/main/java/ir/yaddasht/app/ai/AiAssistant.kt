@@ -27,16 +27,28 @@ enum class AiProvider(
     val helpFa: String
 ) {
     OFFLINE("موتور ویرایشگر ✍️ (آفلاین داخلی)", "", "", ApiFormat.LOCAL, true, false, "", "",
-        "بدون اینترنت و بدون کلید!\nتحلیل سبک، خلاصه‌سازی، کلیدواژه و «ویراستاری متن» روی خود گوشی.\n✅ پیشنهاد ما با توجه به قطعی/مسدودیت شبکه."),
+        "بدون اینترنت و بدون کلید!\nخلاصه‌سازی، کلیدواژه، اقدام‌ها، زمان‌ها، لحن، آمار، پرسش‌وپاسخ و «ویراستاری متن» روی خود گوشی.\n✅ پیشنهاد ما با توجه به قطعی/مسدودیت شبکه."),
+    QWEN("Qwen کوئن 🇨🇳 (رایگان)", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-turbo", ApiFormat.OPENAI, true, true,
+        "https://www.qwenlm.ai", "https://dashscope.console.aliyun.com/apiKey",
+        "۱) در کنسول DashScope (علی‌بابا) ثبت‌نام کن\n۲) از لینک بالا API Key بساز\n✅ سرویس چینی؛ برای ایران در دسترس + سهمیهٔ رایگان"),
     POLLINATIONS("Pollinations 🆓 (بدون کلید)", "https://text.pollinations.ai", "openai", ApiFormat.POLLINATIONS, true, false,
         "https://pollinations.ai", "",
         "نیاز به ثبت‌نام و کلید ندارد؛ اپ از مسیر ناشناسِ رایگان استفاده می‌کند."),
-    OPENROUTER("OpenRouter 🌐 (مدل رایگان)", "https://openrouter.ai/api/v1", "meta-llama/llama-3.1-8b-instruct:free", ApiFormat.OPENAI, true, true,
-        "https://openrouter.ai", "https://openrouter.ai/keys",
-        "۱) وارد سایت شو (ایمیل/گوگل)\n۲) از لینک Keys کلید بساز\n✅ مدل‌های با پسوند :free کاملاً رایگان‌اند"),
+    MISTRAL("Mistral 🇫🇷 (طرح رایگان)", "https://api.mistral.ai/v1", "mistral-small-latest", ApiFormat.OPENAI, true, true,
+        "https://mistral.ai", "https://console.mistral.ai/api-keys",
+        "۱) در console.mistral.ai ثبت‌نام کن\n۲) کلید بساز\n✅ طرح آزمایشی رایگان دارد"),
     GROQ("Groq ⚡ (سریع، سهمیه رایگان)", "https://api.groq.com/openai/v1", "llama-3.1-8b-instant", ApiFormat.OPENAI, true, true,
         "https://groq.com", "https://console.groq.com/keys",
         "۱) در console.groq.com ثبت‌نام کن\n۲) کلید بساز\n✅ سهمیهٔ رایگان روزانه"),
+    CEREBRAS("Cerebras ⚡", "https://api.cerebras.ai/v1", "llama3.1-8b", ApiFormat.OPENAI, true, true,
+        "https://www.cerebras.ai", "https://cloud.cerebras.ai",
+        "۱) در cloud.cerebras.ai ثبت‌نام کن\n۲) کلید بساز\n✅ طرح رایگان دارد"),
+    HUGGINGFACE("HuggingFace 🤗 (رایگان)", "https://api-inference.huggingface.co/v1", "microsoft/Phi-3.5-mini-instruct", ApiFormat.OPENAI, true, true,
+        "https://huggingface.co", "https://huggingface.co/settings/tokens",
+        "۱) در huggingface.co ثبت‌نام کن\n۲) از Settings/Tokens یک توکن بساز\n✅ سهمیهٔ رایگان"),
+    OPENROUTER("OpenRouter 🌐 (مدل رایگان)", "https://openrouter.ai/api/v1", "meta-llama/llama-3.1-8b-instruct:free", ApiFormat.OPENAI, true, true,
+        "https://openrouter.ai", "https://openrouter.ai/keys",
+        "۱) وارد سایت شو (ایمیل/گوگل)\n۲) از لینک Keys کلید بساز\n✅ مدل‌های با پسوند :free کاملاً رایگان‌اند"),
     GITHUB("GitHub Models 🐙 (معمولاً مسدود در ایران)", "https://models.inference.ai.azure.com", "gpt-4o-mini", ApiFormat.OPENAI, false, true,
         "https://github.com/marketplace/models", "https://github.com/settings/personal-access-tokens",
         "⚠️ دامنهٔ azure.com در بسیاری از شبکه‌های ایران مسدود است؛ فقط با DNS غیرایرانی."),
@@ -78,7 +90,8 @@ object AiAssistant {
         callWithFallback(context, """شما دستیار هوشمند فارسی‌زبان اپ «چراغ راه» هستید. یادداشت زیر را تحلیل کن و با ایموجی و ساختار بنویس:
 📌 خلاصه موضوع:
 🔑 نکات کلیدی:
-💡 پیشنهادها برای بهبود:
+🎬 اقدام‌ها:
+💡 پیشنهادها:
 
 عنوان: $title
 متن: ${body.take(3000)}""") { LocalEngine.analyze(title, body) }
@@ -141,7 +154,7 @@ $hist
 
     private fun friendly(err: String): String = when {
         err.contains("Insufficient Balance", true) || err.contains("balance", true) ->
-            "💳 این سرویس پولی است و اعتبار ندارد. از ⚙️ گزینهٔ «موتور ویرایشگر ✍️» یا Pollinations را انتخاب کن."
+            "💳 این سرویس پولی است و اعتبار ندارد. از ⚙️ گزینهٔ «موتور ویرایشگر ✍️»، Qwen یا Pollinations را انتخاب کن."
         err.contains("PAYMENT_REQUIRED", true) || err.contains("402") -> "💳 این مسیر پولی شده؛ اپ از مسیر ناشناس/آفلاین استفاده می‌کند."
         err.contains("401") -> "کلید API معتبر نیست (401)"
         err.contains("403") || err.contains("not available", true) -> "این سرویس در منطقهٔ شما در دسترس نیست (403)"
