@@ -176,7 +176,7 @@ ${if (body.length < 100) "• متن کوتاه است؛ جزئیات بیشتر
         else "در متن این یادداشت پاسخ مستقیمی پیدا نشد.\nکلیدواژه‌های پرسش: ${qk.joinToString("، ")}\n💡 متن را کامل‌تر کن یا از سرویس آنلاین استفاده کن."
     }
 
-    // ✍️ ویراستار — نسخهٔ اصلاح‌شده
+    // ✍️ ویراستار — نسخهٔ نهایی و قطعی
     fun editText(text: String): String {
         if (text.isBlank()) return "متنی برای ویرایش وجود ندارد."
         val fixes = mutableListOf<String>()
@@ -195,10 +195,10 @@ ${if (body.length < 100) "• متن کوتاه است؛ جزئیات بیشتر
         val dupRegex = Regex("(\\S{3,}) \\1")
         if (dupRegex.containsMatchIn(t)) { t = t.replace(dupRegex, "$1"); fixes.add("حذف کلمهٔ تکراری") }
 
-        // ۴) فاصله‌ها و علائم — با ارقام لاتین در regex
+        // ۴) فاصله‌ها و علائم (✅ اصلاح خطای PUNCT0 با استفاده از ${PUNCT})
         t = t.replace(Regex("[ \t]+"), " ")
             .replace(Regex(" +([$PUNCT])"), "$1")
-            .replace(Regex("([$PUNCT])([^\\s$PUNCT0-9])"), "$1 $2")
+            .replace(Regex("([$PUNCT])([^\\s${PUNCT}0-9])"), "$1 $2")
             .replace(Regex("\\n{3,}"), "\n\n")
             .trim()
 
