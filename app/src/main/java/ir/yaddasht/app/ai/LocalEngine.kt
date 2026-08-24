@@ -2,22 +2,23 @@ package ir.yaddasht.app.ai
 
 object LocalEngine {
 
-    private const val ZWNJ = "‌"
+    private const val ZWNJ = "\u200C"
     private const val FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹"
     // ✅ همهٔ انواع نقطه و علائم پایان جمله (فارسی + لاتین + عربی)
-    private const val PUNCT = ".،؛:!؟?\u06D4\u061B\u060C"
+    private const val PUNCT = ".,،؛:!؟?\u06D4\u061B\u060C"
 
     private fun toFaDigits(s: String): String = s.map { c ->
         when (c) {
             in '0'..'9' -> FA_DIGITS[c - '0']
-            in '٠'..'' -> FA_DIGITS[c - '٠']
+            in '\u0660'..'\u0669' -> FA_DIGITS[c - '\u0660']  // ✅ اعداد عربی
+            in '\u06F0'..'\u06F9' -> FA_DIGITS[c - '\u06F0']  // ✅ اعداد فارسی-اردو
             else -> c
         }
     }.joinToString("")
 
     private fun normalize(s: String): String = s
-        .replace('ي', 'ی').replace('ك', 'ک').replace('ة', 'ه')
-        .replace('‌', ' ')
+        .replace('\u064A', '\u06CC').replace('\u0643', '\u06A9').replace('\u0629', '\u0647')
+        .replace('\u200C', ' ')
         .let { toFaDigits(it) }
 
     private val STOPWORDS = setOf(
@@ -85,7 +86,7 @@ object LocalEngine {
 
     private fun times(text: String): List<String> {
         val out = mutableListOf<String>()
-        Regex("(امروز|فردا|پس‌?فردا|دیروز|هفتهٔ? بعد|هفتهٔ? دیگه|ماه بعد|شب|صبح|عصر|ظهر|ساعت [۰-۹0-9]+|[۰-۹0-9]+ روز دیگه)").findAll(normalize(text))
+        Regex("(امروز|فردا|پس‌?فردا|دیروز|هفتهٔ? بعد|هفتهٔ? دیگه|ماه بعد|شب|صبح|عصر|ظهر|ساعت [0-9]+|[0-9]+ روز دیگه)").findAll(normalize(text))
             .forEach { out.add(it.value) }
         return out.distinct().take(8)
     }
@@ -175,11 +176,11 @@ ${if (body.length < 100) "• متن کوتاه است؛ جزئیات بیشتر
         else "در متن این یادداشت پاسخ مستقیمی پیدا نشد.\nکلیدواژه‌های پرسش: ${qk.joinToString("، ")}\n💡 متن را کامل‌تر کن یا از سرویس آنلاین استفاده کن."
     }
 
-    // ✍️ ویراستار — نسخهٔ اصلاح‌شده (نقطهٔ فارسی درست)
+    // ✍️ ویراستار — نسخهٔ اصلاح‌شده
     fun editText(text: String): String {
         if (text.isBlank()) return "متنی برای ویرایش وجود ندارد."
         val fixes = mutableListOf<String>()
-        var t = text.replace('ي', 'ی').replace('ك', 'ک').replace('ة', 'ه')
+        var t = text.replace('\u064A', '\u06CC').replace('\u0643', '\u06A9').replace('\u0629', '\u0647')
         t = toFaDigits(t)
 
         // ۱) نیم‌فاصلهٔ می/نمی (فقط کلمهٔ مستقل)
@@ -187,23 +188,23 @@ ${if (body.length < 100) "• متن کوتاه است؛ جزئیات بیشتر
         if (miRegex.containsMatchIn(t)) { t = t.replace(miRegex, "$1" + ZWNJ); fixes.add("نیم‌فاصلهٔ «می/نمی»") }
 
         // ۲) «هٔ»
-        val heRegex = Regex("([^\\sاوهی]ه) ی (?=\\p{L})")
+        val heRegex = Regex("([^\\s\u0627\u0648\u0647\u06CC]ه) ی (?=\\p{L})")
         if (heRegex.containsMatchIn(t)) { t = t.replace(heRegex, "$1ٔ "); fixes.add("نشانهٔ «هٔ»") }
 
         // ۳) حذف کلمهٔ تکراری (۳ حرفی+)
         val dupRegex = Regex("(\\S{3,}) \\1")
         if (dupRegex.containsMatchIn(t)) { t = t.replace(dupRegex, "$1"); fixes.add("حذف کلمهٔ تکراری") }
 
-        // ۴) فاصله‌ها و علائم — با شناخت نقطهٔ فارسی
+        // ۴) فاصله‌ها و علائم — با ارقام لاتین در regex
         t = t.replace(Regex("[ \t]+"), " ")
-            .replace(Regex(" +([$PUNCT])"), "$1")                       // حذف فاصلهٔ قبل از علامت
-            .replace(Regex("([$PUNCT])([^\\s$PUNCT۰-۹0-9])"), "$1 $2") // فاصله بعد از علامت
+            .replace(Regex(" +([$PUNCT])"), "$1")
+            .replace(Regex("([$PUNCT])([^\\s$PUNCT0-9])"), "$1 $2")
             .replace(Regex("\\n{3,}"), "\n\n")
             .trim()
 
-        // ۵) نقطهٔ پایان — فقط اگر انتها علامت/پرانتز/گیومه/نیم‌فاصله نباشد
+        // ۵) نقطهٔ پایان
         val last = t.takeLast(1)
-        val noNeed = Regex("[$PUNCT)\\]»\"'\\u06D4]").containsMatchIn(last) || last == ZWNJ
+        val noNeed = Regex("[$PUNCT)\\]»\"']").containsMatchIn(last) || last == ZWNJ
         if (t.isNotEmpty() && !noNeed) {
             t += "\u06D4"   // ✅ نقطهٔ فارسی
             fixes.add("نقطهٔ پایان")
