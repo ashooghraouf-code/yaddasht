@@ -315,7 +315,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     if (showExport && note != null) {
         val n = note!!
         AlertDialog(onDismissRequest = { showExport = false },
-            title = { Text("📤 ارسال / خروجی", fontFamily = LalezarFont, fontSize = 20.sp) },
+            title = { Text("📤 ارسال / خروجی", fontFamily = LalezarFont, fontSize = 20.sp, color = Ink) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ExportItem("📤 اشتراک متن یادداشت") { shareNoteText(context, n.title, if (isLocked) "🔒 (محتوا قفل است)" else n.body); showExport = false }
@@ -330,7 +330,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     if (confirmDelete) {
         AlertDialog(onDismissRequest = { confirmDelete = false },
             title = { Text("حذف یادداشت؟", fontFamily = LalezarFont, fontSize = 20.sp) },
-            text = { Text("این یادداشت همراه با همهٔ ضمیمه‌هایش برای همیشه حذف می‌شود.") },
+            text = { Text("«${note.title.ifBlank { "بدون عنوان" }}» همراه با ضمیمه‌هایش برای همیشه حذف می‌شود.") },
             confirmButton = { TextButton(onClick = { confirmDelete = false; val n = note; scope.launch { if (n != null) withContext(Dispatchers.IO) { dao.attachmentsByNote(n.id).forEach { File(it.filePath).delete() }; dao.deleteById(n.id) }; onBack() } }) { Text("حذف", color = Brick, fontWeight = FontWeight.Bold) } },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("انصراف") } })
     }
@@ -407,10 +407,36 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     if (showAi && note != null) { AiAnalysisDialog(title = note?.title ?: "", content = note?.body ?: "", isLocked = isLocked, onDismiss = { showAi = false }) }
 }
 
+// ✅ منوی ارسال با رنگ خوانا (متن تیره روی زمینهٔ سفید)
 @Composable
 private fun ExportItem(label: String, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(12.dp), color = DeepGreenSoft.copy(alpha = .3f)) {
-        Text(label, Modifier.padding(horizontal = 14.dp, vertical = 10.dp), fontSize = 14.sp, color = Ink, fontWeight = FontWeight.Bold)
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = PaperWhite,
+        border = androidx.compose.foundation.BorderStroke(1.dp, LineGreen)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                fontSize = 15.sp,
+                color = Ink,
+                fontWeight = FontWeight.Bold,
+                fontFamily = VazirFont
+            )
+            Spacer(Modifier.weight(1f))
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = null,
+                tint = Saffron,
+                modifier = Modifier.size(18.dp)
+            )
+        }
     }
 }
 
