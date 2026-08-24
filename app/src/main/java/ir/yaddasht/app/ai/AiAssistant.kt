@@ -28,9 +28,9 @@ enum class AiProvider(
 ) {
     OFFLINE("موتور ویرایشگر ✍️ (آفلاین داخلی)", "", "", ApiFormat.LOCAL, true, false, "", "",
         "بدون اینترنت و بدون کلید!\nخلاصه‌سازی، کلیدواژه، اقدام‌ها، زمان‌ها، لحن، آمار، پرسش‌وپاسخ و «ویراستاری متن» روی خود گوشی.\n✅ پیشنهاد ما با توجه به قطعی/مسدودیت شبکه."),
-    QWEN("Qwen کوئن 🇨🇳 (نسخهٔ بین‌المللی)", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "qwen-turbo", ApiFormat.OPENAI, true, true,
+    QWEN("Qwen کوئن 🇨🇳 (کلید لازم)", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "qwen-turbo", ApiFormat.OPENAI, true, true,
         "https://www.alibabacloud.com/product/modelstudio", "https://modelstudio.console.alibabacloud.com/",
-        "۱) وارد کنسول بین‌المللی Alibaba ModelStudio شو\n۲) کلید API بساز\n✅ endpoint بین‌المللی (intl) استفاده می‌شود"),
+        "۱) وارد کنسول بین‌المللی Alibaba ModelStudio شو\n۲) کلید API بساز و دقیقاً همان را وارد کن\n⚠️ کلید DeepSeek اینجا کار نمی‌کند!"),
     POLLINATIONS("Pollinations 🆓 (بدون کلید)", "https://text.pollinations.ai", "openai", ApiFormat.POLLINATIONS, true, false,
         "https://pollinations.ai", "",
         "بدون کلید؛ اگر Cloudflare مسدود کند، اپ خودکار به موتور آفلاین سوئیچ می‌کند."),
@@ -52,7 +52,7 @@ enum class AiProvider(
     GITHUB("GitHub Models 🐙 (معمولاً مسدود)", "https://models.inference.ai.azure.com", "gpt-4o-mini", ApiFormat.OPENAI, false, true,
         "https://github.com/marketplace/models", "https://github.com/settings/personal-access-tokens",
         "⚠️ دامنهٔ azure.com در ایران معمولاً مسدود است."),
-    DEEPSEEK("DeepSeek 🇨🇳 (API پولی!)", "https://api.deepseek.com", "deepseek-chat", ApiFormat.OPENAI, true, true,
+    DEEPSEEK("DeepSeek 🇨 (API پولی!)", "https://api.deepseek.com", "deepseek-chat", ApiFormat.OPENAI, true, true,
         "https://www.deepseek.com", "https://platform.deepseek.com/api_keys",
         "⚠️ API نیاز به شارژ دلاری دارد (خطای Insufficient Balance)."),
     OPENAI("OpenAI (ChatGPT) 🇺🇸", "https://api.openai.com/v1", "gpt-4o-mini", ApiFormat.OPENAI, false, true,
@@ -85,13 +85,16 @@ object AiConfig {
 object AiAssistant {
     data class AnalysisResult(val success: Boolean, val content: String, val error: String? = null)
 
-    // ✅ تشخیص صفحهٔ مسدودسازی Cloudflare / پاسخ HTML به‌جای JSON
     private fun isHtmlBlock(s: String): Boolean {
         val t = s.trim()
         return t.startsWith("<!DOCTYPE", true) || t.startsWith("<html", true) ||
                 t.contains("Cloudflare", true) || t.contains("Attention Required", true) ||
                 t.contains("Just a moment", true)
     }
+
+    private fun isBadKey(msg: String?): Boolean =
+        msg != null && (msg.contains("invalid_api_key", true) || msg.contains("Incorrect API key", true) ||
+                msg.contains("401") || msg.contains("invalid request", true))
 
     suspend fun analyzeNote(context: Context, title: String, body: String): AnalysisResult = withContext(Dispatchers.IO) {
         if (AiConfig.provider(context) == AiProvider.OFFLINE) return@withContext AnalysisResult(true, LocalEngine.analyze(title, body))
@@ -138,7 +141,7 @@ $hist
     }
 
     private fun isBlockedOrPaid(msg: String?): Boolean =
-        msg != null && (isNetworkError(msg) || isHtmlBlock(msg) || msg.contains("402") ||
+        msg != null && (isNetworkError(msg) || isHtmlBlock(msg) || isBadKey(msg) || msg.contains("402") ||
                 msg.contains("PAYMENT_REQUIRED", true) || msg.contains("balance", true) ||
                 msg.contains("CLOUDFLARE", true))
 
@@ -147,11 +150,13 @@ $hist
         val first = attempt(context, primary, prompt)
         if (first.success) return first
         if (isBlockedOrPaid(first.error)) {
-            if (primary != AiProvider.POLLINATIONS) {
+            if (primary != AiProvider.POLLINATIONS && !isBadKey(first.error)) {
                 val second = attempt(context, AiProvider.POLLINATIONS, prompt)
                 if (second.success) return second.copy(content = "🔄 سرویس انتخابی در دسترس نبود؛ از «Pollinations 🆓» استفاده شد.\n\n" + second.content)
             }
-            return AnalysisResult(true, "📴 سرویس‌های آنلاین در دسترس/مجاز نبودند؛ پاسخ توسط «موتور ویرایشگر ✍️» تولید شد:\n\n" + offline())
+            val note = if (isBadKey(first.error)) "🔑 کلید API نامعتبر بود؛ پاسخ توسط «موتور ویرایشگر ✍️» تولید شد:\n\n"
+                       else "📴 سرویس‌های آنلاین در دسترس/مجاز نبودند؛ پاسخ توسط «موتور ویرایشگر ✍️» تولید شد:\n\n"
+            return AnalysisResult(true, note + offline())
         }
         return first
     }
@@ -163,11 +168,11 @@ $hist
         conn.errorStream?.let { BufferedReader(InputStreamReader(it, Charsets.UTF_8)).use { r -> r.readText() } } ?: "HTTP ${conn.responseCode}"
 
     private fun friendly(err: String): String = when {
+        isBadKey(err) -> "🔑 کلید API نامعتبر است؛ در ⚙️ کلید درست وارد کن یا «موتور ویرایشگر ✍️» را انتخاب کن."
         isHtmlBlock(err) -> "🚧 این سرویس توسط Cloudflare مسدود شده؛ اپ خودکار از موتور آفلاین استفاده می‌کند."
         err.contains("Insufficient Balance", true) || err.contains("balance", true) ->
             "💳 این سرویس پولی است و اعتبار ندارد. از ⚙️ گزینهٔ «موتور ویرایشگر ✍️»، Qwen یا Pollinations را انتخاب کن."
         err.contains("PAYMENT_REQUIRED", true) || err.contains("402") -> "💳 این مسیر پولی شده؛ اپ از مسیر ناشناس/آفلاین استفاده می‌کند."
-        err.contains("401") -> "کلید API معتبر نیست (401)"
         err.contains("403") || err.contains("not available", true) -> "این سرویس در منطقهٔ شما در دسترس نیست (403)"
         err.contains("429") -> "صف شلوغ است؛ چند ثانیه صبر کن (429)"
         else -> err
@@ -237,7 +242,11 @@ $hist
             OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(jsonBody); it.flush() }
             if (conn.responseCode != 200) {
                 val err = readErr(conn)
-                return AnalysisResult(false, "", if (isHtmlBlock(err)) "CLOUDFLARE" else friendly(err))
+                return AnalysisResult(false, "", when {
+                    isHtmlBlock(err) -> "CLOUDFLARE"
+                    isBadKey(err) -> err
+                    else -> friendly(err)
+                })
             }
             val raw = readAll(conn)
             if (isHtmlBlock(raw)) return AnalysisResult(false, "", "CLOUDFLARE")
