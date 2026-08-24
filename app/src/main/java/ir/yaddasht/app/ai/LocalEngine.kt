@@ -4,11 +4,13 @@ object LocalEngine {
 
     private const val ZWNJ = "‌"
     private const val FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹"
+    // ✅ همهٔ انواع نقطه و علائم پایان جمله (فارسی + لاتین + عربی)
+    private const val PUNCT = ".،؛:!؟?\u06D4\u061B\u060C"
 
     private fun toFaDigits(s: String): String = s.map { c ->
         when (c) {
             in '0'..'9' -> FA_DIGITS[c - '0']
-            in '٠'..'٩' -> FA_DIGITS[c - '٠']
+            in '٠'..'' -> FA_DIGITS[c - '٠']
             else -> c
         }
     }.joinToString("")
@@ -42,19 +44,16 @@ object LocalEngine {
         val freq = mutableMapOf<String, Int>()
         val display = mutableMapOf<String, String>()
         words(text).filter { it !in STOPWORDS }.forEach { w ->
-            val r = stem(w)
-            freq[r] = (freq[r] ?: 0) + 1
-            display[r] = w
+            val r = stem(w); freq[r] = (freq[r] ?: 0) + 1; display[r] = w
         }
         return freq.entries.sortedByDescending { it.value }.take(max).map { display[it.key] ?: it.key }
     }
 
     private fun sentences(text: String): List<String> =
-        normalize(text).split(Regex("[.!؟?\\n]+")).map { it.trim() }.filter { it.length > 10 }
+        normalize(text).split(Regex("[.!؟?\u06D4\\n]+")).map { it.trim() }.filter { it.length > 10 }
 
     fun stats(text: String): String {
-        val w = words(text)
-        val s = sentences(text)
+        val w = words(text); val s = sentences(text)
         val unique = w.distinct().size
         val avg = if (s.isEmpty()) 0 else w.size / s.size
         val readMin = (w.size / 200) + 1
@@ -95,19 +94,17 @@ object LocalEngine {
         val pos = setOf("خوب", "عالی", "خوش", "موفق", "زیبا", "دوست", "علاقه", "رشد", "پیشرفت", "برنده", "شاد", "امید", "انرژی", "مثبت", "تایید", "سود", "جایزه", "تشکر", "ممنون", "عالیه", "خوبه")
         val neg = setOf("بد", "افتضاح", "مشکل", "خطر", "نگران", "استرس", "غم", "ناراحت", "شکست", "باخت", "درد", "بیمار", "مریض", "خسته", "ناامید", "منفی", "دیر", "دیرکرد", "فراموش", "جریمه", "بدهی", "زیان", "بده")
         val w = words(text)
-        val p = w.count { it in pos }
-        val n = w.count { it in neg }
+        val p = w.count { it in pos }; val n = w.count { it in neg }
         return when {
-            p > n -> "🙂 مثبت (${toFaDigits(p.toString())} نشانهٔ مثبت در برابر ${toFaDigits(n.toString())} منفی)"
-            n > p -> "😟 منفی/نگران (${toFaDigits(n.toString())} نشانهٔ منفی در برابر ${toFaDigits(p.toString())} مثبت)"
+            p > n -> "🙂 مثبت (${toFaDigits(p.toString())} مثبت در برابر ${toFaDigits(n.toString())} منفی)"
+            n > p -> "😟 منفی/نگران (${toFaDigits(n.toString())} منفی در برابر ${toFaDigits(p.toString())} مثبت)"
             else -> "😐 خنثی (لحن اطلاع‌رسانی)"
         }
     }
 
     fun analyze(title: String, body: String): String {
         if (body.isBlank()) return "یادداشت خالی است؛ چیزی برای تحلیل نیست."
-        val act = actions(body)
-        val tm = times(body)
+        val act = actions(body); val tm = times(body)
         return """📌 خلاصه موضوع:
 ${summarize(body, title, 2)}
 
@@ -178,44 +175,37 @@ ${if (body.length < 100) "• متن کوتاه است؛ جزئیات بیشتر
         else "در متن این یادداشت پاسخ مستقیمی پیدا نشد.\nکلیدواژه‌های پرسش: ${qk.joinToString("، ")}\n💡 متن را کامل‌تر کن یا از سرویس آنلاین استفاده کن."
     }
 
-    // ✍️ ویراستار پیشرفته — نسخهٔ اصلاح‌شده (بدون حذف حرف و بدون چسباندن کلمات)
+    // ✍️ ویراستار — نسخهٔ اصلاح‌شده (نقطهٔ فارسی درست)
     fun editText(text: String): String {
         if (text.isBlank()) return "متنی برای ویرایش وجود ندارد."
         val fixes = mutableListOf<String>()
         var t = text.replace('ي', 'ی').replace('ك', 'ک').replace('ة', 'ه')
         t = toFaDigits(t)
 
-        // ۱) نیم‌فاصلهٔ می/نمی — فقط وقتی «می/نمی» یک کلمهٔ مستقل است (نه داخل کلمه مثل «کمی»)
+        // ۱) نیم‌فاصلهٔ می/نمی (فقط کلمهٔ مستقل)
         val miRegex = Regex("(?<![\\p{L}])(می|نمی) +(?=\\p{L})")
-        if (miRegex.containsMatchIn(t)) {
-            t = t.replace(miRegex, "$1" + ZWNJ)
-            fixes.add("نیم‌فاصلهٔ «می/نمی»")
-        }
+        if (miRegex.containsMatchIn(t)) { t = t.replace(miRegex, "$1" + ZWNJ); fixes.add("نیم‌فاصلهٔ «می/نمی»") }
 
-        // ۲) «هٔ» — فقط بعد از حروف بی‌صدا (نه بعد از ا/و/ه تا «ماه ی» خراب نشود)
+        // ۲) «هٔ»
         val heRegex = Regex("([^\\sاوهی]ه) ی (?=\\p{L})")
-        if (heRegex.containsMatchIn(t)) {
-            t = t.replace(heRegex, "$1ٔ ")
-            fixes.add("نشانهٔ «هٔ»")
-        }
+        if (heRegex.containsMatchIn(t)) { t = t.replace(heRegex, "$1ٔ "); fixes.add("نشانهٔ «هٔ»") }
 
-        // ۳) حذف کلمهٔ تکراری — فقط کلمه‌های ۳ حرفی و بیشتر (تکرارهای مجاز مثل «کم کم» دست نمی‌خورند)
+        // ۳) حذف کلمهٔ تکراری (۳ حرفی+)
         val dupRegex = Regex("(\\S{3,}) \\1")
-        if (dupRegex.containsMatchIn(t)) {
-            t = t.replace(dupRegex, "$1")
-            fixes.add("حذف کلمهٔ تکراری")
-        }
+        if (dupRegex.containsMatchIn(t)) { t = t.replace(dupRegex, "$1"); fixes.add("حذف کلمهٔ تکراری") }
 
-        // ۴) فاصله‌ها و علائم — اعداد اعشاری (۳.۵) و لینک‌ها دست‌نخورده می‌مانند
+        // ۴) فاصله‌ها و علائم — با شناخت نقطهٔ فارسی
         t = t.replace(Regex("[ \t]+"), " ")
-            .replace(Regex(" +([.,،؛:!؟?])"), "$1")
-            .replace(Regex("([.,،؛:!؟?])([^\\s.,،؛:!؟?۰-۹0-9])"), "$1 $2")
+            .replace(Regex(" +([$PUNCT])"), "$1")                       // حذف فاصلهٔ قبل از علامت
+            .replace(Regex("([$PUNCT])([^\\s$PUNCT۰-۹0-9])"), "$1 $2") // فاصله بعد از علامت
             .replace(Regex("\\n{3,}"), "\n\n")
             .trim()
 
-        // ۵) نقطهٔ پایان
-        if (t.isNotEmpty() && !Regex("[.،؛:!؟?]").containsMatchIn(t.takeLast(1))) {
-            t += "."
+        // ۵) نقطهٔ پایان — فقط اگر انتها علامت/پرانتز/گیومه/نیم‌فاصله نباشد
+        val last = t.takeLast(1)
+        val noNeed = Regex("[$PUNCT)\\]»\"'\\u06D4]").containsMatchIn(last) || last == ZWNJ
+        if (t.isNotEmpty() && !noNeed) {
+            t += "\u06D4"   // ✅ نقطهٔ فارسی
             fixes.add("نقطهٔ پایان")
         }
 
