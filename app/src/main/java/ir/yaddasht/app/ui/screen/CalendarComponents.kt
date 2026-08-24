@@ -3,7 +3,14 @@ package ir.yaddasht.app.ui.screen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -14,7 +21,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,17 +55,12 @@ fun dayMillis(jy: Int, jm: Int, jd: Int): Long {
     return c.timeInMillis
 }
 
-// ✅ اصلاح‌شده: محاسبه دقیق روز هفته (شنبه = ۰)
 fun firstDowIndex(jy: Int, jm: Int): Int {
     val (gy, gm, gd) = FaDate.toGregorian(jy, jm, 1)
     val c = GregorianCalendar()
     c.clear()
-    c.set(gy, gm - 1, gd, 12, 0, 0) // ظهر برای جلوگیری از مشکل DST
-    
-    // Calendar: یکشنبه=1، دوشنبه=2، ...، شنبه=7
-    // ما می‌خواهیم: شنبه=0، یکشنبه=1، ...، جمعه=6
-    val dow = c.get(Calendar.DAY_OF_WEEK)
-    return when (dow) {
+    c.set(gy, gm - 1, gd, 12, 0, 0)
+    return when (c.get(Calendar.DAY_OF_WEEK)) {
         Calendar.SATURDAY -> 0
         Calendar.SUNDAY -> 1
         Calendar.MONDAY -> 2
@@ -66,9 +72,10 @@ fun firstDowIndex(jy: Int, jm: Int): Int {
     }
 }
 
+// ✅ پوشاندن با علامت‌های جهت (RLE/PDF) تا «۱۲ ربیع‌الاول» در هر متنی درست بماند
 fun hijriFa(millis: Long): String = try {
     val fmt = android.icu.text.SimpleDateFormat("d MMMM y", android.icu.util.ULocale("fa@calendar=islamic"))
-    fmt.format(Date(millis))
+    "‫" + fmt.format(Date(millis)) + "‬"
 } catch (e: Exception) { "" }
 
 fun gregorianFa(millis: Long): String {
@@ -90,27 +97,17 @@ fun ShamsiCalendarPickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit)
         text = {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { if (jm > 1) jm-- else { jm = 12; if (jy > jy0 - 1) jy-- } }) {
-                        Icon(Icons.Filled.ChevronRight, "قبل", tint = Saffron)
-                    }
-                    Text("${FaDate.monthName(jm)} ${jy.fa()}", fontFamily = LalezarFont, fontSize = 18.sp,
-                        color = onSurface, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                    IconButton(onClick = { if (jm < 12) jm++ else { jm = 1; if (jy < jy0 + 3) jy++ } }) {
-                        Icon(Icons.Filled.ChevronLeft, "بعد", tint = Saffron)
-                    }
+                    IconButton(onClick = { if (jm > 1) jm-- else { jm = 12; if (jy > jy0 - 1) jy-- } }) { Icon(Icons.Filled.ChevronRight, "قبل", tint = Saffron) }
+                    Text("${FaDate.monthName(jm)} ${jy.fa()}", fontFamily = LalezarFont, fontSize = 18.sp, color = onSurface, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                    IconButton(onClick = { if (jm < 12) jm++ else { jm = 1; if (jy < jy0 + 3) jy++ } }) { Icon(Icons.Filled.ChevronLeft, "بعد", tint = Saffron) }
                 }
                 val infoMillis = dayMillis(jy, jm, if (selDay > 0) selDay else 1)
                 val hijri = hijriFa(infoMillis)
-                if (hijri.isNotBlank()) Text("🌙 $hijri", fontSize = 11.sp, color = onSurface.copy(alpha = .7f),
-                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-                Text("میلادی: ${gregorianFa(infoMillis)}", fontSize = 10.sp, color = onSurface.copy(alpha = .5f),
-                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                if (hijri.isNotBlank()) Text("🌙 $hijri", fontSize = 11.sp, color = onSurface.copy(alpha = .7f), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                Text("میلادی: ${gregorianFa(infoMillis)}", fontSize = 10.sp, color = onSurface.copy(alpha = .5f), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    WeekDaysFa.forEach { w ->
-                        Text(w, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Saffron,
-                            modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                    }
+                    WeekDaysFa.forEach { w -> Text(w, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Saffron, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
                 }
                 Spacer(Modifier.height(4.dp))
                 val leading = firstDowIndex(jy, jm)
@@ -123,15 +120,11 @@ fun ShamsiCalendarPickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit)
                             else {
                                 val isToday = jy == jy0 && jm == jm0 && d == jd0
                                 val isSel = selDay == d
-                                Box(Modifier.weight(1f).aspectRatio(1f)
-                                    .clip(RoundedCornerShape(10.dp))
+                                Box(Modifier.weight(1f).aspectRatio(1f).clip(RoundedCornerShape(10.dp))
                                     .background(if (isSel) Saffron else Color.Transparent)
                                     .border(if (isToday && !isSel) 1.5.dp else 0.dp, Saffron, RoundedCornerShape(10.dp))
-                                    .clickable { selDay = d },
-                                    contentAlignment = Alignment.Center) {
-                                    Text(d.fa(), fontSize = 13.sp,
-                                        color = if (isSel) Ink else onSurface,
-                                        fontWeight = if (isSel || isToday) FontWeight.Bold else FontWeight.Normal)
+                                    .clickable { selDay = d }, contentAlignment = Alignment.Center) {
+                                    Text(d.fa(), fontSize = 13.sp, color = if (isSel) Ink else onSurface, fontWeight = if (isSel || isToday) FontWeight.Bold else FontWeight.Normal)
                                 }
                             }
                         }
