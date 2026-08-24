@@ -64,13 +64,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
 private enum class LockMode { Set, Unlock }
+
+private fun esc(s: String) = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+private fun safeName(s: String) = s.take(24).replace(Regex("[^\\p{L}\\p{N}_-]"), "_").ifBlank { "note" }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,6 +92,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     var viewerImage by remember { mutableStateOf<Attachment?>(null) }
     var showFocus by remember { mutableStateOf(false) }
     var showAi by remember { mutableStateOf(false) }
+    var showExport by remember { mutableStateOf(false) }
     var lockMode by remember { mutableStateOf<LockMode?>(null) }
     var pass1 by remember { mutableStateOf("") }
     var pass2 by remember { mutableStateOf("") }
@@ -107,21 +112,14 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         if (noteId == NEW_NOTE_ID) realId = withContext(Dispatchers.IO) { dao.insert(Note()) }
         ready = true
     }
-    LaunchedEffect(ready, realId) {
-        if (!ready) return@LaunchedEffect
-        dao.observeNote(realId).collect { n -> note = n; if (lastSaved == null) lastSaved = n }
-    }
-    LaunchedEffect(ready, realId) {
-        if (!ready) return@LaunchedEffect
-        dao.observeAttachments(realId).collect { attachments = it }
-    }
+    LaunchedEffect(ready, realId) { if (!ready) return@LaunchedEffect; dao.observeNote(realId).collect { n -> note = n; if (lastSaved == null) lastSaved = n } }
+    LaunchedEffect(ready, realId) { if (!ready) return@LaunchedEffect; dao.observeAttachments(realId).collect { attachments = it } }
     LaunchedEffect(ready) {
         if (!ready) return@LaunchedEffect
         snapshotFlow { note }.debounce(350).collect { n ->
             val saved = lastSaved
             if (n != null && saved != null && n.copy(updatedAt = saved.updatedAt) != saved) {
-                val stamped = n.copy(updatedAt = System.currentTimeMillis())
-                lastSaved = stamped
+                val stamped = n.copy(updatedAt = System.currentTimeMillis()); lastSaved = stamped
                 withContext(Dispatchers.IO) { dao.update(stamped) }
             }
         }
@@ -208,6 +206,33 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             withContext(Dispatchers.Main) { if (file != null) sharePdf(context, file, n.title) else Toast.makeText(context, "ساخت PDF ناموفق بود", Toast.LENGTH_SHORT).show() }
         }
     }
+    fun exportWord() {
+        val n = note ?: return
+        scope.launch(Dispatchers.IO) {
+            val html = "<html dir='rtl'><head><meta charset='utf-8'></head><body><h1>${esc(n.title)}</h1><p>${esc(n.body).replace("\n", "<br/>")}</p></body></html>"
+            val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+            val file = File(dir, "${safeName(n.title)}.doc")
+            file.writeText(html, Charsets.UTF_8)
+            withContext(Dispatchers.Main) { shareBackupFile(context, file) }
+        }
+    }
+    fun exportJsonNote() {
+        val n = note ?: return
+        scope.launch(Dispatchers.IO) {
+            val atts = dao.attachmentsByNote(n.id)
+            val json = JSONObject().apply {
+                put("title", n.title); put("body", n.body); put("color", n.color); put("pinned", n.pinned)
+                put("reminderAt", n.reminderAt); put("createdAt", n.createdAt); put("updatedAt", n.updatedAt)
+                put("attachments", JSONArray().apply { atts.forEach { a -> put(JSONObject().apply {
+                    put("fileName", a.fileName); put("mimeType", a.mimeType); put("isImage", a.isImage)
+                }) } })
+            }
+            val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+            val file = File(dir, "${safeName(n.title)}.json")
+            file.writeText(json.toString(2), Charsets.UTF_8)
+            withContext(Dispatchers.Main) { shareBackupFile(context, file) }
+        }
+    }
 
     Scaffold(containerColor = DeepGreen) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
@@ -215,7 +240,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                 IconButton(onClick = exit) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = PaperWhite) }
                 Text(if (isLocked) "🔒 یادداشت محرمانه" else "یادداشت", fontFamily = LalezarFont, fontSize = 20.sp, color = PaperWhite, modifier = Modifier.weight(1f).padding(start = 4.dp))
                 IconButton(onClick = { note = note?.copy(pinned = !(note?.pinned ?: false)) }) { Icon(Icons.Filled.PushPin, "سنجاق", tint = if (note?.pinned == true) Saffron else Color(0xFF5E8077)) }
-                IconButton(onClick = { note?.let { shareNoteText(context, it.title, if (isLocked) "🔒 (محتوا قفل است)" else it.body) } }) { Icon(Icons.Filled.Share, "اشتراک‌گذاری", tint = PaperWhite) }
+                IconButton(onClick = { showExport = true }) { Icon(Icons.Filled.Share, "ارسال و خروجی", tint = PaperWhite) }
                 IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Filled.Delete, "حذف", tint = Brick) }
             }
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -223,7 +248,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                 ToolChip("⏰", "یادآور") { showDatePicker = true }
                 ToolChip("✅", if (isChecklist) "خروج از چک‌لیست" else "چک‌لیست") { if (!isLocked) note?.let { n -> note = n.copy(body = if (isChecklist) Checklist.fromChecklist(n.body) else Checklist.toChecklist(n.body)) } }
                 ToolChip("🗣️", "دیکته") { if (!isLocked) launchSpeech() }
-                ToolChip("📄", "PDF") { if (!isLocked) exportPdf() }
                 ToolChip("✒️", "تمرکز") { if (!isLocked && !isChecklist) showFocus = true }
                 ToolChip("🤖", "هوش مصنوعی") { showAi = true }
             }
@@ -238,7 +262,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                         Spacer(Modifier.height(10.dp))
                     }
                     TextField(value = note?.title.orEmpty(), onValueChange = { note = note?.copy(title = it) },
-                        placeholder = { Text("عنوان یادداشت…", fontFamily = LalezarFont, color = InkSoft, fontSize = 22.sp) },
+                        placeholder = { Text("عنوان یادداشت", fontFamily = LalezarFont, color = InkSoft, fontSize = 22.sp) },
                         textStyle = TextStyle(fontFamily = LalezarFont, fontSize = 26.sp, color = Ink),
                         colors = transparentFieldColors(), singleLine = true, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(6.dp))
@@ -251,7 +275,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                         isLocked -> LockedBox { lockError = ""; pass1 = ""; lockMode = LockMode.Unlock }
                         isChecklist -> ChecklistEditor(note!!) { note = it }
                         else -> TextField(value = note?.body.orEmpty(), onValueChange = { note = note?.copy(body = it) },
-                            placeholder = { Text("اینجا بنویس… یا از «دیکته» و «چک‌لیست» استفاده کن", color = InkSoft, fontSize = 15.sp) },
+                            placeholder = { Text("اینجا بنویس یا از «دیکته» و «چک‌لیست» استفاده کن", color = InkSoft, fontSize = 15.sp) },
                             textStyle = TextStyle(fontFamily = VazirFont, fontSize = 15.sp, color = Ink, lineHeight = 26.sp),
                             colors = transparentFieldColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp))
                     }
@@ -286,6 +310,21 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                 }
             }
         }
+    }
+
+    if (showExport && note != null) {
+        val n = note!!
+        AlertDialog(onDismissRequest = { showExport = false },
+            title = { Text("📤 ارسال / خروجی", fontFamily = LalezarFont, fontSize = 20.sp) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ExportItem("📤 اشتراک متن یادداشت") { shareNoteText(context, n.title, if (isLocked) "🔒 (محتوا قفل است)" else n.body); showExport = false }
+                    ExportItem("📄 خروجی PDF") { if (!isLocked) exportPdf(); showExport = false }
+                    ExportItem("📝 خروجی Word") { if (!isLocked) exportWord(); showExport = false }
+                    ExportItem("🧾 خروجی JSON") { exportJsonNote(); showExport = false }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showExport = false }) { Text("بستن", color = Saffron, fontWeight = FontWeight.Bold) } })
     }
 
     if (confirmDelete) {
@@ -334,12 +373,12 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             confirmButton = { TextButton(onClick = { showRecoveryCode = null }) { Text("ذخیره کردم ✅", color = Saffron, fontWeight = FontWeight.Bold) } })
     }
 
-    if (showDatePicker) { ShamsiDatePickerDialog(onConfirm = { pickedDate = it; showDatePicker = false; showTimePicker = true }, onDismiss = { showDatePicker = false }) }
+    if (showDatePicker) { ShamsiCalendarPickerDialog(onConfirm = { pickedDate = it; showDatePicker = false; showTimePicker = true }, onDismiss = { showDatePicker = false }) }
 
     if (showTimePicker) {
         val timePickerState = rememberTimePickerState()
         AlertDialog(onDismissRequest = { showTimePicker = false },
-            confirmButton = { TextButton(onClick = { val local = Calendar.getInstance().apply { timeInMillis = pickedDate; set(Calendar.HOUR_OF_DAY, timePickerState.hour); set(Calendar.MINUTE, timePickerState.minute); set(Calendar.SECOND, 0) }; if (local.timeInMillis > System.currentTimeMillis()) scheduleReminder(local.timeInMillis) else Toast.makeText(context, "این زمان گذشته است!", Toast.LENGTH_SHORT).show(); showTimePicker = false }) { Text("تنظیم ⏰", color = Saffron, fontWeight = FontWeight.Bold) } },
+            confirmButton = { TextButton(onClick = { val finalTime = pickedDate + timePickerState.hour.toLong() * 3600_000 + timePickerState.minute.toLong() * 60_000; if (finalTime > System.currentTimeMillis()) scheduleReminder(finalTime) else Toast.makeText(context, "این زمان گذشته است!", Toast.LENGTH_SHORT).show(); showTimePicker = false }) { Text("تنظیم ⏰", color = Saffron, fontWeight = FontWeight.Bold) } },
             dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("انصراف") } },
             text = { TimePicker(timePickerState) })
     }
@@ -356,13 +395,18 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
 
     if (showFocus && note != null && !isLocked) { FocusModeOverlay(body = note!!.body, onChange = { note = note?.copy(body = it) }, onExit = { showFocus = false }) }
 
-    if (showAi && note != null) {
-        AiAnalysisDialog(title = note?.title ?: "", content = note?.body ?: "", isLocked = isLocked, onDismiss = { showAi = false })
+    if (showAi && note != null) { AiAnalysisDialog(title = note?.title ?: "", content = note?.body ?: "", isLocked = isLocked, onDismiss = { showAi = false }) }
+}
+
+@Composable
+private fun ExportItem(label: String, onClick: () -> Unit) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(12.dp), color = DeepGreenSoft.copy(alpha = .3f)) {
+        Text(label, Modifier.padding(horizontal = 14.dp, vertical = 10.dp), fontSize = 14.sp, color = Ink, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
-private fun ShamsiDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) {
+private fun ShamsiCalendarPickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) {
     val (jy0, jm0, jd0) = FaDate.jalali(System.currentTimeMillis())
     var jy by remember { mutableIntStateOf(jy0) }
     var jm by remember { mutableIntStateOf(jm0) }
@@ -517,12 +561,18 @@ private fun FocusModeOverlay(body: String, onChange: (String) -> Unit, onExit: (
                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onExit) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "خروج", tint = InkSoft) }
                     Spacer(Modifier.weight(1f))
-                    Text("${words.fa()} کلمه • ${body.length.fa()} حرف", fontFamily = LalezarFont, fontSize = 15.sp, color = InkSoft)
-                    Spacer(Modifier.weight(1f)); Text("✒️", fontSize = 20.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("${words.fa()} کلمه", fontFamily = LalezarFont, fontSize = 15.sp, color = InkSoft)
+                        Text("•", fontSize = 15.sp, color = InkSoft)
+                        Text("${body.length.fa()} حرف", fontFamily = LalezarFont, fontSize = 15.sp, color = InkSoft)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Text("✒️", fontSize = 20.sp)
                 }
                 Box(Modifier.fillMaxWidth().height(2.dp).background(Saffron.copy(alpha = .5f)))
-                TextField(value = body, onValueChange = onChange, textStyle = TextStyle(fontFamily = VazirFont, fontSize = 19.sp, color = Ink, lineHeight = 36.sp),
-                    colors = transparentFieldColors(), placeholder = { Text("فقط بنویس…", color = InkSoft.copy(alpha = .6f), fontSize = 18.sp) },
+                TextField(value = body, onValueChange = onChange,
+                    textStyle = TextStyle(fontFamily = VazirFont, fontSize = 19.sp, color = Ink, lineHeight = 36.sp),
+                    colors = transparentFieldColors(), placeholder = { Text("فقط بنویس", color = InkSoft.copy(alpha = .6f), fontSize = 18.sp) },
                     modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 26.dp, vertical = 10.dp))
             }
         }
