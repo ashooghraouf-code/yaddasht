@@ -26,43 +26,17 @@ enum class AiProvider(
     val keyUrl: String,
     val helpFa: String
 ) {
-    OFFLINE("موتور ویرایشگر ✍️ (آفلاین داخلی)", "", "", ApiFormat.LOCAL, true, false, "", "",
-        "بدون اینترنت و بدون کلید!\nخلاصه‌سازی، کلیدواژه، اقدام‌ها، زمان‌ها، لحن، آمار، پرسش‌وپاسخ و «ویراستاری متن» روی خود گوشی.\n✅ پیشنهاد ما با توجه به قطعی/مسدودیت شبکه."),
-    QWEN("Qwen کوئن 🇨🇳 (کلید لازم)", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "qwen-turbo", ApiFormat.OPENAI, true, true,
-        "https://www.alibabacloud.com/product/modelstudio", "https://modelstudio.console.alibabacloud.com/",
-        "۱) وارد کنسول بین‌المللی Alibaba ModelStudio شو\n۲) کلید API بساز و دقیقاً همان را وارد کن\n⚠️ کلید DeepSeek اینجا کار نمی‌کند!"),
-    POLLINATIONS("Pollinations 🆓 (بدون کلید)", "https://text.pollinations.ai", "openai", ApiFormat.POLLINATIONS, true, false,
-        "https://pollinations.ai", "",
-        "بدون کلید؛ اگر Cloudflare مسدود کند، اپ خودکار به موتور آفلاین سوئیچ می‌کند."),
-    MISTRAL("Mistral 🇫🇷 (طرح رایگان)", "https://api.mistral.ai/v1", "mistral-small-latest", ApiFormat.OPENAI, true, true,
-        "https://mistral.ai", "https://console.mistral.ai/api-keys",
-        "۱) در console.mistral.ai ثبت‌نام کن\n۲) کلید بساز\n✅ طرح آزمایشی رایگان"),
-    GROQ("Groq ⚡ (سریع، سهمیه رایگان)", "https://api.groq.com/openai/v1", "llama-3.1-8b-instant", ApiFormat.OPENAI, true, true,
+    OFFLINE("✍️ موتور ویرایشگر (پیشنهادی)", "", "", ApiFormat.LOCAL, true, false, "", "",
+        "بدون اینترنت و بدون کلید.\nخلاصه، کلیدواژه، اقدام، لحن، آمار، پرسش‌وپاسخ و ویراستاری متن.\n✅ همیشه در دسترس؛ همیشه کار می‌کند."),
+    GROQ("⚡ Groq (سریع، کلید لازم)", "https://api.groq.com/openai/v1", "llama-3.1-8b-instant", ApiFormat.OPENAI, true, true,
         "https://groq.com", "https://console.groq.com/keys",
-        "۱) در console.groq.com ثبت‌نام کن\n۲) کلید بساز\n✅ سهمیهٔ رایگان روزانه"),
-    CEREBRAS("Cerebras ⚡", "https://api.cerebras.ai/v1", "llama3.1-8b", ApiFormat.OPENAI, true, true,
-        "https://www.cerebras.ai", "https://cloud.cerebras.ai",
-        "۱) در cloud.cerebras.ai ثبت‌نام کن\n۲) کلید بساز\n✅ طرح رایگان"),
-    HUGGINGFACE("HuggingFace 🤗 (رایگان)", "https://api-inference.huggingface.co/v1", "microsoft/Phi-3.5-mini-instruct", ApiFormat.OPENAI, true, true,
-        "https://huggingface.co", "https://huggingface.co/settings/tokens",
-        "۱) در huggingface.co ثبت‌نام کن\n۲) توکن بساز\n✅ سهمیهٔ رایگان"),
-    OPENROUTER("OpenRouter 🌐 (مدل رایگان)", "https://openrouter.ai/api/v1", "meta-llama/llama-3.1-8b-instruct:free", ApiFormat.OPENAI, true, true,
+        "۱) با ایمیل/گوگل در console.groq.com ثبت‌نام کن\n۲) از API Keys یک کلید بساز\n✅ سهمیهٔ رایگان روزانه؛ معمولاً از ایران کار می‌کند."),
+    OPENROUTER("🌐 OpenRouter (مدل رایگان)", "https://openrouter.ai/api/v1", "meta-llama/llama-3.1-8b-instruct:free", ApiFormat.OPENAI, true, true,
         "https://openrouter.ai", "https://openrouter.ai/keys",
-        "۱) وارد سایت شو\n۲) کلید بساز\n✅ مدل‌های :free رایگان‌اند"),
-    GITHUB("GitHub Models 🐙 (معمولاً مسدود)", "https://models.inference.ai.azure.com", "gpt-4o-mini", ApiFormat.OPENAI, false, true,
-        "https://github.com/marketplace/models", "https://github.com/settings/personal-access-tokens",
-        "⚠️ دامنهٔ azure.com در ایران معمولاً مسدود است."),
-    DEEPSEEK("DeepSeek 🇨 (API پولی!)", "https://api.deepseek.com", "deepseek-chat", ApiFormat.OPENAI, true, true,
-        "https://www.deepseek.com", "https://platform.deepseek.com/api_keys",
-        "⚠️ API نیاز به شارژ دلاری دارد (خطای Insufficient Balance)."),
-    OPENAI("OpenAI (ChatGPT) 🇺🇸", "https://api.openai.com/v1", "gpt-4o-mini", ApiFormat.OPENAI, false, true,
-        "https://openai.com", "https://platform.openai.com/api-keys",
-        "⚠️ ایران تحریم است؛ مسئولیت با کاربر"),
-    GEMINI("Google Gemini 🇺🇸", "https://generativelanguage.googleapis.com/v1beta", "gemini-1.5-flash", ApiFormat.GEMINI, false, true,
-        "https://ai.google.dev", "https://aistudio.google.com/app/apikey",
-        "⚠️ گوگل برای ایران در دسترس نیست؛ مسئولیت با کاربر"),
-    CUSTOM("🔧 سرویس سفارشی", "", "", ApiFormat.OPENAI, true, true, "", "",
-        "آدرس پایه، نام مدل و کلید را دستی وارد کن.");
+        "۱) با ایمیل/گوگل ثبت‌نام کن\n۲) کلید بساز\n✅ مدل‌های :free کاملاً رایگان و بدون نیاز به کارت."),
+    POLLINATIONS("🆓 Pollinations (بدون کلید)", "https://text.pollinations.ai", "openai", ApiFormat.POLLINATIONS, true, false,
+        "https://pollinations.ai", "",
+        "بدون ثبت‌نام و بدون کلید.\n⚠️ گاهی توسط Cloudflare بلاک می‌شود؛ در آن صورت اپ خودکار به موتور آفلاین می‌رود.");
 }
 
 object AiConfig {
@@ -155,7 +129,7 @@ $hist
                 if (second.success) return second.copy(content = "🔄 سرویس انتخابی در دسترس نبود؛ از «Pollinations 🆓» استفاده شد.\n\n" + second.content)
             }
             val note = if (isBadKey(first.error)) "🔑 کلید API نامعتبر بود؛ پاسخ توسط «موتور ویرایشگر ✍️» تولید شد:\n\n"
-                       else "📴 سرویس‌های آنلاین در دسترس/مجاز نبودند؛ پاسخ توسط «موتور ویرایشگر ✍️» تولید شد:\n\n"
+                       else "📴 سرویس آنلاین در دسترس نبود؛ پاسخ توسط «موتور ویرایشگر ✍️» تولید شد:\n\n"
             return AnalysisResult(true, note + offline())
         }
         return first
@@ -171,8 +145,8 @@ $hist
         isBadKey(err) -> "🔑 کلید API نامعتبر است؛ در ⚙️ کلید درست وارد کن یا «موتور ویرایشگر ✍️» را انتخاب کن."
         isHtmlBlock(err) -> "🚧 این سرویس توسط Cloudflare مسدود شده؛ اپ خودکار از موتور آفلاین استفاده می‌کند."
         err.contains("Insufficient Balance", true) || err.contains("balance", true) ->
-            "💳 این سرویس پولی است و اعتبار ندارد. از ⚙️ گزینهٔ «موتور ویرایشگر ✍️»، Qwen یا Pollinations را انتخاب کن."
-        err.contains("PAYMENT_REQUIRED", true) || err.contains("402") -> "💳 این مسیر پولی شده؛ اپ از مسیر ناشناس/آفلاین استفاده می‌کند."
+            "💳 اعتبار این سرویس تمام شده؛ از «موتور ویرایشگر ✍️» استفاده کن."
+        err.contains("PAYMENT_REQUIRED", true) || err.contains("402") -> "💳 این مسیر پولی شده؛ اپ از موتور آفلاین استفاده می‌کند."
         err.contains("403") || err.contains("not available", true) -> "این سرویس در منطقهٔ شما در دسترس نیست (403)"
         err.contains("429") -> "صف شلوغ است؛ چند ثانیه صبر کن (429)"
         else -> err
