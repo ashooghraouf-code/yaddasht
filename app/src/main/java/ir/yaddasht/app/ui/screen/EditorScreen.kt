@@ -330,7 +330,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     if (confirmDelete) {
         AlertDialog(onDismissRequest = { confirmDelete = false },
             title = { Text("حذف یادداشت؟", fontFamily = LalezarFont, fontSize = 20.sp) },
-            text = { Text("«${note.title.ifBlank { "بدون عنوان" }}» همراه با ضمیمه‌هایش برای همیشه حذف می‌شود.") },
+            text = { Text("«${note?.title?.ifBlank { "بدون عنوان" } ?: "بدون عنوان"}» همراه با ضمیمه‌هایش برای همیشه حذف می‌شود.") },
             confirmButton = { TextButton(onClick = { confirmDelete = false; val n = note; scope.launch { if (n != null) withContext(Dispatchers.IO) { dao.attachmentsByNote(n.id).forEach { File(it.filePath).delete() }; dao.deleteById(n.id) }; onBack() } }) { Text("حذف", color = Brick, fontWeight = FontWeight.Bold) } },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("انصراف") } })
     }
@@ -407,7 +407,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     if (showAi && note != null) { AiAnalysisDialog(title = note?.title ?: "", content = note?.body ?: "", isLocked = isLocked, onDismiss = { showAi = false }) }
 }
 
-// ✅ منوی ارسال با رنگ خوانا (متن تیره روی زمینهٔ سفید)
 @Composable
 private fun ExportItem(label: String, onClick: () -> Unit) {
     Surface(
