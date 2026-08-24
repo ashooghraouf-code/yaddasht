@@ -165,8 +165,12 @@ fun HomeScreen(
 
     fun doBackup() {
         scope.launch(Dispatchers.IO) {
-            val file = FullBackup.exportAll(context, dao, taskDao)
-            withContext(Dispatchers.Main) { shareBackupFile(context, file) }
+            try {
+                val file = FullBackup.exportAll(context, dao, taskDao)
+                withContext(Dispatchers.Main) { shareBackupFile(context, file) }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { Toast.makeText(context, "خطا در پشتیبان‌گیری: ${e.message}", Toast.LENGTH_LONG).show() }
+            }
         }
     }
 
@@ -252,7 +256,13 @@ fun HomeScreen(
                                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("${FaDate.monthName(calJm)} ${calJy.fa()}", fontFamily = LalezarFont, fontSize = 20.sp, color = PaperWhite)
                                     val infoMillis = dayMillis(calJy, calJm, calDay)
-                                    Text("🌙 ${hijriFa(infoMillis)} • میلادی: ${gregorianFa(infoMillis)}", fontSize = 10.sp, color = MutedGreenText)
+                                    // ✅ اصلاح Bidi: هر بخش در Text جداگانه تا «۱۲ ربیع‌الاول» درست نمایش یابد
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text("🌙", fontSize = 12.sp)
+                                        Text(hijriFa(infoMillis), fontSize = 11.sp, color = MutedGreenText)
+                                        Text("•", fontSize = 11.sp, color = MutedGreenText)
+                                        Text("میلادی: ${gregorianFa(infoMillis)}", fontSize = 11.sp, color = MutedGreenText)
+                                    }
                                 }
                                 IconButton(onClick = { if (calJm < 12) calJm++ else { calJm = 1; calJy++ } }) { Icon(Icons.Filled.ChevronLeft, "بعد", tint = Saffron) }
                             }
