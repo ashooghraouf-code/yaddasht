@@ -1,6 +1,9 @@
 package ir.yaddasht.app
 
+import android.app.Activity
+import android.app.KeyguardManager
 import android.content.Context
+import android.content.Intent
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -9,10 +12,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.biometric.BiometricManager
-import androidx.biometric.BiometricPrompt
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,18 +36,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import ir.yaddasht.app.data.AppDatabase
 import ir.yaddasht.app.ui.screen.DrawScreen
 import ir.yaddasht.app.ui.screen.EditorScreen
 import ir.yaddasht.app.ui.screen.HomeScreen
 import ir.yaddasht.app.ui.screen.TaskEditorScreen
-import ir.yaddasht.app.ui.theme.Brick
 import ir.yaddasht.app.ui.theme.DeepGreen
-import ir.yaddasht.app.ui.theme.Ink
 import ir.yaddasht.app.ui.theme.LalezarFont
 import ir.yaddasht.app.ui.theme.MutedGreenText
 import ir.yaddasht.app.ui.theme.PaperWhite
@@ -116,38 +117,70 @@ class MainActivity : FragmentActivity() {
         override fun onAccuracyChanged(s: Sensor?, a: Int) {}
     }
 
-    private fun showBiometric(onSuccess: () -> Unit) {
-        val executor = ContextCompat.getMainExecutor(this)
-        val prompt = BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) { super.onAuthenticationSucceeded(result); onSuccess() }
-        })
-        val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("قفل چراغ راه 🔒").setSubtitle("با اثر انگشت یا رمز دستگاه باز کن")
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
-            .build()
-        prompt.authenticate(info)
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
         setContent {
             YaddashtTheme {
-                val dao = remember { AppDatabase.get(applicationContext).dao() }
-                val taskDao = remember { AppDatabase.get(applicationContext).taskDao() }
+                val context = LocalContext.current
+                val dao = remember { AppDatabase.get(context.applicationContext).dao() }
+                val taskDao = remember { AppDatabase.get(context.applicationContext).taskDao() }
                 var authRequired by remember { mutableStateOf(false) }
                 var authChecked by remember { mutableStateOf(false) }
+                var authPassed by remember { mutableStateOf(false) }
+
+                // ✅ KeyguardManager launcher - بدون نیاز به permission
+                val keyguardLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.StartActivityForResult()
+                ) { result ->
+                    if (result.resultCode == Activity.RESULT_OK) {
+                        authPassed = true
+                        authRequired = false
+                    }
+                }
+
                 LaunchedEffect(Unit) {
-                    val hasLocked = withContext(Dispatchers.IO) { dao.allNotesSync().any { NoteLock.isLocked(it.body) } }
-                    val canBio = BiometricManager.from(this@MainActivity).canAuthenticate(
-                        BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS
-                    if (hasLocked && canBio) authRequired = true
+                    val hasLocked = withContext(Dispatchers.IO) {
+                        dao.allNotesSync().any { NoteLock.isLocked(it.body) }
+                    }
+                    if (hasLocked) {
+                        val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+                        if (keyguardManager.isDeviceSecure) {
+                            authRequired = true
+                        }
+                    }
                     authChecked = true
                 }
-                LaunchedEffect(authRequired) { if (authRequired) showBiometric { authRequired = false } }
-                if (authRequired) {
-                    LockScreen { showBiometric { authRequired = false } }
+
+                LaunchedEffect(authRequired) {
+                    if (authRequired && !authPassed) {
+                        val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+                        val intent = keyguardManager.createConfirmDeviceCredentialIntent(
+                            "قفل چراغ راه 🔒",
+                            "با اثر انگشت، رمز، الگو یا PIN گوشی باز کن"
+                        )
+                        if (intent != null) {
+                            keyguardLauncher.launch(intent)
+                        } else {
+                            // اگر دستگاه امن نیست، مستقیم رد کن
+                            authRequired = false
+                            authPassed = true
+                        }
+                    }
+                }
+
+                if (authRequired && !authPassed) {
+                    LockScreen {
+                        val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+                        val intent = keyguardManager.createConfirmDeviceCredentialIntent(
+                            "قفل چراغ راه 🔒",
+                            "با اثر انگشت، رمز، الگو یا PIN گوشی باز کن"
+                        )
+                        if (intent != null) {
+                            keyguardLauncher.launch(intent)
+                        }
+                    }
                 } else if (authChecked) {
                     val openNoteId = remember { intent.getLongExtra("note_id", 0L) }
                     val isTaskExtra = remember { intent.getBooleanExtra("is_task", false) }
@@ -201,7 +234,7 @@ private fun LockScreen(onUnlock: () -> Unit) {
             Spacer(Modifier.height(6.dp))
             Text("یادداشت محرمانه داری؛ اول خودت را ثابت کن!", fontSize = 12.sp, color = MutedGreenText)
             Spacer(Modifier.height(20.dp))
-            Button(onClick = onUnlock, colors = ButtonDefaults.buttonColors(containerColor = Saffron, contentColor = Ink)) {
+            Button(onClick = onUnlock, colors = ButtonDefaults.buttonColors(containerColor = Saffron, contentColor = DeepGreen)) {
                 Text("باز کردن 🔓", fontFamily = LalezarFont, fontSize = 16.sp)
             }
         }
