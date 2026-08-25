@@ -26,17 +26,43 @@ enum class AiProvider(
     val keyUrl: String,
     val helpFa: String
 ) {
-    OFFLINE("✍️ موتور ویرایشگر (پیشنهادی)", "", "", ApiFormat.LOCAL, true, false, "", "",
-        "بدون اینترنت و بدون کلید.\nخلاصه، کلیدواژه، اقدام، لحن، آمار، پرسش‌وپاسخ و ویراستاری متن.\n✅ همیشه در دسترس؛ همیشه کار می‌کند."),
-    GROQ("⚡ Groq (سریع، کلید لازم)", "https://api.groq.com/openai/v1", "llama-3.1-8b-instant", ApiFormat.OPENAI, true, true,
-        "https://groq.com", "https://console.groq.com/keys",
-        "۱) با ایمیل/گوگل در console.groq.com ثبت‌نام کن\n۲) از API Keys یک کلید بساز\n✅ سهمیهٔ رایگان روزانه؛ معمولاً از ایران کار می‌کند."),
-    OPENROUTER("🌐 OpenRouter (مدل رایگان)", "https://openrouter.ai/api/v1", "meta-llama/llama-3.1-8b-instruct:free", ApiFormat.OPENAI, true, true,
-        "https://openrouter.ai", "https://openrouter.ai/keys",
-        "۱) با ایمیل/گوگل ثبت‌نام کن\n۲) کلید بساز\n✅ مدل‌های :free کاملاً رایگان و بدون نیاز به کارت."),
-    POLLINATIONS("🆓 Pollinations (بدون کلید)", "https://text.pollinations.ai", "openai", ApiFormat.POLLINATIONS, true, false,
+    OFFLINE("موتور ویرایشگر ✍️ (آفلاین داخلی)", "", "", ApiFormat.LOCAL, true, false, "", "",
+        "بدون اینترنت و بدون کلید!\nخلاصه‌سازی، کلیدواژه، اقدام‌ها، زمان‌ها، لحن، آمار، پرسش‌وپاسخ و «ویراستاری متن» روی خود گوشی.\n✅ پیشنهاد ما با توجه به قطعی/مسدودیت شبکه."),
+    QWEN("Qwen کوئن 🇨 (نسخه بین‌المللی)", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "qwen-turbo", ApiFormat.OPENAI, true, true,
+        "https://www.alibabacloud.com/product/modelstudio", "https://modelstudio.console.alibabacloud.com/",
+        "۱) وارد کنسول Alibaba Cloud ModelStudio (لینک بالا) شو\n۲) از بخش API-Key کلید بساز\n۳) اپ به‌صورت پیش‌فرض از endpoint بین‌المللی استفاده می‌کند"),
+    POLLINATIONS("Pollinations 🆓 (بدون کلید)", "https://text.pollinations.ai", "openai", ApiFormat.POLLINATIONS, true, false,
         "https://pollinations.ai", "",
-        "بدون ثبت‌نام و بدون کلید.\n⚠️ گاهی توسط Cloudflare بلاک می‌شود؛ در آن صورت اپ خودکار به موتور آفلاین می‌رود.");
+        "نیاز به ثبت‌نام و کلید ندارد؛ اپ از مسیر ناشناسِ رایگان استفاده می‌کند."),
+    MISTRAL("Mistral 🇫 (طرح رایگان)", "https://api.mistral.ai/v1", "mistral-small-latest", ApiFormat.OPENAI, true, true,
+        "https://mistral.ai", "https://console.mistral.ai/api-keys",
+        "۱) در console.mistral.ai ثبت‌نام کن\n۲) کلید بساز\n✅ طرح آزمایشی رایگان دارد"),
+    GROQ("Groq ⚡ (سریع، سهمیه رایگان)", "https://api.groq.com/openai/v1", "llama-3.1-8b-instant", ApiFormat.OPENAI, true, true,
+        "https://groq.com", "https://console.groq.com/keys",
+        "۱) در console.groq.com ثبت‌نام کن\n۲) کلید بساز\n✅ سهمیهٔ رایگان روزانه"),
+    CEREBRAS("Cerebras ⚡", "https://api.cerebras.ai/v1", "llama3.1-8b", ApiFormat.OPENAI, true, true,
+        "https://www.cerebras.ai", "https://cloud.cerebras.ai",
+        "۱) در cloud.cerebras.ai ثبت‌نام کن\n۲) کلید بساز\n✅ طرح رایگان دارد"),
+    HUGGINGFACE("HuggingFace 🤗 (رایگان)", "https://api-inference.huggingface.co/v1", "microsoft/Phi-3.5-mini-instruct", ApiFormat.OPENAI, true, true,
+        "https://huggingface.co", "https://huggingface.co/settings/tokens",
+        "۱) در huggingface.co ثبت‌نام کن\n۲) از Settings/Tokens یک توکن بساز\n✅ سهمیهٔ رایگان"),
+    OPENROUTER("OpenRouter 🌐 (مدل رایگان)", "https://openrouter.ai/api/v1", "meta-llama/llama-3.1-8b-instruct:free", ApiFormat.OPENAI, true, true,
+        "https://openrouter.ai", "https://openrouter.ai/keys",
+        "۱) وارد سایت شو (ایمیل/گوگل)\n۲) از لینک Keys کلید بساز\n✅ مدل‌های با پسوند :free کاملاً رایگان‌اند"),
+    GITHUB("GitHub Models 🐙 (معمولاً مسدود در ایران)", "https://models.inference.ai.azure.com", "gpt-4o-mini", ApiFormat.OPENAI, false, true,
+        "https://github.com/marketplace/models", "https://github.com/settings/personal-access-tokens",
+        "⚠️ دامنهٔ azure.com در بسیاری از شبکه‌های ایران مسدود است؛ فقط با DNS غیرایرانی."),
+    DEEPSEEK("DeepSeek 🇨 (API پولی!)", "https://api.deepseek.com", "deepseek-chat", ApiFormat.OPENAI, true, true,
+        "https://www.deepseek.com", "https://platform.deepseek.com/api_keys",
+        "⚠️ چتِ سایت رایگان است ولی API نیاز به شارژ دلاری دارد (خطای Insufficient Balance)."),
+    OPENAI("OpenAI (ChatGPT) 🇺🇸", "https://api.openai.com/v1", "gpt-4o-mini", ApiFormat.OPENAI, false, true,
+        "https://openai.com", "https://platform.openai.com/api-keys",
+        "۱) حساب بساز و کلید بگیر\n⚠️ ایران تحریم است؛ مسئولیت با کاربر"),
+    GEMINI("Google Gemini 🇺🇸", "https://generativelanguage.googleapis.com/v1beta", "gemini-1.5-flash", ApiFormat.GEMINI, false, true,
+        "https://ai.google.dev", "https://aistudio.google.com/app/apikey",
+        "۱) وارد AI Studio شو و کلید بگیر\n⚠️ گوگل برای ایران در دسترس نیست؛ مسئولیت با کاربر"),
+    CUSTOM("🔧 سرویس سفارشی", "", "", ApiFormat.OPENAI, true, true, "", "",
+        "آدرس پایه، نام مدل و کلید را دستی وارد کن؛ برای هر سرور/سرویس سازگار با OpenAI.");
 }
 
 object AiConfig {
@@ -58,17 +84,6 @@ object AiConfig {
 
 object AiAssistant {
     data class AnalysisResult(val success: Boolean, val content: String, val error: String? = null)
-
-    private fun isHtmlBlock(s: String): Boolean {
-        val t = s.trim()
-        return t.startsWith("<!DOCTYPE", true) || t.startsWith("<html", true) ||
-                t.contains("Cloudflare", true) || t.contains("Attention Required", true) ||
-                t.contains("Just a moment", true)
-    }
-
-    private fun isBadKey(msg: String?): Boolean =
-        msg != null && (msg.contains("invalid_api_key", true) || msg.contains("Incorrect API key", true) ||
-                msg.contains("401") || msg.contains("invalid request", true))
 
     suspend fun analyzeNote(context: Context, title: String, body: String): AnalysisResult = withContext(Dispatchers.IO) {
         if (AiConfig.provider(context) == AiProvider.OFFLINE) return@withContext AnalysisResult(true, LocalEngine.analyze(title, body))
@@ -115,22 +130,18 @@ $hist
     }
 
     private fun isBlockedOrPaid(msg: String?): Boolean =
-        msg != null && (isNetworkError(msg) || isHtmlBlock(msg) || isBadKey(msg) || msg.contains("402") ||
-                msg.contains("PAYMENT_REQUIRED", true) || msg.contains("balance", true) ||
-                msg.contains("CLOUDFLARE", true))
+        msg != null && (isNetworkError(msg) || msg.contains("402") || msg.contains("PAYMENT_REQUIRED", true) || msg.contains("balance", true))
 
     private suspend fun callWithFallback(context: Context, prompt: String, offline: () -> String): AnalysisResult {
         val primary = AiConfig.provider(context)
         val first = attempt(context, primary, prompt)
         if (first.success) return first
         if (isBlockedOrPaid(first.error)) {
-            if (primary != AiProvider.POLLINATIONS && !isBadKey(first.error)) {
+            if (primary != AiProvider.POLLINATIONS) {
                 val second = attempt(context, AiProvider.POLLINATIONS, prompt)
-                if (second.success) return second.copy(content = "🔄 سرویس انتخابی در دسترس نبود؛ از «Pollinations 🆓» استفاده شد.\n\n" + second.content)
+                if (second.success) return second.copy(content = "🔄 سرویس انتخابی در دسترس نبود؛ به‌صورت خودکار از «Pollinations 🆓» استفاده شد.\n\n" + second.content)
             }
-            val note = if (isBadKey(first.error)) "🔑 کلید API نامعتبر بود؛ پاسخ توسط «موتور ویرایشگر ✍️» تولید شد:\n\n"
-                       else "📴 سرویس آنلاین در دسترس نبود؛ پاسخ توسط «موتور ویرایشگر ✍️» تولید شد:\n\n"
-            return AnalysisResult(true, note + offline())
+            return AnalysisResult(true, "📴 اینترنت/سرویس‌های آنلاین در دسترس نبودند؛ پاسخ توسط «موتور ویرایشگر ✍️» تولید شد:\n\n" + offline())
         }
         return first
     }
@@ -142,11 +153,10 @@ $hist
         conn.errorStream?.let { BufferedReader(InputStreamReader(it, Charsets.UTF_8)).use { r -> r.readText() } } ?: "HTTP ${conn.responseCode}"
 
     private fun friendly(err: String): String = when {
-        isBadKey(err) -> "🔑 کلید API نامعتبر است؛ در ⚙️ کلید درست وارد کن یا «موتور ویرایشگر ✍️» را انتخاب کن."
-        isHtmlBlock(err) -> "🚧 این سرویس توسط Cloudflare مسدود شده؛ اپ خودکار از موتور آفلاین استفاده می‌کند."
         err.contains("Insufficient Balance", true) || err.contains("balance", true) ->
-            "💳 اعتبار این سرویس تمام شده؛ از «موتور ویرایشگر ✍️» استفاده کن."
-        err.contains("PAYMENT_REQUIRED", true) || err.contains("402") -> "💳 این مسیر پولی شده؛ اپ از موتور آفلاین استفاده می‌کند."
+            "💳 این سرویس پولی است و اعتبار ندارد. از ⚙️ گزینهٔ «موتور ویرایشگر ✍️»، Qwen یا Pollinations را انتخاب کن."
+        err.contains("PAYMENT_REQUIRED", true) || err.contains("402") -> "💳 این مسیر پولی شده؛ اپ از مسیر ناشناس/آفلاین استفاده می‌کند."
+        err.contains("401") -> "کلید API معتبر نیست (401)"
         err.contains("403") || err.contains("not available", true) -> "این سرویس در منطقهٔ شما در دسترس نیست (403)"
         err.contains("429") -> "صف شلوغ است؛ چند ثانیه صبر کن (429)"
         else -> err
@@ -173,28 +183,14 @@ $hist
                 val conn = URL("$base/").openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
                 conn.setRequestProperty("Content-Type", "application/json")
-                conn.setRequestProperty("User-Agent", "YaddashtApp/1.0")
                 conn.connectTimeout = 20000; conn.readTimeout = 90000; conn.doOutput = true
                 OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(body); it.flush() }
-                if (conn.responseCode == 200) {
-                    val c = parseContent(readAll(conn))
-                    if (isHtmlBlock(c)) return AnalysisResult(false, "", "CLOUDFLARE")
-                    return AnalysisResult(true, c.trim())
-                }
-                val errRaw = readErr(conn)
-                if (isHtmlBlock(errRaw)) return AnalysisResult(false, "", "CLOUDFLARE")
+                if (conn.responseCode == 200) return AnalysisResult(true, parseContent(readAll(conn)).trim())
                 val getUrl = "$base/" + URLEncoder.encode(prompt.take(1800), "UTF-8")
                 val c2 = URL(getUrl).openConnection() as HttpURLConnection
-                c2.requestMethod = "GET"
-                c2.setRequestProperty("User-Agent", "YaddashtApp/1.0")
-                c2.connectTimeout = 20000; c2.readTimeout = 90000
-                if (c2.responseCode == 200) {
-                    val c = readAll(c2)
-                    if (isHtmlBlock(c)) return AnalysisResult(false, "", "CLOUDFLARE")
-                    return AnalysisResult(true, c.trim())
-                }
-                val err2 = readErr(c2)
-                return AnalysisResult(false, "", if (isHtmlBlock(err2)) "CLOUDFLARE" else friendly(err2))
+                c2.requestMethod = "GET"; c2.connectTimeout = 20000; c2.readTimeout = 90000
+                if (c2.responseCode == 200) return AnalysisResult(true, readAll(c2).trim())
+                return AnalysisResult(false, "", friendly(readErr(c2)))
             }
 
             val (urlStr, jsonBody, auth) = when (provider.format) {
@@ -214,16 +210,8 @@ $hist
             if (auth && key.isNotBlank()) conn.setRequestProperty("Authorization", "Bearer $key")
             conn.connectTimeout = 20000; conn.readTimeout = 90000; conn.doOutput = true
             OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(jsonBody); it.flush() }
-            if (conn.responseCode != 200) {
-                val err = readErr(conn)
-                return AnalysisResult(false, "", when {
-                    isHtmlBlock(err) -> "CLOUDFLARE"
-                    isBadKey(err) -> err
-                    else -> friendly(err)
-                })
-            }
+            if (conn.responseCode != 200) return AnalysisResult(false, "", friendly(readErr(conn)))
             val raw = readAll(conn)
-            if (isHtmlBlock(raw)) return AnalysisResult(false, "", "CLOUDFLARE")
             val content = if (provider.format == ApiFormat.GEMINI)
                 JSONObject(raw).getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
             else parseContent(raw)
