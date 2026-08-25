@@ -1,4 +1,4 @@
-name: Cheragh Rah Build - Release
+name: Cheragh Rah - Release Build
 
 on:
   push:
@@ -11,23 +11,20 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
-    - name: Set up JDK 17
+    - name: Setup Java
       uses: actions/setup-java@v3
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
         
-    - name: Grant execute permission
+    - name: Make Gradle Executable
       run: chmod +x gradlew
       
-    - name: Build RELEASE APK
+    - name: Build Release APK
       run: ./gradlew assembleRelease
       
-    - name: Upload RELEASE APK
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: cheragh-rah-release-apk
-        path: app/build/outputs/apk/release/app-release.apk
-        retention-days: 30
-        
+        name: cheragh-rah-release
+        path: app/build/outputs/apk/release/*.apk
