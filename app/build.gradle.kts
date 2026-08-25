@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")  // ← پلاگین جدید Compose
     id("com.google.devtools.ksp")
 }
 
@@ -12,8 +13,8 @@ android {
         applicationId = "ir.yaddasht.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -40,9 +41,7 @@ android {
     buildFeatures {
         compose = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
-    }
+    // ⚠️ بخش composeOptions دیگر لازم نیست (Kotlin 2.0 خودش هندل می‌کند)
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
