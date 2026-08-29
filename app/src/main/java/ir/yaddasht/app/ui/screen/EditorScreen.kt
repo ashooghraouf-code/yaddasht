@@ -67,13 +67,21 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 private enum class LockMode { Set, Unlock }
 
-private fun esc(s: String) = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+private fun esc(s: String): String {
+    return s.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&#39;")
+}
+
 private fun safeName(s: String) = s.take(24).replace(Regex("[^\\p{L}\\p{N}_-]"), "_").ifBlank { "note" }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -186,7 +194,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     fun launchSpeech() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR"); putExtra(RecognizerIntent.EXTRA_PROMPT, "حرف بزن… 🎙️")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR"); putExtra(RecognizerIntent.EXTRA_PROMPT, "حرف بزن… ️")
         }
         try { speechLauncher.launch(intent) } catch (e: Exception) { Toast.makeText(context, "این دستگاه دیکته ندارد", Toast.LENGTH_SHORT).show() }
     }
@@ -196,7 +204,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         ReminderScheduler.schedule(context, realId, n.title, ts)
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
             notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        Toast.makeText(context, "یادآور تنظیم شد ⏰", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "یادآور تنظیم شد ", Toast.LENGTH_SHORT).show()
     }
     fun exportPdf() {
         val n = note ?: return
@@ -209,11 +217,66 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     fun exportWord() {
         val n = note ?: return
         scope.launch(Dispatchers.IO) {
-            val html = "<html dir='rtl'><head><meta charset='utf-8'></head><body><h1>${esc(n.title)}</h1><p>${esc(n.body).replace("\n", "<br/>")}</p></body></html>"
-            val dir = File(context.cacheDir, "exports").apply { mkdirs() }
-            val file = File(dir, "${safeName(n.title)}.doc")
-            file.writeText(html, Charsets.UTF_8)
-            withContext(Dispatchers.Main) { shareBackupFile(context, file) }
+            try {
+                val html = buildString {
+                    appendLine("<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>")
+                    appendLine("<head>")
+                    appendLine("<meta charset='utf-8'>")
+                    appendLine("<meta http-equiv='Content-Type' content='text/html; charset=utf-8'>")
+                    appendLine("<style>")
+                    appendLine("body { font-family: Tahoma, Arial, sans-serif; direction: rtl; text-align: right; padding: 20px; }")
+                    appendLine("h1 { color: #0B3D2E; font-size: 24pt; border-bottom: 2px solid #F4B942; padding-bottom: 8px; }")
+                    appendLine("p { font-size: 12pt; line-height: 1.8; }")
+                    appendLine("</style>")
+                    appendLine("</head>")
+                    appendLine("<body>")
+                    appendLine("<h1>${esc(n.title.ifBlank { "بدون عنوان" })}</h1>")
+                    appendLine("<p>${esc(n.body).replace("\n", "<br/>")}</p>")
+                    appendLine("<hr/>")
+                    appendLine("<p style='font-size: 9pt; color: #888;'>")
+                    appendLine("خروجی از اپ چراغ راه • ${FaDate.full(System.currentTimeMillis())}")
+                    appendLine("</p>")
+                    appendLine("</body>")
+                    appendLine("</html>")
+                }
+
+                val dir = File(context.filesDir, "exports")
+                if (!dir.exists()) dir.mkdirs()
+
+                val fileName = "yaddasht-${System.currentTimeMillis()}.doc"
+                val file = File(dir, fileName)
+
+                FileOutputStream(file).use { fos ->
+                    fos.write(html.toByteArray(Charsets.UTF_8))
+                    fos.flush()
+                }
+
+                if (file.length() == 0L) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "خطا: فایل خالی ساخته شد!", Toast.LENGTH_LONG).show()
+                    }
+                    return@launch
+                }
+
+                val uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file
+                )
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/msword"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_SUBJECT, n.title.ifBlank { "یادداشت" })
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                withContext(Dispatchers.Main) {
+                    context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری فایل Word"))
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "خطا در ساخت Word: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
     fun exportJsonNote() {
@@ -227,9 +290,12 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                     put("fileName", a.fileName); put("mimeType", a.mimeType); put("isImage", a.isImage)
                 }) } })
             }
-            val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+            val dir = File(context.filesDir, "exports").apply { if (!exists()) mkdirs() }
             val file = File(dir, "${safeName(n.title)}.json")
-            file.writeText(json.toString(2), Charsets.UTF_8)
+            FileOutputStream(file).use { fos ->
+                fos.write(json.toString(2).toByteArray(Charsets.UTF_8))
+                fos.flush()
+            }
             withContext(Dispatchers.Main) { shareBackupFile(context, file) }
         }
     }
@@ -318,8 +384,8 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             title = { Text("📤 ارسال / خروجی", fontFamily = LalezarFont, fontSize = 20.sp, color = Ink) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ExportItem("📤 اشتراک متن یادداشت") { shareNoteText(context, n.title, if (isLocked) "🔒 (محتوا قفل است)" else n.body); showExport = false }
-                    ExportItem("📄 خروجی PDF") { if (!isLocked) exportPdf(); showExport = false }
+                    ExportItem("📤 اشتراک متن یادداشت") { shareNoteText(context, n.title, if (isLocked) " (محتوا قفل است)" else n.body); showExport = false }
+                    ExportItem(" خروجی PDF") { if (!isLocked) exportPdf(); showExport = false }
                     ExportItem("📝 خروجی Word") { if (!isLocked) exportWord(); showExport = false }
                     ExportItem("🧾 خروجی JSON") { exportJsonNote(); showExport = false }
                 }
@@ -529,7 +595,7 @@ private fun AttachmentsSection(attachments: List<Attachment>, onImageClick: (Att
     audios.forEach { att -> AudioAttachmentRow(att, { onShare(att) }, { onDelete(att) }) }
     docs.forEach { att ->
         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = .05f)).padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("📄", fontSize = 18.sp); Spacer(Modifier.width(8.dp))
+            Text("", fontSize = 18.sp); Spacer(Modifier.width(8.dp))
             Text(att.fileName, fontSize = 12.sp, color = Ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             IconButton(onClick = { onShare(att) }, modifier = Modifier.size(30.dp)) { Icon(Icons.Filled.Share, "ارسال", tint = InkSoft, modifier = Modifier.size(16.dp)) }
             IconButton(onClick = { onDelete(att) }, modifier = Modifier.size(30.dp)) { Icon(Icons.Filled.Close, "حذف", tint = Brick, modifier = Modifier.size(16.dp)) }
@@ -569,7 +635,7 @@ private fun FocusModeOverlay(body: String, onChange: (String) -> Unit, onExit: (
                         Text("${body.length.fa()} حرف", fontFamily = LalezarFont, fontSize = 15.sp, color = InkSoft)
                     }
                     Spacer(Modifier.weight(1f))
-                    Text("✒️", fontSize = 20.sp)
+                    Text("️", fontSize = 20.sp)
                 }
                 Box(Modifier.fillMaxWidth().height(2.dp).background(Saffron.copy(alpha = .5f)))
                 TextField(value = body, onValueChange = onChange,
