@@ -83,6 +83,8 @@ import ir.yaddasht.app.data.NoteDao
 import ir.yaddasht.app.data.Priority
 import ir.yaddasht.app.data.Task
 import ir.yaddasht.app.data.TaskDao
+import ir.yaddasht.app.reminder.LeadTime
+import ir.yaddasht.app.reminder.ReminderScheduler
 import ir.yaddasht.app.ui.theme.Brick
 import ir.yaddasht.app.ui.theme.DeepGreen
 import ir.yaddasht.app.ui.theme.DeepGreenSoft
@@ -470,16 +472,22 @@ fun HomeScreen(
     if (showStats) StatsDialog(notes, counts.sumOf { it.count }) { showStats = false }
 
     if (showAddTask) AddTaskDialog(onDismiss = { showAddTask = false },
-        onSave = { title, due, pr ->
-            scope.launch(Dispatchers.IO) { taskDao.insert(Task(title = title, dueDate = due, priority = pr)) }
+        onSave = { title, due, pr, lead ->
+            scope.launch(Dispatchers.IO) {
+                val id = taskDao.insert(Task(title = title, dueDate = due, priority = pr))
+                if (due > 0) ReminderScheduler.scheduleMulti(context, id, title, due, true, setOf(lead))
+            }
             showAddTask = false
             Toast.makeText(context, "وظیفه اضافه شد ✅", Toast.LENGTH_SHORT).show()
         })
 
     if (newTaskOnDate > 0) {
         AddTaskDialog(initialDate = newTaskOnDate, onDismiss = { newTaskOnDate = 0L },
-            onSave = { title, due, pr ->
-                scope.launch(Dispatchers.IO) { taskDao.insert(Task(title = title, dueDate = due, priority = pr)) }
+            onSave = { title, due, pr, lead ->
+                scope.launch(Dispatchers.IO) {
+                    val id = taskDao.insert(Task(title = title, dueDate = due, priority = pr))
+                    if (due > 0) ReminderScheduler.scheduleMulti(context, id, title, due, true, setOf(lead))
+                }
                 newTaskOnDate = 0L
                 Toast.makeText(context, "وظیفه برای ${FaDate.full(due)} اضافه شد ✅", Toast.LENGTH_SHORT).show()
             })
@@ -520,15 +528,16 @@ fun HomeScreen(
     }
 }
 
-@Composable private fun AddTaskDialog(initialDate: Long = 0L, onDismiss: () -> Unit, onSave: (String, Long, Priority) -> Unit) {
+@Composable private fun AddTaskDialog(initialDate: Long = 0L, onDismiss: () -> Unit, onSave: (String, Long, Priority, LeadTime) -> Unit) {
     var title by remember { mutableStateOf("") }
     var dueDate by remember { mutableLongStateOf(initialDate) }
     var showCalendar by remember { mutableStateOf(false) }
     var priority by remember { mutableStateOf(Priority.NORMAL) }
+    var leadTime by remember { mutableStateOf(LeadTime.HOUR_1) }
     AlertDialog(onDismissRequest = onDismiss,
         title = { Text("✅ وظیفه جدید", fontFamily = LalezarFont, fontSize = 20.sp) },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(title, { title = it }, label = { Text("عنوان وظیفه") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(12.dp))
                 Surface(onClick = { showCalendar = true }, shape = RoundedCornerShape(12.dp), color = DeepGreenSoft, border = androidx.compose.foundation.BorderStroke(1.dp, LineGreen)) {
@@ -547,6 +556,14 @@ fun HomeScreen(
                     QuickDateChip("فردا") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1); set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0) }.timeInMillis }
                     QuickDateChip("هفته بعد") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 7) }.timeInMillis }
                 }
+                Spacer(Modifier.height(14.dp))
+                Text("🔔 هشدار قبل از موعد", fontFamily = LalezarFont, fontSize = 14.sp, color = Saffron)
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    LeadTime.values().forEach { lead ->
+                        LeadChip(lead.label, leadTime == lead) { leadTime = lead }
+                    }
+                }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     DueChip("🔴 مهم", priority == Priority.HIGH) { priority = Priority.HIGH }
@@ -555,10 +572,16 @@ fun HomeScreen(
                 }
             }
         },
-        confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = { onSave(title.trim(), dueDate, priority) }) { Text("افزودن", color = if (title.isNotBlank()) Saffron else Brick, fontWeight = FontWeight.Bold) } },
+        confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = { onSave(title.trim(), dueDate, priority, leadTime) }) { Text("افزودن", color = if (title.isNotBlank()) Saffron else Brick, fontWeight = FontWeight.Bold) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } })
     if (showCalendar) {
         ShamsiCalendarPickerDialog(onConfirm = { dueDate = it + 21L * 3600_000; showCalendar = false }, onDismiss = { showCalendar = false })
+    }
+}
+
+@Composable private fun LeadChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(10.dp), color = if (selected) Saffron else DeepGreenSoft, border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) Saffron else LineGreen)) {
+        Text(label, Modifier.padding(horizontal = 10.dp, vertical = 6.dp), fontSize = 11.sp, color = if (selected) Ink else PaperWhite)
     }
 }
 
