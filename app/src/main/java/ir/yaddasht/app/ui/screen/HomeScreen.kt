@@ -112,23 +112,35 @@ import java.util.Calendar
 
 private val HOLIDAY_RED = Color(0xFFE5484D)
 private val WEEK_FA = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
+private const val DAY_MS = 86_400_000L
 
-private fun jalaliMillis(jy: Int, jm: Int, jd: Int, hour: Int): Long {
-    val pc = android.icu.util.PersianCalendar()
-    pc.clear()
-    pc.set(android.icu.util.Calendar.YEAR, jy)
-    pc.set(android.icu.util.Calendar.MONTH, jm - 1)
-    pc.set(android.icu.util.Calendar.DAY_OF_MONTH, jd)
-    pc.set(android.icu.util.Calendar.HOUR_OF_DAY, hour)
-    pc.set(android.icu.util.Calendar.MINUTE, 0)
-    pc.set(android.icu.util.Calendar.SECOND, 0)
-    pc.set(android.icu.util.Calendar.MILLISECOND, 0)
-    return pc.timeInMillis
+private fun jalaliMillis(jy: Int, jm: Int, jd: Int, hour: Int = 12): Long {
+    var est = 1617220800000L + (jy - 1400).toLong() * 365L * DAY_MS + (jm - 1).toLong() * 30L * DAY_MS + (jd - 1).toLong() * DAY_MS
+    for (i in 0 until 700) {
+        val (y, m, d) = FaDate.jalali(est)
+        if (y == jy && m == jm && d == jd) {
+            val c = Calendar.getInstance()
+            c.timeInMillis = est
+            c.set(Calendar.HOUR_OF_DAY, hour)
+            c.set(Calendar.MINUTE, 0)
+            c.set(Calendar.SECOND, 0)
+            c.set(Calendar.MILLISECOND, 0)
+            return c.timeInMillis
+        }
+        val dir = when {
+            y < jy -> 1; y > jy -> -1
+            m < jm -> 1; m > jm -> -1
+            d < jd -> 1; else -> -1
+        }
+        est += dir * DAY_MS
+    }
+    return est
 }
 
 private fun leadingBlanks(jy: Int, jm: Int): Int {
+    val millis = jalaliMillis(jy, jm, 1, 12)
     val c = Calendar.getInstance()
-    c.timeInMillis = jalaliMillis(jy, jm, 1, 12)
+    c.timeInMillis = millis
     return when (c.get(Calendar.DAY_OF_WEEK)) {
         Calendar.SATURDAY -> 0
         Calendar.SUNDAY -> 1
@@ -141,19 +153,17 @@ private fun leadingBlanks(jy: Int, jm: Int): Int {
 }
 
 private fun monthLen(jy: Int, jm: Int): Int {
-    val pc = android.icu.util.PersianCalendar()
-    pc.clear()
-    pc.set(android.icu.util.Calendar.YEAR, jy)
-    pc.set(android.icu.util.Calendar.MONTH, jm - 1)
-    pc.set(android.icu.util.Calendar.DAY_OF_MONTH, 1)
-    return pc.getActualMaximum(android.icu.util.Calendar.DAY_OF_MONTH)
+    val (nextY, nextM) = if (jm == 12) jy + 1 to 1 else jy to jm + 1
+    val firstThis = jalaliMillis(jy, jm, 1, 12)
+    val firstNext = jalaliMillis(nextY, nextM, 1, 12)
+    return ((firstNext - firstThis) / DAY_MS).toInt()
 }
 
 private fun taskTint(due: Long, completed: Boolean): Color {
     if (completed) return Color(0xFF5E8077)
     if (due <= 0L) return Color(0xFF888888)
     val now = System.currentTimeMillis()
-    val days = (due - now).toFloat() / 86_400_000f
+    val days = (due - now).toFloat() / DAY_MS
     val t = days.coerceIn(0f, 7f) / 7f
     val red = Color(0xFFE5484D); val amber = Color(0xFFF5A524); val green = Color(0xFF46A758)
     return if (t < .5f) lerp(red, amber, t / .5f) else lerp(amber, green, (t - .5f) / .5f)
@@ -200,7 +210,7 @@ private fun isIranHoliday(jy: Int, jm: Int, jd: Int): Boolean {
     val hd = cal.get(android.icu.util.Calendar.DAY_OF_MONTH)
     if (hm == 2 && hd == 29) {
         val next = android.icu.util.IslamicCalendar()
-        next.timeInMillis = millis + 86_400_000L
+        next.timeInMillis = millis + DAY_MS
         if (next.get(android.icu.util.Calendar.MONTH) + 1 == 3) return true
     }
     return when {
