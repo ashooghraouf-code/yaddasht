@@ -138,9 +138,8 @@ private fun jalaliMillis(jy: Int, jm: Int, jd: Int, hour: Int = 12): Long {
 }
 
 private fun leadingBlanks(jy: Int, jm: Int): Int {
-    val millis = jalaliMillis(jy, jm, 1, 12)
     val c = Calendar.getInstance()
-    c.timeInMillis = millis
+    c.timeInMillis = jalaliMillis(jy, jm, 1, 12)
     return when (c.get(Calendar.DAY_OF_WEEK)) {
         Calendar.SATURDAY -> 0
         Calendar.SUNDAY -> 1
@@ -157,6 +156,15 @@ private fun monthLen(jy: Int, jm: Int): Int {
     val firstThis = jalaliMillis(jy, jm, 1, 12)
     val firstNext = jalaliMillis(nextY, nextM, 1, 12)
     return ((firstNext - firstThis) / DAY_MS).toInt()
+}
+
+private fun iranHijri(millis: Long): Triple<Int, Int, Int> {
+    val cal = android.icu.util.IslamicCalendar()
+    cal.timeInMillis = millis + DAY_MS
+    val d = cal.get(android.icu.util.Calendar.DAY_OF_MONTH)
+    val m = cal.get(android.icu.util.Calendar.MONTH) + 1
+    val y = cal.get(android.icu.util.Calendar.YEAR)
+    return Triple(m, d, y)
 }
 
 private fun taskTint(due: Long, completed: Boolean): Color {
@@ -181,11 +189,7 @@ private fun gregorianFullFa(millis: Long): String {
 }
 
 private fun hijriFullFa(millis: Long): String {
-    val cal = android.icu.util.IslamicCalendar()
-    cal.timeInMillis = millis
-    val d = cal.get(android.icu.util.Calendar.DAY_OF_MONTH)
-    val m = cal.get(android.icu.util.Calendar.MONTH) + 1
-    val y = cal.get(android.icu.util.Calendar.YEAR)
+    val (m, d, y) = iranHijri(millis)
     val names = arrayOf("محرم", "صفر", "ربیع‌الاول", "ربیع‌الثانی", "جمادی‌الاول", "جمادی‌الثانی", "رجب", "شعبان", "رمضان", "شوال", "ذی‌القعده", "ذی‌الحجه")
     val name = names.getOrElse(m - 1) { "" }
     return "${d.fa()} ${name} ${y.fa()} (${d.fa()}/${m.fa()}/${y.fa()})"
@@ -204,14 +208,10 @@ private fun isIranHoliday(jy: Int, jm: Int, jd: Int): Boolean {
         jm == 3 && jd == 15 -> return true
         jm == 11 && jd == 22 -> return true
     }
-    val cal = android.icu.util.IslamicCalendar()
-    cal.timeInMillis = millis
-    val hm = cal.get(android.icu.util.Calendar.MONTH) + 1
-    val hd = cal.get(android.icu.util.Calendar.DAY_OF_MONTH)
+    val (hm, hd) = iranHijri(millis)
     if (hm == 2 && hd == 29) {
-        val next = android.icu.util.IslamicCalendar()
-        next.timeInMillis = millis + DAY_MS
-        if (next.get(android.icu.util.Calendar.MONTH) + 1 == 3) return true
+        val next = iranHijri(millis + DAY_MS)
+        if (next.first == 3) return true
     }
     return when {
         hm == 1 && hd == 10 -> true
