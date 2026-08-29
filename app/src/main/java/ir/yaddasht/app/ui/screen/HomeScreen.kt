@@ -540,12 +540,19 @@ fun HomeScreen(
     var priority by remember { mutableStateOf(Priority.NORMAL) }
     var leadTime by remember { mutableStateOf(LeadTime.HOUR_1) }
 
-    val initialCal = remember(initialDate) {
+    val initialHour = remember(initialDate) {
         if (initialDate > 0) {
             val c = Calendar.getInstance()
             c.timeInMillis = initialDate
-            Triple(c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), true)
-        } else Triple(9, 0, false)
+            c.get(Calendar.HOUR_OF_DAY)
+        } else 9
+    }
+    val initialMinute = remember(initialDate) {
+        if (initialDate > 0) {
+            val c = Calendar.getInstance()
+            c.timeInMillis = initialDate
+            c.get(Calendar.MINUTE)
+        } else 0
     }
 
     AlertDialog(onDismissRequest = onDismiss,
@@ -566,8 +573,8 @@ fun HomeScreen(
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    QuickDateChip("امروز ساعت ۲۱") { dueDate = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 21); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis }
-                    QuickDateChip("فردا ساعت ۱۲") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1); set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0) }.timeInMillis }
+                    QuickDateChip("امروز ۲۱:۰۰") { dueDate = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 21); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis }
+                    QuickDateChip("فردا ۱۲:۰۰") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1); set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0) }.timeInMillis }
                     QuickDateChip("هفته بعد") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 7); set(Calendar.HOUR_OF_DAY, 9); set(Calendar.MINUTE, 0) }.timeInMillis }
                 }
                 Spacer(Modifier.height(14.dp))
@@ -597,8 +604,8 @@ fun HomeScreen(
 
     if (showTimePicker) {
         val timePickerState = rememberTimePickerState(
-            initialHour = initialCal.third && dueDate == initialDate && initialDate > 0 ? initialCal.first else 9,
-            initialMinute = initialCal.third && dueDate == initialDate && initialDate > 0 ? initialCal.second else 0,
+            initialHour = initialHour,
+            initialMinute = initialMinute,
             is24Hour = true
         )
         AlertDialog(
