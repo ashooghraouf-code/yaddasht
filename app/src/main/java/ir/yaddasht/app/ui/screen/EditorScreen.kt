@@ -55,6 +55,7 @@ import ir.yaddasht.app.NEW_NOTE_ID
 import ir.yaddasht.app.data.Attachment
 import ir.yaddasht.app.data.Note
 import ir.yaddasht.app.data.NoteDao
+import ir.yaddasht.app.reminder.LeadTime
 import ir.yaddasht.app.reminder.ReminderScheduler
 import ir.yaddasht.app.ui.theme.*
 import ir.yaddasht.app.util.*
@@ -135,6 +136,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
     var recordingFile by remember { mutableStateOf<File?>(null) }
     var recordSeconds by remember { mutableIntStateOf(0) }
+    var leadTime by remember { mutableStateOf(LeadTime.HOUR_1) }
 
     val isLocked = note?.body?.let(NoteLock::isLocked) == true
     val isChecklist = note?.body?.let(Checklist::isChecklist) == true
@@ -224,10 +226,11 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     fun scheduleReminder(ts: Long) {
         val n = note ?: return
         note = n.copy(reminderAt = ts)
-        ReminderScheduler.schedule(context, realId, n.title, ts)
+        val title = n.title.ifBlank { "یادداشت" }
+        ReminderScheduler.scheduleMulti(context, realId, title, ts, false, setOf(leadTime))
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
             notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        Toast.makeText(context, "یادآور تنظیم شد", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "یادآور تنظیم شد با هشدار ${leadTime.label}", Toast.LENGTH_SHORT).show()
     }
     fun exportPdf() {
         val n = note ?: return
@@ -327,7 +330,10 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                     if (rem > System.currentTimeMillis()) {
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Saffron.copy(alpha = .28f)).padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("⏰ یادآور: " + FaDate.full(rem) + " – " + SimpleDateFormat("HH:mm", Locale.US).format(Date(rem)), fontSize = 12.sp, color = Ink, modifier = Modifier.weight(1f))
-                            Icon(Icons.Filled.Close, "لغو یادآور", tint = Brick, modifier = Modifier.size(20.dp).clickable { note = note?.copy(reminderAt = 0); ReminderScheduler.cancel(context, realId) })
+                            Icon(Icons.Filled.Close, "لغو یادآور", tint = Brick, modifier = Modifier.size(20.dp).clickable { 
+                                note = note?.copy(reminderAt = 0)
+                                ReminderScheduler.cancelAll(context, realId, false)
+                            })
                         }
                         Spacer(Modifier.height(10.dp))
                     }
@@ -452,14 +458,27 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     if (showTimePicker) {
         val timePickerState = rememberTimePickerState()
         AlertDialog(onDismissRequest = { showTimePicker = false },
+            title = { Text("🔔 هشدار قبل از موعد", fontFamily = LalezarFont, fontSize = 18.sp) },
+            text = {
+                Column {
+                    TimePicker(timePickerState)
+                    Spacer(Modifier.height(12.dp))
+                    Text("انتخاب زمان هشدار:", fontSize = 13.sp, color = PaperWhite)
+                    Spacer(Modifier.height(6.dp))
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        LeadTime.values().forEach { lead ->
+                            LeadChip(lead.label, leadTime == lead) { leadTime = lead }
+                        }
+                    }
+                }
+            },
             confirmButton = { TextButton(onClick = {
                 val finalTime = pickedDate + timePickerState.hour.toLong() * 3600_000 + timePickerState.minute.toLong() * 60_000
                 if (finalTime > System.currentTimeMillis()) scheduleReminder(finalTime)
                 else Toast.makeText(context, "این زمان گذشته است!", Toast.LENGTH_SHORT).show()
                 showTimePicker = false
             }) { Text("تنظیم ⏰", color = Saffron, fontWeight = FontWeight.Bold) } },
-            dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("انصراف") } },
-            text = { TimePicker(timePickerState) })
+            dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("انصراف") } })
     }
 
     viewerImage?.let { att ->
@@ -475,6 +494,13 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     if (showFocus && note != null && !isLocked) { FocusModeOverlay(body = note!!.body, onChange = { note = note?.copy(body = it) }, onExit = { showFocus = false }) }
 
     if (showAi && note != null) { AiAnalysisDialog(title = note?.title ?: "", content = note?.body ?: "", isLocked = isLocked, onDismiss = { showAi = false }) }
+}
+
+@Composable
+private fun LeadChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(10.dp), color = if (selected) Saffron else DeepGreenSoft, border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) Saffron else LineGreen)) {
+        Text(label, Modifier.padding(horizontal = 10.dp, vertical = 6.dp), fontSize = 11.sp, color = if (selected) Ink else PaperWhite)
+    }
 }
 
 @Composable
