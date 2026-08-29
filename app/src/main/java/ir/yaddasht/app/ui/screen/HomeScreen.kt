@@ -55,6 +55,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -533,8 +535,19 @@ fun HomeScreen(
     var title by remember { mutableStateOf("") }
     var dueDate by remember { mutableLongStateOf(initialDate) }
     var showCalendar by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+    var pickedDate by remember { mutableLongStateOf(0L) }
     var priority by remember { mutableStateOf(Priority.NORMAL) }
     var leadTime by remember { mutableStateOf(LeadTime.HOUR_1) }
+
+    val initialCal = remember(initialDate) {
+        if (initialDate > 0) {
+            val c = Calendar.getInstance()
+            c.timeInMillis = initialDate
+            Triple(c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), true)
+        } else Triple(9, 0, false)
+    }
+
     AlertDialog(onDismissRequest = onDismiss,
         title = { Text("✅ وظیفه جدید", fontFamily = LalezarFont, fontSize = 20.sp) },
         text = {
@@ -553,9 +566,9 @@ fun HomeScreen(
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    QuickDateChip("امروز") { dueDate = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 21); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis }
-                    QuickDateChip("فردا") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1); set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0) }.timeInMillis }
-                    QuickDateChip("هفته بعد") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 7) }.timeInMillis }
+                    QuickDateChip("امروز ساعت ۲۱") { dueDate = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 21); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis }
+                    QuickDateChip("فردا ساعت ۱۲") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1); set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0) }.timeInMillis }
+                    QuickDateChip("هفته بعد") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 7); set(Calendar.HOUR_OF_DAY, 9); set(Calendar.MINUTE, 0) }.timeInMillis }
                 }
                 Spacer(Modifier.height(14.dp))
                 Text("🔔 هشدار قبل از موعد", fontFamily = LalezarFont, fontSize = 14.sp, color = Saffron)
@@ -575,8 +588,31 @@ fun HomeScreen(
         },
         confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = { onSave(title.trim(), dueDate, priority, leadTime) }) { Text("افزودن", color = if (title.isNotBlank()) Saffron else Brick, fontWeight = FontWeight.Bold) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } })
+
     if (showCalendar) {
-        ShamsiCalendarPickerDialog(onConfirm = { dueDate = it + 21L * 3600_000; showCalendar = false }, onDismiss = { showCalendar = false })
+        ShamsiCalendarPickerDialog(
+            onConfirm = { pickedDate = it; showCalendar = false; showTimePicker = true },
+            onDismiss = { showCalendar = false })
+    }
+
+    if (showTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = initialCal.third && dueDate == initialDate && initialDate > 0 ? initialCal.first else 9,
+            initialMinute = initialCal.third && dueDate == initialDate && initialDate > 0 ? initialCal.second else 0,
+            is24Hour = true
+        )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text("⏰ انتخاب ساعت", fontFamily = LalezarFont, fontSize = 18.sp) },
+            text = { TimePicker(state = timePickerState) },
+            confirmButton = {
+                TextButton(onClick = {
+                    dueDate = pickedDate + timePickerState.hour.toLong() * 3600_000L + timePickerState.minute.toLong() * 60_000L
+                    showTimePicker = false
+                }) { Text("تأیید", color = Saffron, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("انصراف") } }
+        )
     }
 }
 
