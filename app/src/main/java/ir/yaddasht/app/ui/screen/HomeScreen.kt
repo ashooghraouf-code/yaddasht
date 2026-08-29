@@ -88,6 +88,7 @@ import ir.yaddasht.app.ui.theme.DeepGreen
 import ir.yaddasht.app.ui.theme.DeepGreenSoft
 import ir.yaddasht.app.ui.theme.Ink
 import ir.yaddasht.app.ui.theme.InkSoft
+import androidx.compose.material3.LinearProgressIndicator
 import ir.yaddasht.app.ui.theme.LalezarFont
 import ir.yaddasht.app.ui.theme.LineGreen
 import ir.yaddasht.app.ui.theme.MutedGreenText
@@ -109,6 +110,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Calendar
 
+private val HOLIDAY_RED = Color(0xFFE5484D)
+
 private fun taskTint(due: Long, completed: Boolean): Color {
     if (completed) return Color(0xFF5E8077)
     if (due <= 0L) return Color(0xFF888888)
@@ -117,6 +120,68 @@ private fun taskTint(due: Long, completed: Boolean): Color {
     val t = days.coerceIn(0f, 7f) / 7f
     val red = Color(0xFFE5484D); val amber = Color(0xFFF5A524); val green = Color(0xFF46A758)
     return if (t < .5f) lerp(red, amber, t / .5f) else lerp(amber, green, (t - .5f) / .5f)
+}
+
+private fun gregorianFullFa(millis: Long): String {
+    val c = Calendar.getInstance()
+    c.timeInMillis = millis
+    val d = c.get(Calendar.DAY_OF_MONTH)
+    val m = c.get(Calendar.MONTH) + 1
+    val y = c.get(Calendar.YEAR)
+    val names = arrayOf("ژانویه", "فوریه", "مارس", "آوریل", "مه", "ژوئن", "ژوئیه", "اوت", "سپتامبر", "اکتبر", "نوامبر", "دسامبر")
+    val name = names.getOrElse(m - 1) { "" }
+    return "${d.fa()} ${name} ${y.fa()} (${d.fa()}/${m.fa()}/${y.fa()})"
+}
+
+private fun hijriFullFa(millis: Long): String {
+    val cal = android.icu.util.IslamicCalendar()
+    cal.timeInMillis = millis
+    val d = cal.get(android.icu.util.Calendar.DAY_OF_MONTH)
+    val m = cal.get(android.icu.util.Calendar.MONTH) + 1
+    val y = cal.get(android.icu.util.Calendar.YEAR)
+    val names = arrayOf("محرم", "صفر", "ربیع‌الاول", "ربیع‌الثانی", "جمادی‌الاول", "جمادی‌الثانی", "رجب", "شعبان", "رمضان", "شوال", "ذی‌القعده", "ذی‌الحجه")
+    val name = names.getOrElse(m - 1) { "" }
+    return "${d.fa()} ${name} ${y.fa()} (${d.fa()}/${m.fa()}/${y.fa()})"
+}
+
+private fun isIranHoliday(jy: Int, jm: Int, jd: Int): Boolean {
+    val millis = dayMillis(jy, jm, jd)
+    val c = Calendar.getInstance()
+    c.timeInMillis = millis
+    if (c.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY) return true
+    when {
+        jm == 1 && jd >= 1 && jd <= 4 -> return true
+        jm == 1 && jd == 12 -> return true
+        jm == 1 && jd == 13 -> return true
+        jm == 3 && jd == 14 -> return true
+        jm == 3 && jd == 15 -> return true
+        jm == 11 && jd == 22 -> return true
+    }
+    val cal = android.icu.util.IslamicCalendar()
+    cal.timeInMillis = millis
+    val hm = cal.get(android.icu.util.Calendar.MONTH) + 1
+    val hd = cal.get(android.icu.util.Calendar.DAY_OF_MONTH)
+    return when {
+        hm == 1 && hd == 10 -> true
+        hm == 2 && hd == 20 -> true
+        hm == 2 && hd == 28 -> true
+        hm == 2 && hd == 30 -> true
+        hm == 7 && hd == 13 -> true
+        hm == 7 && hd == 27 -> true
+        hm == 8 && hd == 15 -> true
+        hm == 9 && hd == 21 -> true
+        hm == 10 && hd == 1 -> true
+        hm == 10 && hd == 10 -> true
+        hm == 12 && hd == 18 -> true
+        else -> false
+    }
+}
+
+private fun computeHolidayDays(jy: Int, jm: Int): Set<Int> {
+    val set = mutableSetOf<Int>()
+    val len = FaDate.monthLength(jy, jm)
+    for (d in 1..len) if (isIranHoliday(jy, jm, d)) set.add(d)
+    return set
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -187,7 +252,6 @@ fun HomeScreen(
         floatingActionButton = {
             when (tab) {
                 0 -> NewNoteFab(onNewNote)
-                // ✅ اصلاح: دکمهٔ شناور فقط در تب «وظایف» (۱) میاد، نه در تقویم
                 1 -> ExtendedFloatingActionButton(onClick = { showAddTask = true }, containerColor = Saffron, contentColor = Ink) {
                     Icon(Icons.Filled.Add, "جدید"); Spacer(Modifier.width(8.dp)); Text("وظیفه جدید", fontFamily = LalezarFont, fontSize = 17.sp)
                 }
@@ -246,6 +310,7 @@ fun HomeScreen(
                         }
                     }
                     else -> {
+                        val holidayDays = remember(calJy, calJm) { computeHolidayDays(calJy, calJm) }
                         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp)) {
                             Spacer(Modifier.height(8.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -253,13 +318,14 @@ fun HomeScreen(
                                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("${FaDate.monthName(calJm)} ${calJy.fa()}", fontFamily = LalezarFont, fontSize = 20.sp, color = PaperWhite)
                                     val infoMillis = dayMillis(calJy, calJm, calDay)
-                                    Text("🌙 ${hijriFa(infoMillis)} • میلادی: ${gregorianFa(infoMillis)}", fontSize = 10.sp, color = MutedGreenText)
+                                    Text("🌙 قمری: ${hijriFullFa(infoMillis)}", fontSize = 10.sp, color = MutedGreenText)
+                                    Text("🌍 میلادی: ${gregorianFullFa(infoMillis)}", fontSize = 10.sp, color = MutedGreenText)
                                 }
                                 IconButton(onClick = { if (calJm < 12) calJm++ else { calJm = 1; calJy++ } }) { Icon(Icons.Filled.ChevronLeft, "بعد", tint = Saffron) }
                             }
                             Spacer(Modifier.height(6.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                LegendItem(Color(0xFFE5484D), "وظیفه نزدیک"); LegendItem(Color(0xFF46A758), "وظیفه دور"); LegendItem(Saffron, "یادآور یادداشت")
+                                LegendItem(HOLIDAY_RED, "تعطیل رسمی"); LegendItem(Color(0xFF46A758), "وظیفه دور"); LegendItem(Saffron, "یادآور"); LegendItem(HOLIDAY_RED, "دور قرمز = تعطیل")
                             }
                             Spacer(Modifier.height(4.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -277,13 +343,14 @@ fun HomeScreen(
                                             val dayItems = itemsByDay[Triple(calJy, calJm, d)].orEmpty()
                                             val isToday = calJy == tjy && calJm == tjm && d == tjd
                                             val isSel = calDay == d
+                                            val isHoliday = holidayDays.contains(d)
                                             Box(Modifier.weight(1f).height(72.dp).clip(RoundedCornerShape(12.dp))
                                                 .background(if (isSel) DeepGreenSoft else Color.Transparent)
-                                                .border(if (isToday) 1.5.dp else 0.dp, Saffron, RoundedCornerShape(12.dp))
+                                                .border(if (isHoliday) 2.dp else if (isToday) 1.5.dp else 0.dp, if (isHoliday) HOLIDAY_RED else Saffron, RoundedCornerShape(12.dp))
                                                 .combinedClickable(onClick = { calDay = d }, onLongClick = { calDay = d; newTaskOnDate = dayMillis(calJy, calJm, d) })
                                                 .padding(3.dp)) {
                                                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-                                                    Text(d.fa(), fontSize = 12.sp, color = if (isToday) Saffron else PaperWhite, fontWeight = if (isToday || isSel) FontWeight.Bold else FontWeight.Normal)
+                                                    Text(d.fa(), fontSize = 12.sp, color = if (isHoliday) HOLIDAY_RED else if (isToday) Saffron else PaperWhite, fontWeight = if (isToday || isSel || isHoliday) FontWeight.Bold else FontWeight.Normal)
                                                     val taskItems = dayItems.filter { it.first.startsWith("task:") }
                                                     val noteItems = dayItems.filter { it.first.startsWith("note:") }
                                                     taskItems.take(2).forEach { item -> Box(Modifier.fillMaxWidth().height(6.dp).padding(top = 2.dp).clip(RoundedCornerShape(3.dp)).background(taskTint(item.second, item.third))) }
