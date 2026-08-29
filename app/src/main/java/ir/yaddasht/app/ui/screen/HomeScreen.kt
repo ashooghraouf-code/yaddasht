@@ -111,6 +111,43 @@ import java.io.File
 import java.util.Calendar
 
 private val HOLIDAY_RED = Color(0xFFE5484D)
+private val WEEK_FA = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
+
+private fun jalaliMillis(jy: Int, jm: Int, jd: Int, hour: Int): Long {
+    val pc = android.icu.util.PersianCalendar()
+    pc.clear()
+    pc.set(android.icu.util.Calendar.YEAR, jy)
+    pc.set(android.icu.util.Calendar.MONTH, jm - 1)
+    pc.set(android.icu.util.Calendar.DAY_OF_MONTH, jd)
+    pc.set(android.icu.util.Calendar.HOUR_OF_DAY, hour)
+    pc.set(android.icu.util.Calendar.MINUTE, 0)
+    pc.set(android.icu.util.Calendar.SECOND, 0)
+    pc.set(android.icu.util.Calendar.MILLISECOND, 0)
+    return pc.timeInMillis
+}
+
+private fun leadingBlanks(jy: Int, jm: Int): Int {
+    val c = Calendar.getInstance()
+    c.timeInMillis = jalaliMillis(jy, jm, 1, 12)
+    return when (c.get(Calendar.DAY_OF_WEEK)) {
+        Calendar.SATURDAY -> 0
+        Calendar.SUNDAY -> 1
+        Calendar.MONDAY -> 2
+        Calendar.TUESDAY -> 3
+        Calendar.WEDNESDAY -> 4
+        Calendar.THURSDAY -> 5
+        else -> 6
+    }
+}
+
+private fun monthLen(jy: Int, jm: Int): Int {
+    val pc = android.icu.util.PersianCalendar()
+    pc.clear()
+    pc.set(android.icu.util.Calendar.YEAR, jy)
+    pc.set(android.icu.util.Calendar.MONTH, jm - 1)
+    pc.set(android.icu.util.Calendar.DAY_OF_MONTH, 1)
+    return pc.getActualMaximum(android.icu.util.Calendar.DAY_OF_MONTH)
+}
 
 private fun taskTint(due: Long, completed: Boolean): Color {
     if (completed) return Color(0xFF5E8077)
@@ -145,7 +182,7 @@ private fun hijriFullFa(millis: Long): String {
 }
 
 private fun isIranHoliday(jy: Int, jm: Int, jd: Int): Boolean {
-    val millis = dayMillis(jy, jm, jd)
+    val millis = jalaliMillis(jy, jm, jd, 12)
     val c = Calendar.getInstance()
     c.timeInMillis = millis
     if (c.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY) return true
@@ -185,7 +222,7 @@ private fun isIranHoliday(jy: Int, jm: Int, jd: Int): Boolean {
 
 private fun computeHolidayDays(jy: Int, jm: Int): Set<Int> {
     val set = mutableSetOf<Int>()
-    val len = FaDate.monthLength(jy, jm)
+    val len = monthLen(jy, jm)
     for (d in 1..len) if (isIranHoliday(jy, jm, d)) set.add(d)
     return set
 }
@@ -323,7 +360,7 @@ fun HomeScreen(
                                 IconButton(onClick = { if (calJm > 1) calJm-- else { calJm = 12; calJy-- } }) { Icon(Icons.Filled.ChevronRight, "قبل", tint = Saffron) }
                                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("${FaDate.monthName(calJm)} ${calJy.fa()}", fontFamily = LalezarFont, fontSize = 20.sp, color = PaperWhite)
-                                    val infoMillis = dayMillis(calJy, calJm, calDay)
+                                    val infoMillis = jalaliMillis(calJy, calJm, calDay, 12)
                                     Text("🌙 قمری: ${hijriFullFa(infoMillis)}", fontSize = 10.sp, color = MutedGreenText)
                                     Text("🌍 میلادی: ${gregorianFullFa(infoMillis)}", fontSize = 10.sp, color = MutedGreenText)
                                 }
@@ -335,11 +372,11 @@ fun HomeScreen(
                             }
                             Spacer(Modifier.height(4.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                                WeekDaysFa.forEach { w -> Text(w, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Saffron, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
+                                WEEK_FA.forEach { w -> Text(w, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Saffron, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
                             }
                             Spacer(Modifier.height(4.dp))
-                            val leading = firstDowIndex(calJy, calJm)
-                            val len = FaDate.monthLength(calJy, calJm)
+                            val leading = leadingBlanks(calJy, calJm)
+                            val len = monthLen(calJy, calJm)
                             val cells = List(leading) { 0 } + (1..len).toList()
                             cells.chunked(7).forEach { row ->
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -353,7 +390,7 @@ fun HomeScreen(
                                             Box(Modifier.weight(1f).height(72.dp).clip(RoundedCornerShape(12.dp))
                                                 .background(if (isSel) DeepGreenSoft else Color.Transparent)
                                                 .border(if (isHoliday) 2.dp else if (isToday) 1.5.dp else 0.dp, if (isHoliday) HOLIDAY_RED else Saffron, RoundedCornerShape(12.dp))
-                                                .combinedClickable(onClick = { calDay = d }, onLongClick = { calDay = d; newTaskOnDate = dayMillis(calJy, calJm, d) })
+                                                .combinedClickable(onClick = { calDay = d }, onLongClick = { calDay = d; newTaskOnDate = jalaliMillis(calJy, calJm, d, 0) })
                                                 .padding(3.dp)) {
                                                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
                                                     Text(d.fa(), fontSize = 12.sp, color = if (isHoliday) HOLIDAY_RED else if (isToday) Saffron else PaperWhite, fontWeight = if (isToday || isSel || isHoliday) FontWeight.Bold else FontWeight.Normal)
@@ -364,7 +401,7 @@ fun HomeScreen(
                                                     if (dayItems.size > 2) Text("+${(dayItems.size - 2).fa()}", fontSize = 8.sp, color = MutedGreenText)
                                                 }
                                                 Box(Modifier.align(Alignment.BottomEnd).size(18.dp).clip(CircleShape).background(Saffron)
-                                                    .clickable { calDay = d; newTaskOnDate = dayMillis(calJy, calJm, d) }, contentAlignment = Alignment.Center) {
+                                                    .clickable { calDay = d; newTaskOnDate = jalaliMillis(calJy, calJm, d, 0) }, contentAlignment = Alignment.Center) {
                                                     Text("+", fontSize = 12.sp, color = Ink, fontWeight = FontWeight.Bold)
                                                 }
                                             }
@@ -377,7 +414,7 @@ fun HomeScreen(
                             Spacer(Modifier.height(10.dp))
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Text("📍 ${calDay.fa()} ${FaDate.monthName(calJm)}", fontFamily = LalezarFont, fontSize = 16.sp, color = Saffron, modifier = Modifier.weight(1f))
-                                Surface(onClick = { newTaskOnDate = dayMillis(calJy, calJm, calDay) }, shape = RoundedCornerShape(10.dp), color = Saffron) {
+                                Surface(onClick = { newTaskOnDate = jalaliMillis(calJy, calJm, calDay, 0) }, shape = RoundedCornerShape(10.dp), color = Saffron) {
                                     Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Icon(Icons.Filled.Add, null, tint = Ink, modifier = Modifier.size(14.dp)); Spacer(Modifier.width(4.dp))
                                         Text("وظیفه جدید", fontSize = 11.sp, color = Ink, fontWeight = FontWeight.Bold)
