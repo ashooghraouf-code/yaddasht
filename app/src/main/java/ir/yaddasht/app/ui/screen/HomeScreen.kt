@@ -161,11 +161,17 @@ private fun isIranHoliday(jy: Int, jm: Int, jd: Int): Boolean {
     cal.timeInMillis = millis
     val hm = cal.get(android.icu.util.Calendar.MONTH) + 1
     val hd = cal.get(android.icu.util.Calendar.DAY_OF_MONTH)
+    if (hm == 2 && hd == 29) {
+        val next = android.icu.util.IslamicCalendar()
+        next.timeInMillis = millis + 86_400_000L
+        if (next.get(android.icu.util.Calendar.MONTH) + 1 == 3) return true
+    }
     return when {
         hm == 1 && hd == 10 -> true
         hm == 2 && hd == 20 -> true
         hm == 2 && hd == 28 -> true
         hm == 2 && hd == 30 -> true
+        hm == 3 && hd == 17 -> true
         hm == 7 && hd == 13 -> true
         hm == 7 && hd == 27 -> true
         hm == 8 && hd == 15 -> true
@@ -325,7 +331,7 @@ fun HomeScreen(
                             }
                             Spacer(Modifier.height(6.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                LegendItem(HOLIDAY_RED, "تعطیل رسمی"); LegendItem(Color(0xFF46A758), "وظیفه دور"); LegendItem(Saffron, "یادآور"); LegendItem(HOLIDAY_RED, "دور قرمز = تعطیل")
+                                LegendItem(HOLIDAY_RED, "تعطیل رسمی = دور قرمز"); LegendItem(Color(0xFF46A758), "وظیفه دور"); LegendItem(Saffron, "یادآور یادداشت")
                             }
                             Spacer(Modifier.height(4.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
