@@ -108,32 +108,8 @@ import ir.yaddasht.app.data.Note
 import ir.yaddasht.app.data.NoteDao
 import ir.yaddasht.app.reminder.LeadTime
 import ir.yaddasht.app.reminder.ReminderScheduler
-import ir.yaddasht.app.ui.theme.Brick
-import ir.yaddasht.app.ui.theme.DeepGreen
-import ir.yaddasht.app.ui.theme.DeepGreenSoft
-import ir.yaddasht.app.ui.theme.Ink
-import ir.yaddasht.app.ui.theme.InkSoft
-import ir.yaddasht.app.ui.theme.LalezarFont
-import ir.yaddasht.app.ui.theme.LineGreen
-import ir.yaddasht.app.ui.theme.PaperColors
-import ir.yaddasht.app.ui.theme.PaperWhite
-import ir.yaddasht.app.ui.theme.Saffron
-import ir.yaddasht.app.ui.theme.VazirFont
-import ir.yaddasht.app.ui.theme.paperColor
-import ir.yaddasht.app.util.AiAnalysisDialog
-import ir.yaddasht.app.util.AttachmentStore
-import ir.yaddasht.app.util.Checklist
-import ir.yaddasht.app.util.FaDate
-import ir.yaddasht.app.util.NoteLock
-import ir.yaddasht.app.util.PdfExporter
-import ir.yaddasht.app.util.Recovery
-import ir.yaddasht.app.util.fa
-import ir.yaddasht.app.util.faDigits
-import ir.yaddasht.app.util.guessMimeType
-import ir.yaddasht.app.util.shareAttachment
-import ir.yaddasht.app.util.shareBackupFile
-import ir.yaddasht.app.util.shareNoteText
-import ir.yaddasht.app.util.sharePdf
+import ir.yaddasht.app.ui.theme.*
+import ir.yaddasht.app.util.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -727,39 +703,4 @@ private fun AudioAttachmentRow(att: Attachment, onShare: () -> Unit, onDelete: (
 
 @Composable
 private fun FocusModeOverlay(body: String, onChange: (String) -> Unit, onExit: () -> Unit) {
-    val words = remember(body) { body.split(Regex("\\s+")).count { it.isNotBlank() } }
-    Dialog(onDismissRequest = onExit, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(Modifier.fillMaxSize().background(PaperWhite)) {
-            Column(Modifier.fillMaxSize()) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onExit) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "خروج", tint = InkSoft) }
-                    Spacer(Modifier.weight(1f))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("${words.fa()} کلمه", fontFamily = LalezarFont, fontSize = 15.sp, color = InkSoft)
-                        Text("•", fontSize = 15.sp, color = InkSoft)
-                        Text("${body.length.fa()} حرف", fontFamily = LalezarFont, fontSize = 15.sp, color = InkSoft)
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Text("✒️", fontSize = 20.sp)
-                }
-                Box(Modifier.fillMaxWidth().height(2.dp).background(Saffron.copy(alpha = .5f)))
-                TextField(value = body, onValueChange = onChange,
-                    textStyle = TextStyle(fontFamily = VazirFont, fontSize = 19.sp, color = Ink, lineHeight = 36.sp, letterSpacing = 0.2.sp, textAlign = TextAlign.Start),
-                    colors = transparentFieldColors(), placeholder = { Text("فقط بنویس", color = InkSoft.copy(alpha = .6f), fontSize = 18.sp) },
-                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 26.dp, vertical = 10.dp))
-            }
-        }
-    }
-}
-
-private fun importUris(context: Context, scope: CoroutineScope, dao: NoteDao, noteId: Long, uris: List<Uri>) {
-    if (uris.isEmpty()) return
-    scope.launch(Dispatchers.IO) {
-        uris.forEach { uri ->
-            val file = AttachmentStore.copyToPrivate(context, uri) ?: return@forEach
-            val mime = context.contentResolver.getType(uri) ?: guessMimeType(file.name)
-            dao.insertAttachment(Attachment(noteId = noteId, fileName = file.name, filePath = file.absolutePath, mimeType = mime, isImage = mime.startsWith("image/")))
-        }
-        withContext(Dispatchers.Main) { Toast.makeText(context, "ضمیمه اضافه شد ✔", Toast.LENGTH_SHORT).show() }
-    }
-}
+    val
