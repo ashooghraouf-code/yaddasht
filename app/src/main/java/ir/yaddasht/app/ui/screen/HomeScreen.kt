@@ -147,7 +147,7 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
     var showStats by remember { mutableStateOf(false) }
     var hideMemory by rememberSaveable { mutableStateOf(false) }
-    var showAddTask by remember { mutableStateOf(false) }
+    var taskDialogMode by remember { mutableStateOf<TaskDialogMode>(TaskDialogMode.Closed) }
     var newTaskOnDate by remember { mutableLongStateOf(0L) }
 
     val (tjy, tjm, tjd) = FaDate.jalali(System.currentTimeMillis())
@@ -183,7 +183,7 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
         floatingActionButton = {
             when (tab) {
                 0 -> NewNoteFab(onNewNote)
-                1 -> ExtendedFloatingActionButton(onClick = { showAddTask = true }, containerColor = Saffron, contentColor = Ink) {
+                1 -> ExtendedFloatingActionButton(onClick = { taskDialogMode = TaskDialogMode.New }, containerColor = Saffron, contentColor = Ink) {
                     Icon(Icons.Filled.Add, "جدید"); Spacer(Modifier.width(8.dp)); Text("وظیفه جدید", fontFamily = LalezarFont, fontSize = 17.sp)
                 }
             }
@@ -232,9 +232,13 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                         else -> LazyColumn(contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 120.dp), modifier = Modifier.fillMaxSize()) {
                             filteredTasks.forEach { task ->
                                 item {
-                                    TaskCard(task, onClick = { onOpenTask(task.id) },
+                                    TaskCard(task,
+                                        onClick = { taskDialogMode = TaskDialogMode.Edit(task) },
                                         onToggle = { scope.launch(Dispatchers.IO) { taskDao.update(task.copy(isCompleted = !task.isCompleted)) } },
-                                        onDelete = { scope.launch(Dispatchers.IO) { taskDao.deleteById(task.id) } })
+                                        onDelete = { scope.launch(Dispatchers.IO) {
+                                            ReminderScheduler.cancelAll(context, task.id, true)
+                                            taskDao.deleteById(task.id)
+                                        } })
                                     Spacer(Modifier.height(10.dp))
                                 }
                             }
@@ -328,9 +332,13 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                                     val id = item.first.removePrefix("task:").toLongOrNull() ?: -1L
                                     val task = tasks.find { it.id == id }
                                     if (task != null) {
-                                        TaskCard(task, onClick = { onOpenTask(task.id) },
+                                        TaskCard(task,
+                                            onClick = { taskDialogMode = TaskDialogMode.Edit(task) },
                                             onToggle = { scope.launch(Dispatchers.IO) { taskDao.update(task.copy(isCompleted = !task.isCompleted)) } },
-                                            onDelete = { scope.launch(Dispatchers.IO) { taskDao.deleteById(task.id) } })
+                                            onDelete = { scope.launch(Dispatchers.IO) {
+                                                ReminderScheduler.cancelAll(context, task.id, true)
+                                                taskDao.deleteById(task.id)
+                                            } })
                                     }
                                 }
                                 Spacer(Modifier.height(8.dp))
@@ -345,26 +353,51 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
 
     if (showStats) StatsDialog(notes, counts.sumOf { it.count }) { showStats = false }
 
-    if (showAddTask) AddTaskDialog(onDismiss = { showAddTask = false },
-        onSave = { title, due, pr, leads ->
-            scope.launch(Dispatchers.IO) {
-                val id = taskDao.insert(Task(title = title, dueDate = due, priority = pr))
-                if (due > 0) ReminderScheduler.scheduleMulti(context, id, title, due, true, leads)
-            }
-            showAddTask = false
-            Toast.makeText(context, "وظیفه اضافه شد ✅", Toast.LENGTH_SHORT).show()
-        })
-
-    if (newTaskOnDate > 0) {
-        AddTaskDialog(initialDate = newTaskOnDate, onDismiss = { newTaskOnDate = 0L },
-            onSave = { title, due, pr, leads ->
-                scope.launch(Dispatchers.IO) {
-                    val id = taskDao.insert(Task(title = title, dueDate = due, priority = pr))
-                    if (due > 0) ReminderScheduler.scheduleMulti(context, id, title, due, true, leads)
+    when (val mode = taskDialogMode) {
+        is TaskDialogMode.New -> {
+            val initDate = if (newTaskOnDate > 0) newTaskOnDate else 0L
+            TaskEditDialog(
+                initialTask = null,
+                initialDate = initDate,
+                onDismiss = { taskDialogMode = TaskDialogMode.Closed; newTaskOnDate = 0L },
+                onSave = { title, due, pr, leads ->
+                    scope.launch(Dispatchers.IO) {
+                        val id = taskDao.insert(Task(title = title, dueDate = due, priority = pr))
+                        if (due > 0) ReminderScheduler.scheduleMulti(context, id, title, due, true, leads)
+                        else ReminderScheduler.cancelAll(context, id, true)
+                    }
+                    taskDialogMode = TaskDialogMode.Closed
+                    newTaskOnDate = 0L
+                    Toast.makeText(context, "وظیفه اضافه شد ✅", Toast.LENGTH_SHORT).show()
+                },
+                onDelete = null
+            )
+        }
+        is TaskDialogMode.Edit -> {
+            TaskEditDialog(
+                initialTask = mode.task,
+                initialDate = 0L,
+                onDismiss = { taskDialogMode = TaskDialogMode.Closed },
+                onSave = { title, due, pr, leads ->
+                    scope.launch(Dispatchers.IO) {
+                        ReminderScheduler.cancelAll(context, mode.task.id, true)
+                        taskDao.update(mode.task.copy(title = title, dueDate = due, priority = pr))
+                        if (due > 0) ReminderScheduler.scheduleMulti(context, mode.task.id, title, due, true, leads)
+                    }
+                    taskDialogMode = TaskDialogMode.Closed
+                    Toast.makeText(context, "وظیفه به‌روز شد ✅", Toast.LENGTH_SHORT).show()
+                },
+                onDelete = {
+                    scope.launch(Dispatchers.IO) {
+                        ReminderScheduler.cancelAll(context, mode.task.id, true)
+                        taskDao.deleteById(mode.task.id)
+                    }
+                    taskDialogMode = TaskDialogMode.Closed
+                    Toast.makeText(context, "وظیفه حذف شد 🗑️", Toast.LENGTH_SHORT).show()
                 }
-                newTaskOnDate = 0L
-                Toast.makeText(context, "وظیفه برای ${FaDate.full(due)} اضافه شد ✅", Toast.LENGTH_SHORT).show()
-            })
+            )
+        }
+        TaskDialogMode.Closed -> Unit
     }
 
     noteToDelete?.let { note ->
@@ -374,6 +407,12 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
             confirmButton = { TextButton(onClick = { noteToDelete = null; scope.launch(Dispatchers.IO) { val atts = dao.attachmentsByNote(note.id); dao.deleteById(note.id); atts.forEach { File(it.filePath).delete() } } }) { Text("حذف", color = Brick, fontWeight = FontWeight.Bold) } },
             dismissButton = { TextButton(onClick = { noteToDelete = null }) { Text("انصراف") } })
     }
+}
+
+private sealed class TaskDialogMode {
+    object Closed : TaskDialogMode()
+    object New : TaskDialogMode()
+    data class Edit(val task: Task) : TaskDialogMode()
 }
 
 @Composable private fun LegendItem(color: Color, label: String) {
@@ -395,6 +434,7 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                     color = if (task.isCompleted) MutedGreenText else PaperWhite,
                     textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null)
                 if (task.dueDate > 0) { Spacer(Modifier.height(2.dp)); Text("📅 " + FaDate.full(task.dueDate), fontSize = 11.sp, color = tint, fontWeight = FontWeight.Bold) }
+                Text("✏️ برای ویرایش ضربه بزن", fontSize = 9.sp, color = MutedGreenText.copy(alpha = .7f))
             }
             if (task.priority == Priority.HIGH && !task.isCompleted) Text("🔴", fontSize = 12.sp)
             IconButton(onClick = onDelete, modifier = Modifier.size(30.dp)) { Icon(Icons.Filled.Close, "حذف", tint = Brick, modifier = Modifier.size(16.dp)) }
@@ -402,15 +442,23 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
     }
 }
 
-@Composable private fun AddTaskDialog(initialDate: Long = 0L, onDismiss: () -> Unit, onSave: (String, Long, Priority, Set<LeadTime>) -> Unit) {
-    var title by remember { mutableStateOf("") }
-    var dueDate by remember { mutableLongStateOf(initialDate) }
+@Composable private fun TaskEditDialog(
+    initialTask: Task?,
+    initialDate: Long,
+    onDismiss: () -> Unit,
+    onSave: (String, Long, Priority, Set<LeadTime>) -> Unit,
+    onDelete: (() -> Unit)?
+) {
+    val isEdit = initialTask != null
+    var title by remember { mutableStateOf(initialTask?.title ?: "") }
+    var dueDate by remember { mutableLongStateOf(initialTask?.dueDate ?: initialDate) }
     var showPicker by remember { mutableStateOf(false) }
-    var priority by remember { mutableStateOf(Priority.NORMAL) }
-    var leads by remember { mutableStateOf(setOf(LeadTime.NONE, LeadTime.HOUR_1)) }
+    var priority by remember { mutableStateOf(initialTask?.priority ?: Priority.NORMAL) }
+    var leads by remember { mutableStateOf<Set<LeadTime>>(setOf(LeadTime.NONE, LeadTime.HOUR_1)) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     AlertDialog(onDismissRequest = onDismiss,
-        title = { Text("✅ وظیفه جدید", fontFamily = LalezarFont, fontSize = 20.sp) },
+        title = { Text(if (isEdit) "✏️ ویرایش وظیفه" else "✅ وظیفه جدید", fontFamily = LalezarFont, fontSize = 20.sp) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(title, { title = it }, label = { Text("عنوان وظیفه") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -432,7 +480,7 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                     QuickDateChip("هفته بعد") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 7); set(Calendar.HOUR_OF_DAY, 9); set(Calendar.MINUTE, 0) }.timeInMillis }
                 }
                 Spacer(Modifier.height(14.dp))
-                Text("🔔 هشدارها (چند تا می‌تونی تیک بزنی)", fontFamily = LalezarFont, fontSize = 14.sp, color = Saffron)
+                Text("🔔 هشدارها", fontFamily = LalezarFont, fontSize = 14.sp, color = Saffron)
                 Spacer(Modifier.height(6.dp))
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     LeadTime.values().forEach { lead ->
@@ -445,13 +493,35 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                     DueChip("🟡 عادی", priority == Priority.NORMAL) { priority = Priority.NORMAL }
                     DueChip("🟢 کم", priority == Priority.LOW) { priority = Priority.LOW }
                 }
+                if (isEdit && onDelete != null) {
+                    Spacer(Modifier.height(16.dp))
+                    Surface(onClick = { showDeleteConfirm = true }, shape = RoundedCornerShape(12.dp), color = Brick.copy(alpha = .15f), border = androidx.compose.foundation.BorderStroke(1.dp, Brick)) {
+                        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                            Icon(Icons.Filled.Delete, null, tint = Brick, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("حذف این وظیفه", color = Brick, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                    }
+                }
             }
         },
-        confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = { onSave(title.trim(), dueDate, priority, leads) }) { Text("افزودن", color = if (title.isNotBlank()) Saffron else Brick, fontWeight = FontWeight.Bold) } },
+        confirmButton = {
+            TextButton(enabled = title.isNotBlank(), onClick = { onSave(title.trim(), dueDate, priority, leads) }) {
+                Text(if (isEdit) "ذخیره" else "افزودن", color = if (title.isNotBlank()) Saffron else Brick, fontWeight = FontWeight.Bold)
+            }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } })
 
     if (showPicker) {
         YadavarDatePickerDialog(onConfirm = { dueDate = it; showPicker = false }, onDismiss = { showPicker = false })
+    }
+
+    if (showDeleteConfirm && onDelete != null) {
+        AlertDialog(onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("حذف وظیفه؟", fontFamily = LalezarFont, fontSize = 20.sp) },
+            text = { Text("آیا مطمئنی که می‌خوای «${title.ifBlank { "بدون عنوان" }}» را حذف کنی؟") },
+            confirmButton = { TextButton(onClick = { showDeleteConfirm = false; onDelete() }) { Text("حذف", color = Brick, fontWeight = FontWeight.Bold) } },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("انصراف") } })
     }
 }
 
