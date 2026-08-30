@@ -96,13 +96,26 @@ private fun pdGreg(millis: Long): Triple<Int, Int, Int> {
     return Triple(c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH), c.get(Calendar.YEAR))
 }
 
+private fun pdWeekday(millis: Long): String {
+    val c = Calendar.getInstance(); c.timeInMillis = millis
+    return when (c.get(Calendar.DAY_OF_WEEK)) {
+        Calendar.SATURDAY -> "شنبه"
+        Calendar.SUNDAY -> "یکشنبه"
+        Calendar.MONDAY -> "دوشنبه"
+        Calendar.TUESDAY -> "سه‌شنبه"
+        Calendar.WEDNESDAY -> "چهارشنبه"
+        Calendar.THURSDAY -> "پنجشنبه"
+        else -> "جمعه"
+    }
+}
+
 @Composable
 fun LeadToggleChip(label: String, selected: Boolean, onClick: () -> Unit) {
     Surface(onClick = onClick, shape = RoundedCornerShape(10.dp),
         color = if (selected) Saffron else DeepGreenSoft,
         border = BorderStroke(1.dp, if (selected) Saffron else LineGreen)) {
         Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (selected) Text("✓ ", fontSize = 11.sp, color = Ink, fontWeight = FontWeight.Bold)
+            if (selected) { Text("✓ ", fontSize = 11.sp, color = Ink, fontWeight = FontWeight.Bold) }
             Text(label, fontSize = 11.sp, color = if (selected) Ink else PaperWhite)
         }
     }
@@ -129,8 +142,8 @@ fun YadavarDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) {
                     IconButton(onClick = { if (calJm > 1) calJm-- else { calJm = 12; calJy-- } }) { Icon(Icons.Filled.ChevronRight, "قبل", tint = Saffron) }
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("${FaDate.monthName(calJm)} ${calJy.fa()}", fontFamily = LalezarFont, fontSize = 18.sp, color = PaperWhite)
-                        Text("🌙 ${hd.fa()} ${PD_HIJRI.getOrElse(hm - 1) { "" }} ${hy.fa()}", fontSize = 11.sp, color = MutedGreenText)
-                        Text("🌍 ${gd.fa()} ${PD_GREG.getOrElse(gm - 1) { "" }} ${gy.fa()}", fontSize = 11.sp, color = MutedGreenText)
+                        Text("🌙 قمری: ${pdWeekday(selMillis)}، ${hd.fa()} ${PD_HIJRI.getOrElse(hm - 1) { "" }} ${hy.fa()}", fontSize = 11.sp, color = MutedGreenText)
+                        Text("🌍 میلادی: ${pdWeekday(selMillis)}، ${gd.fa()} ${PD_GREG.getOrElse(gm - 1) { "" }} ${gy.fa()}", fontSize = 11.sp, color = MutedGreenText)
                     }
                     IconButton(onClick = { if (calJm < 12) calJm++ else { calJm = 1; calJy++ } }) { Icon(Icons.Filled.ChevronLeft, "بعد", tint = Saffron) }
                 }
