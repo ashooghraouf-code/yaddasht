@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -90,7 +88,7 @@ private fun pdMonthLen(jy: Int, jm: Int): Int {
 }
 
 private fun pdHijri(millis: Long): Triple<Int, Int, Int> {
-    val cal = android.icu.util.IslamicCalendar(); cal.timeInMillis = millis + PD_MS
+    val cal = android.icu.util.IslamicCalendar(); cal.timeInMillis = millis
     return Triple(cal.get(android.icu.util.Calendar.MONTH) + 1, cal.get(android.icu.util.Calendar.DAY_OF_MONTH), cal.get(android.icu.util.Calendar.YEAR))
 }
 
@@ -132,8 +130,8 @@ fun YadavarDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) {
                     IconButton(onClick = { if (calJm > 1) calJm-- else { calJm = 12; calJy-- } }) { Icon(Icons.Filled.ChevronRight, "قبل", tint = Saffron) }
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("${FaDate.monthName(calJm)} ${calJy.fa()}", fontFamily = LalezarFont, fontSize = 18.sp, color = PaperWhite)
-                        Text("🌙 ${hd.fa()} ${PD_HIJRI.getOrElse(hm - 1) { "" }} ${hy.fa()}", fontSize = 10.sp, color = MutedGreenText)
-                        Text("🌍 ${gd.fa()} ${PD_GREG.getOrElse(gm - 1) { "" }} ${gy.fa()}", fontSize = 10.sp, color = MutedGreenText)
+                        Text("🌙 ${hd.fa()} ${PD_HIJRI.getOrElse(hm - 1) { "" }} ${hy.fa()}", fontSize = 11.sp, color = MutedGreenText)
+                        Text("🌍 ${gd.fa()} ${PD_GREG.getOrElse(gm - 1) { "" }} ${gy.fa()}", fontSize = 11.sp, color = MutedGreenText)
                     }
                     IconButton(onClick = { if (calJm < 12) calJm++ else { calJm = 1; calJy++ } }) { Icon(Icons.Filled.ChevronLeft, "بعد", tint = Saffron) }
                 }
