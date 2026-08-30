@@ -42,6 +42,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -305,7 +306,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                         isChecklist -> ChecklistEditor(note!!) { note = it }
                         else -> TextField(value = note?.body.orEmpty(), onValueChange = { note = note?.copy(body = it) },
                             placeholder = { Text("اینجا بنویس یا از «دیکته» و «چک‌لیست» استفاده کن", color = InkSoft, fontSize = 15.sp) },
-                            textStyle = TextStyle(fontFamily = VazirFont, fontSize = 15.sp, color = Ink, lineHeight = 26.sp),
+                            textStyle = TextStyle(fontFamily = VazirFont, fontSize = 15.sp, color = Ink, lineHeight = 28.sp, letterSpacing = 0.2.sp, textAlign = TextAlign.Start),
                             colors = transparentFieldColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp))
                     }
                 }
@@ -398,14 +399,12 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     showRecoveryCode?.let { code ->
         AlertDialog(onDismissRequest = { showRecoveryCode = null },
             title = { Text("🔑 کد بازیابی", fontFamily = LalezarFont, fontSize = 20.sp) },
-            text = { Column { Text("این کد را جای امن بنویس! اگه روزی رمزت را فراموش کردی، با همین کد می‌تونی یادداشت را باز کنی:"); Spacer(Modifier.height(12.dp)); Text(code, fontFamily = LalezarFont, fontSize = 30.sp, color = Saffron, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center) } },
+            text = { Column { Text("این کد را جای امن بنویس! اگه روزی رمزت را فراموش کردی، با همین کد می‌تونی یادداشت را باز کنی:"); Spacer(Modifier.height(12.dp)); Text(code, fontFamily = LalezarFont, fontSize = 30.sp, color = Saffron, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) } },
             confirmButton = { TextButton(onClick = { showRecoveryCode = null }) { Text("ذخیره کردم ✅", color = Saffron, fontWeight = FontWeight.Bold) } })
     }
 
     if (showDatePicker) {
-        YadavarDatePickerDialog(
-            onConfirm = { pickedDate = it; showDatePicker = false; showLeads = true },
-            onDismiss = { showDatePicker = false })
+        YadavarDatePickerDialog(onConfirm = { pickedDate = it; showDatePicker = false; showLeads = true }, onDismiss = { showDatePicker = false })
     }
 
     if (showLeads) {
@@ -488,7 +487,7 @@ private fun ChecklistEditor(note: Note, onChange: (Note) -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(checked = checked, onCheckedChange = { onChange(note.copy(body = Checklist.toggleLine(note.body, i))) }, colors = CheckboxDefaults.colors(checkedColor = Saffron, checkmarkColor = Ink))
             TextField(value = text, onValueChange = { v -> val mark = if (checked) "☑ " else "☐ "; val list = lines.toMutableList(); list[i] = mark + v; onChange(note.copy(body = list.joinToString("\n"))) },
-                textStyle = TextStyle(fontFamily = VazirFont, fontSize = 15.sp, color = Ink, textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None),
+                textStyle = TextStyle(fontFamily = VazirFont, fontSize = 15.sp, color = Ink, lineHeight = 26.sp, letterSpacing = 0.2.sp, textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None, textAlign = TextAlign.Start),
                 colors = transparentFieldColors(), modifier = Modifier.weight(1f))
         }
     }
@@ -582,7 +581,7 @@ private fun FocusModeOverlay(body: String, onChange: (String) -> Unit, onExit: (
                 }
                 Box(Modifier.fillMaxWidth().height(2.dp).background(Saffron.copy(alpha = .5f)))
                 TextField(value = body, onValueChange = onChange,
-                    textStyle = TextStyle(fontFamily = VazirFont, fontSize = 19.sp, color = Ink, lineHeight = 36.sp),
+                    textStyle = TextStyle(fontFamily = VazirFont, fontSize = 19.sp, color = Ink, lineHeight = 36.sp, letterSpacing = 0.2.sp, textAlign = TextAlign.Start),
                     colors = transparentFieldColors(), placeholder = { Text("فقط بنویس", color = InkSoft.copy(alpha = .6f), fontSize = 18.sp) },
                     modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 26.dp, vertical = 10.dp))
             }
@@ -598,6 +597,4 @@ private fun importUris(context: Context, scope: CoroutineScope, dao: NoteDao, no
             val mime = context.contentResolver.getType(uri) ?: guessMimeType(file.name)
             dao.insertAttachment(Attachment(noteId = noteId, fileName = file.name, filePath = file.absolutePath, mimeType = mime, isImage = mime.startsWith("image/")))
         }
-        withContext(Dispatchers.Main) { Toast.makeText(context, "ضمیمه اضافه شد ✔", Toast.LENGTH_SHORT).show() }
-    }
-}
+        withContext(Dispatchers.Main) { Toast.makeText(context, "ضمیمه
