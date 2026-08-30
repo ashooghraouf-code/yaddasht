@@ -83,26 +83,17 @@ private const val DOCX_CONTENT_TYPES = """<?xml version="1.0" encoding="UTF-8" s
 private const val DOCX_RELS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"""
 
-private fun xmlEsc(s: String): String = s
-    .replace("&", "&amp;")
-    .replace("<", "&lt;")
-    .replace(">", "&gt;")
-    .replace("\"", "&quot;")
+private fun xmlEsc(s: String): String = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
 
 private fun buildDocumentXml(title: String, body: String): String {
     val sb = StringBuilder()
     sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>")
     sb.append("<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body>")
-    sb.append("<w:p><w:pPr><w:jc w:val=\"right\"/><w:rtl/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val=\"44\"/><w:rtl/></w:rPr><w:t xml:space=\"preserve\">")
-    sb.append(xmlEsc(title))
-    sb.append("</w:t></w:r></w:p>")
+    sb.append("<w:p><w:pPr><w:jc w:val=\"right\"/><w:rtl/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val=\"44\"/><w:rtl/></w:rPr><w:t xml:space=\"preserve\">").append(xmlEsc(title)).append("</w:t></w:r></w:p>")
     body.split("\n").forEach { line ->
-        sb.append("<w:p><w:pPr><w:jc w:val=\"right\"/><w:rtl/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t xml:space=\"preserve\">")
-        sb.append(xmlEsc(line))
-        sb.append("</w:t></w:r></w:p>")
+        sb.append("<w:p><w:pPr><w:jc w:val=\"right\"/><w:rtl/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t xml:space=\"preserve\">").append(xmlEsc(line)).append("</w:t></w:r></w:p>")
     }
-    sb.append("<w:sectPr/>")
-    sb.append("</w:body></w:document>")
+    sb.append("<w:sectPr/></w:body></w:document>")
     return sb.toString()
 }
 
@@ -131,20 +122,17 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     var lockError by remember { mutableStateOf("") }
     var showRecoveryCode by remember { mutableStateOf<String?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
-    var showTimePicker by remember { mutableStateOf(false) }
+    var showLeads by remember { mutableStateOf(false) }
     var pickedDate by remember { mutableLongStateOf(0L) }
+    var leads by remember { mutableStateOf(setOf(LeadTime.NONE, LeadTime.HOUR_1)) }
     var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
     var recordingFile by remember { mutableStateOf<File?>(null) }
     var recordSeconds by remember { mutableIntStateOf(0) }
-    var leadTime by remember { mutableStateOf(LeadTime.HOUR_1) }
 
     val isLocked = note?.body?.let(NoteLock::isLocked) == true
     val isChecklist = note?.body?.let(Checklist::isChecklist) == true
 
-    LaunchedEffect(Unit) {
-        if (noteId == NEW_NOTE_ID) realId = withContext(Dispatchers.IO) { dao.insert(Note()) }
-        ready = true
-    }
+    LaunchedEffect(Unit) { if (noteId == NEW_NOTE_ID) realId = withContext(Dispatchers.IO) { dao.insert(Note()) }; ready = true }
     LaunchedEffect(ready, realId) { if (!ready) return@LaunchedEffect; dao.observeNote(realId).collect { n -> note = n; if (lastSaved == null) lastSaved = n } }
     LaunchedEffect(ready, realId) { if (!ready) return@LaunchedEffect; dao.observeAttachments(realId).collect { attachments = it } }
     LaunchedEffect(ready) {
@@ -176,9 +164,8 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
 
     val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val file = pendingCameraFile
-        if (ok && file != null && file.length() > 0) {
-            scope.launch(Dispatchers.IO) { dao.insertAttachment(Attachment(noteId = realId, fileName = file.name, filePath = file.absolutePath, mimeType = "image/jpeg", isImage = true)) }
-        } else file?.delete()
+        if (ok && file != null && file.length() > 0) scope.launch(Dispatchers.IO) { dao.insertAttachment(Attachment(noteId = realId, fileName = file.name, filePath = file.absolutePath, mimeType = "image/jpeg", isImage = true)) }
+        else file?.delete()
         pendingCameraFile = null
     }
     val pickImages = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { importUris(context, scope, dao, realId, it) }
@@ -204,9 +191,8 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         try { recorder?.stop() } catch (_: Exception) {}
         recorder?.release(); recorder = null
         val f = recordingFile; recordingFile = null
-        if (f != null && f.length() > 2000) {
-            scope.launch(Dispatchers.IO) { dao.insertAttachment(Attachment(noteId = realId, fileName = f.name, filePath = f.absolutePath, mimeType = "audio/mp4", isImage = false)) }
-        } else { f?.delete(); Toast.makeText(context, "ضبط خیلی کوتاه بود", Toast.LENGTH_SHORT).show() }
+        if (f != null && f.length() > 2000) scope.launch(Dispatchers.IO) { dao.insertAttachment(Attachment(noteId = realId, fileName = f.name, filePath = f.absolutePath, mimeType = "audio/mp4", isImage = false)) }
+        else { f?.delete(); Toast.makeText(context, "ضبط خیلی کوتاه بود", Toast.LENGTH_SHORT).show() }
     }
     val audioPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) startRecording() else Toast.makeText(context, "بدون دسترسی میکروفون ضبط ممکن نیست", Toast.LENGTH_SHORT).show()
@@ -223,14 +209,13 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         }
         try { speechLauncher.launch(intent) } catch (e: Exception) { Toast.makeText(context, "این دستگاه دیکته ندارد", Toast.LENGTH_SHORT).show() }
     }
-    fun scheduleReminder(ts: Long) {
+    fun scheduleReminder(ts: Long, leadsSet: Set<LeadTime>) {
         val n = note ?: return
         note = n.copy(reminderAt = ts)
-        val title = n.title.ifBlank { "یادداشت" }
-        ReminderScheduler.scheduleMulti(context, realId, title, ts, false, setOf(leadTime))
+        ReminderScheduler.scheduleMulti(context, realId, n.title.ifBlank { "یادداشت" }, ts, false, leadsSet)
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
             notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        Toast.makeText(context, "یادآور تنظیم شد با هشدار ${leadTime.label}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "یادآور با ${leadsSet.size.fa()} هشدار تنظیم شد ⏰", Toast.LENGTH_SHORT).show()
     }
     fun exportPdf() {
         val n = note ?: return
@@ -244,46 +229,22 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         val n = note ?: return
         scope.launch(Dispatchers.IO) {
             try {
-                val dir = File(context.filesDir, "exports")
-                if (!dir.exists()) dir.mkdirs()
+                val dir = File(context.filesDir, "exports"); if (!dir.exists()) dir.mkdirs()
                 val file = File(dir, "yaddasht-${System.currentTimeMillis()}.docx")
-
                 ZipOutputStream(FileOutputStream(file)).use { zip ->
-                    zip.putNextEntry(ZipEntry("[Content_Types].xml"))
-                    zip.write(DOCX_CONTENT_TYPES.toByteArray(Charsets.UTF_8))
-                    zip.closeEntry()
-
-                    zip.putNextEntry(ZipEntry("_rels/.rels"))
-                    zip.write(DOCX_RELS.toByteArray(Charsets.UTF_8))
-                    zip.closeEntry()
-
-                    zip.putNextEntry(ZipEntry("word/document.xml"))
-                    zip.write(buildDocumentXml(n.title.ifBlank { "بدون عنوان" }, n.body).toByteArray(Charsets.UTF_8))
-                    zip.closeEntry()
+                    zip.putNextEntry(ZipEntry("[Content_Types].xml")); zip.write(DOCX_CONTENT_TYPES.toByteArray(Charsets.UTF_8)); zip.closeEntry()
+                    zip.putNextEntry(ZipEntry("_rels/.rels")); zip.write(DOCX_RELS.toByteArray(Charsets.UTF_8)); zip.closeEntry()
+                    zip.putNextEntry(ZipEntry("word/document.xml")); zip.write(buildDocumentXml(n.title.ifBlank { "بدون عنوان" }, n.body).toByteArray(Charsets.UTF_8)); zip.closeEntry()
                 }
-
-                if (file.length() == 0L) {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "خطا: فایل خالی ساخته شد!", Toast.LENGTH_LONG).show()
-                    }
-                    return@launch
-                }
-
+                if (file.length() == 0L) { withContext(Dispatchers.Main) { Toast.makeText(context, "خطا: فایل خالی ساخته شد!", Toast.LENGTH_LONG).show() }; return@launch }
                 val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    putExtra(Intent.EXTRA_SUBJECT, n.title.ifBlank { "یادداشت" })
+                    putExtra(Intent.EXTRA_STREAM, uri); putExtra(Intent.EXTRA_SUBJECT, n.title.ifBlank { "یادداشت" })
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-                withContext(Dispatchers.Main) {
-                    context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری فایل Word"))
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "خطا در ساخت Word: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-            }
+                withContext(Dispatchers.Main) { context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری فایل Word")) }
+            } catch (e: Exception) { withContext(Dispatchers.Main) { Toast.makeText(context, "خطا در ساخت Word: ${e.message}", Toast.LENGTH_LONG).show() } }
         }
     }
     fun exportJsonNote() {
@@ -293,16 +254,11 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             val json = JSONObject().apply {
                 put("title", n.title); put("body", n.body); put("color", n.color); put("pinned", n.pinned)
                 put("reminderAt", n.reminderAt); put("createdAt", n.createdAt); put("updatedAt", n.updatedAt)
-                put("attachments", JSONArray().apply { atts.forEach { a -> put(JSONObject().apply {
-                    put("fileName", a.fileName); put("mimeType", a.mimeType); put("isImage", a.isImage)
-                }) } })
+                put("attachments", JSONArray().apply { atts.forEach { a -> put(JSONObject().apply { put("fileName", a.fileName); put("mimeType", a.mimeType); put("isImage", a.isImage) }) } })
             }
             val dir = File(context.filesDir, "exports").apply { if (!exists()) mkdirs() }
             val file = File(dir, "${safeName(n.title)}.json")
-            FileOutputStream(file).use { fos ->
-                fos.write(json.toString(2).toByteArray(Charsets.UTF_8))
-                fos.flush()
-            }
+            FileOutputStream(file).use { fos -> fos.write(json.toString(2).toByteArray(Charsets.UTF_8)); fos.flush() }
             withContext(Dispatchers.Main) { shareBackupFile(context, file) }
         }
     }
@@ -330,10 +286,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                     if (rem > System.currentTimeMillis()) {
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Saffron.copy(alpha = .28f)).padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("⏰ یادآور: " + FaDate.full(rem) + " – " + SimpleDateFormat("HH:mm", Locale.US).format(Date(rem)), fontSize = 12.sp, color = Ink, modifier = Modifier.weight(1f))
-                            Icon(Icons.Filled.Close, "لغو یادآور", tint = Brick, modifier = Modifier.size(20.dp).clickable { 
-                                note = note?.copy(reminderAt = 0)
-                                ReminderScheduler.cancelAll(context, realId, false)
-                            })
+                            Icon(Icons.Filled.Close, "لغو یادآور", tint = Brick, modifier = Modifier.size(20.dp).clickable { note = note?.copy(reminderAt = 0); ReminderScheduler.cancelAll(context, realId, false) })
                         }
                         Spacer(Modifier.height(10.dp))
                     }
@@ -450,35 +403,23 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     }
 
     if (showDatePicker) {
-        ShamsiCalendarPickerDialog(
-            onConfirm = { pickedDate = it; showDatePicker = false; showTimePicker = true },
+        YadavarDatePickerDialog(
+            onConfirm = { pickedDate = it; showDatePicker = false; showLeads = true },
             onDismiss = { showDatePicker = false })
     }
 
-    if (showTimePicker) {
-        val timePickerState = rememberTimePickerState()
-        AlertDialog(onDismissRequest = { showTimePicker = false },
-            title = { Text("🔔 هشدار قبل از موعد", fontFamily = LalezarFont, fontSize = 18.sp) },
+    if (showLeads) {
+        AlertDialog(onDismissRequest = { showLeads = false },
+            title = { Text("🔔 هشدارهای یادآور", fontFamily = LalezarFont, fontSize = 18.sp) },
             text = {
-                Column {
-                    TimePicker(timePickerState)
-                    Spacer(Modifier.height(12.dp))
-                    Text("انتخاب زمان هشدار:", fontSize = 13.sp, color = PaperWhite)
-                    Spacer(Modifier.height(6.dp))
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        LeadTime.values().forEach { lead ->
-                            LeadChip(lead.label, leadTime == lead) { leadTime = lead }
-                        }
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    LeadTime.values().forEach { lead ->
+                        LeadToggleChip(lead.label, leads.contains(lead)) { leads = if (leads.contains(lead)) leads - lead else leads + lead }
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = {
-                val finalTime = pickedDate + timePickerState.hour.toLong() * 3600_000 + timePickerState.minute.toLong() * 60_000
-                if (finalTime > System.currentTimeMillis()) scheduleReminder(finalTime)
-                else Toast.makeText(context, "این زمان گذشته است!", Toast.LENGTH_SHORT).show()
-                showTimePicker = false
-            }) { Text("تنظیم ⏰", color = Saffron, fontWeight = FontWeight.Bold) } },
-            dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("انصراف") } })
+            confirmButton = { TextButton(onClick = { scheduleReminder(pickedDate, leads); showLeads = false }) { Text("تنظیم ⏰", color = Saffron, fontWeight = FontWeight.Bold) } },
+            dismissButton = { TextButton(onClick = { showLeads = false }) { Text("انصراف") } })
     }
 
     viewerImage?.let { att ->
@@ -497,40 +438,12 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
 }
 
 @Composable
-private fun LeadChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(10.dp), color = if (selected) Saffron else DeepGreenSoft, border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) Saffron else LineGreen)) {
-        Text(label, Modifier.padding(horizontal = 10.dp, vertical = 6.dp), fontSize = 11.sp, color = if (selected) Ink else PaperWhite)
-    }
-}
-
-@Composable
 private fun ExportItem(label: String, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = PaperWhite,
-        border = androidx.compose.foundation.BorderStroke(1.dp, LineGreen)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = label,
-                fontSize = 15.sp,
-                color = Ink,
-                fontWeight = FontWeight.Bold,
-                fontFamily = VazirFont
-            )
+    Surface(onClick = onClick, shape = RoundedCornerShape(12.dp), color = PaperWhite, border = androidx.compose.foundation.BorderStroke(1.dp, LineGreen)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(text = label, fontSize = 15.sp, color = Ink, fontWeight = FontWeight.Bold, fontFamily = VazirFont)
             Spacer(Modifier.weight(1f))
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = null,
-                tint = Saffron,
-                modifier = Modifier.size(18.dp)
-            )
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Saffron, modifier = Modifier.size(18.dp))
         }
     }
 }
