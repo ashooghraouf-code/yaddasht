@@ -10,66 +10,18 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberTimePickerState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -83,36 +35,11 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import ir.yaddasht.app.data.Note
-import ir.yaddasht.app.data.NoteDao
-import ir.yaddasht.app.data.Priority
-import ir.yaddasht.app.data.Task
-import ir.yaddasht.app.data.TaskDao
-import ir.yaddasht.app.reminder.LeadTime
-import ir.yaddasht.app.reminder.ReminderScheduler
-import ir.yaddasht.app.ui.theme.Brick
-import ir.yaddasht.app.ui.theme.DeepGreen
-import ir.yaddasht.app.ui.theme.DeepGreenSoft
-import ir.yaddasht.app.ui.theme.Ink
-import ir.yaddasht.app.ui.theme.InkSoft
-import ir.yaddasht.app.ui.theme.LalezarFont
-import ir.yaddasht.app.ui.theme.LineGreen
-import ir.yaddasht.app.ui.theme.MutedGreenText
-import ir.yaddasht.app.ui.theme.PaperWhite
-import ir.yaddasht.app.ui.theme.Saffron
-import ir.yaddasht.app.ui.theme.VazirFont
-import ir.yaddasht.app.ui.theme.paperColor
-import ir.yaddasht.app.util.Checklist
-import ir.yaddasht.app.util.FaDate
-import ir.yaddasht.app.util.FullBackup
-import ir.yaddasht.app.util.NoteLock
-import ir.yaddasht.app.util.fa
-import ir.yaddasht.app.util.relativeTimeFa
-import ir.yaddasht.app.util.shareBackupFile
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import ir.yaddasht.app.data.*
+import ir.yaddasht.app.reminder.*
+import ir.yaddasht.app.ui.theme.*
+import ir.yaddasht.app.util.*
+import kotlinx.coroutines.*
 import java.io.File
 import java.util.Calendar
 
@@ -127,50 +54,31 @@ private fun jalaliMillis(jy: Int, jm: Int, jd: Int, hour: Int = 12): Long {
         if (y == jy && m == jm && d == jd) {
             val c = Calendar.getInstance()
             c.timeInMillis = est
-            c.set(Calendar.HOUR_OF_DAY, hour)
-            c.set(Calendar.MINUTE, 0)
-            c.set(Calendar.SECOND, 0)
-            c.set(Calendar.MILLISECOND, 0)
+            c.set(Calendar.HOUR_OF_DAY, hour); c.set(Calendar.MINUTE, 0); c.set(Calendar.SECOND, 0); c.set(Calendar.MILLISECOND, 0)
             return c.timeInMillis
         }
-        val dir = when {
-            y < jy -> 1; y > jy -> -1
-            m < jm -> 1; m > jm -> -1
-            d < jd -> 1; else -> -1
-        }
+        val dir = when { y < jy -> 1; y > jy -> -1; m < jm -> 1; m > jm -> -1; d < jd -> 1; else -> -1 }
         est += dir * DAY_MS
     }
     return est
 }
 
 private fun leadingBlanks(jy: Int, jm: Int): Int {
-    val c = Calendar.getInstance()
-    c.timeInMillis = jalaliMillis(jy, jm, 1, 12)
+    val c = Calendar.getInstance(); c.timeInMillis = jalaliMillis(jy, jm, 1, 12)
     return when (c.get(Calendar.DAY_OF_WEEK)) {
-        Calendar.SATURDAY -> 0
-        Calendar.SUNDAY -> 1
-        Calendar.MONDAY -> 2
-        Calendar.TUESDAY -> 3
-        Calendar.WEDNESDAY -> 4
-        Calendar.THURSDAY -> 5
-        else -> 6
+        Calendar.SATURDAY -> 0; Calendar.SUNDAY -> 1; Calendar.MONDAY -> 2; Calendar.TUESDAY -> 3
+        Calendar.WEDNESDAY -> 4; Calendar.THURSDAY -> 5; else -> 6
     }
 }
 
 private fun monthLen(jy: Int, jm: Int): Int {
-    val (nextY, nextM) = if (jm == 12) jy + 1 to 1 else jy to jm + 1
-    val firstThis = jalaliMillis(jy, jm, 1, 12)
-    val firstNext = jalaliMillis(nextY, nextM, 1, 12)
-    return ((firstNext - firstThis) / DAY_MS).toInt()
+    val (ny, nm) = if (jm == 12) jy + 1 to 1 else jy to jm + 1
+    return ((jalaliMillis(ny, nm, 1, 12) - jalaliMillis(jy, jm, 1, 12)) / DAY_MS).toInt()
 }
 
 private fun iranHijri(millis: Long): Triple<Int, Int, Int> {
-    val cal = android.icu.util.IslamicCalendar()
-    cal.timeInMillis = millis + DAY_MS
-    val d = cal.get(android.icu.util.Calendar.DAY_OF_MONTH)
-    val m = cal.get(android.icu.util.Calendar.MONTH) + 1
-    val y = cal.get(android.icu.util.Calendar.YEAR)
-    return Triple(m, d, y)
+    val cal = android.icu.util.IslamicCalendar(); cal.timeInMillis = millis + DAY_MS
+    return Triple(cal.get(android.icu.util.Calendar.MONTH) + 1, cal.get(android.icu.util.Calendar.DAY_OF_MONTH), cal.get(android.icu.util.Calendar.YEAR))
 }
 
 private fun taskTint(due: Long, completed: Boolean): Color {
@@ -184,27 +92,21 @@ private fun taskTint(due: Long, completed: Boolean): Color {
 }
 
 private fun gregorianFullFa(millis: Long): String {
-    val c = Calendar.getInstance()
-    c.timeInMillis = millis
-    val d = c.get(Calendar.DAY_OF_MONTH)
-    val m = c.get(Calendar.MONTH) + 1
-    val y = c.get(Calendar.YEAR)
+    val c = Calendar.getInstance(); c.timeInMillis = millis
+    val d = c.get(Calendar.DAY_OF_MONTH); val m = c.get(Calendar.MONTH) + 1; val y = c.get(Calendar.YEAR)
     val names = arrayOf("ژانویه", "فوریه", "مارس", "آوریل", "مه", "ژوئن", "ژوئیه", "اوت", "سپتامبر", "اکتبر", "نوامبر", "دسامبر")
-    val name = names.getOrElse(m - 1) { "" }
-    return "${d.fa()} ${name} ${y.fa()} (${d.fa()}/${m.fa()}/${y.fa()})"
+    return "${d.fa()} ${names.getOrElse(m - 1) { "" }} ${y.fa()} (${d.fa()}/${m.fa()}/${y.fa()})"
 }
 
 private fun hijriFullFa(millis: Long): String {
     val (m, d, y) = iranHijri(millis)
     val names = arrayOf("محرم", "صفر", "ربیع‌الاول", "ربیع‌الثانی", "جمادی‌الاول", "جمادی‌الثانی", "رجب", "شعبان", "رمضان", "شوال", "ذی‌القعده", "ذی‌الحجه")
-    val name = names.getOrElse(m - 1) { "" }
-    return "${d.fa()} ${name} ${y.fa()} (${d.fa()}/${m.fa()}/${y.fa()})"
+    return "${d.fa()} ${names.getOrElse(m - 1) { "" }} ${y.fa()} (${d.fa()}/${m.fa()}/${y.fa()})"
 }
 
 private fun isIranHoliday(jy: Int, jm: Int, jd: Int): Boolean {
     val millis = jalaliMillis(jy, jm, jd, 12)
-    val c = Calendar.getInstance()
-    c.timeInMillis = millis
+    val c = Calendar.getInstance(); c.timeInMillis = millis
     if (c.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY) return true
     when {
         jm == 1 && jd >= 1 && jd <= 4 -> return true
@@ -215,43 +117,24 @@ private fun isIranHoliday(jy: Int, jm: Int, jd: Int): Boolean {
         jm == 11 && jd == 22 -> return true
     }
     val (hm, hd) = iranHijri(millis)
-    if (hm == 2 && hd == 29) {
-        val next = iranHijri(millis + DAY_MS)
-        if (next.first == 3) return true
-    }
+    if (hm == 2 && hd == 29 && iranHijri(millis + DAY_MS).first == 3) return true
     return when {
-        hm == 1 && hd == 10 -> true
-        hm == 2 && hd == 20 -> true
-        hm == 2 && hd == 28 -> true
-        hm == 2 && hd == 30 -> true
-        hm == 3 && hd == 17 -> true
-        hm == 7 && hd == 13 -> true
-        hm == 7 && hd == 27 -> true
-        hm == 8 && hd == 15 -> true
-        hm == 9 && hd == 21 -> true
-        hm == 10 && hd == 1 -> true
-        hm == 10 && hd == 10 -> true
-        hm == 12 && hd == 18 -> true
+        hm == 1 && hd == 10 -> true; hm == 2 && hd == 20 -> true; hm == 2 && hd == 28 -> true; hm == 2 && hd == 30 -> true
+        hm == 3 && hd == 17 -> true; hm == 7 && hd == 13 -> true; hm == 7 && hd == 27 -> true; hm == 8 && hd == 15 -> true
+        hm == 9 && hd == 21 -> true; hm == 10 && hd == 1 -> true; hm == 10 && hd == 10 -> true; hm == 12 && hd == 18 -> true
         else -> false
     }
 }
 
 private fun computeHolidayDays(jy: Int, jm: Int): Set<Int> {
     val set = mutableSetOf<Int>()
-    val len = monthLen(jy, jm)
-    for (d in 1..len) if (isIranHoliday(jy, jm, d)) set.add(d)
+    for (d in 1..monthLen(jy, jm)) if (isIranHoliday(jy, jm, d)) set.add(d)
     return set
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun HomeScreen(
-    dao: NoteDao,
-    taskDao: TaskDao,
-    onOpenNote: (Long) -> Unit,
-    onNewNote: () -> Unit,
-    onOpenTask: (Long) -> Unit
-) {
+fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNewNote: () -> Unit, onOpenTask: (Long) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val notes by dao.observeNotes().collectAsState(initial = emptyList())
@@ -272,27 +155,16 @@ fun HomeScreen(
     var calJm by remember { mutableIntStateOf(tjm) }
     var calDay by remember { mutableIntStateOf(tjd) }
 
-    LaunchedEffect(tab) {
-        if (tab == 2) { val (jy, jm, jd) = FaDate.jalali(System.currentTimeMillis()); calJy = jy; calJm = jm; calDay = jd }
-    }
+    LaunchedEffect(tab) { if (tab == 2) { val (jy, jm, jd) = FaDate.jalali(System.currentTimeMillis()); calJy = jy; calJm = jm; calDay = jd } }
 
     val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            scope.launch(Dispatchers.IO) {
-                val (n, t) = FullBackup.importAll(context, dao, taskDao, uri)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, if (n + t > 0) "$n یادداشت و $t وظیفه بازیابی شد ✅" else "فایل پشتیبان معتبر نبود ❌", Toast.LENGTH_LONG).show()
-                }
-            }
+        if (uri != null) scope.launch(Dispatchers.IO) {
+            val (n, t) = FullBackup.importAll(context, dao, taskDao, uri)
+            withContext(Dispatchers.Main) { Toast.makeText(context, if (n + t > 0) "$n یادداشت و $t وظیفه بازیابی شد ✅" else "فایل پشتیبان معتبر نبود ❌", Toast.LENGTH_LONG).show() }
         }
     }
 
-    fun doBackup() {
-        scope.launch(Dispatchers.IO) {
-            val file = FullBackup.exportAll(context, dao, taskDao)
-            withContext(Dispatchers.Main) { shareBackupFile(context, file) }
-        }
-    }
+    fun doBackup() { scope.launch(Dispatchers.IO) { val file = FullBackup.exportAll(context, dao, taskDao); withContext(Dispatchers.Main) { shareBackupFile(context, file) } } }
 
     val filteredNotes = notes.filter { query.isBlank() || it.title.contains(query, true) || (!NoteLock.isLocked(it.body) && it.body.contains(query, true)) }
     val pinned = filteredNotes.filter { it.pinned }
@@ -384,16 +256,14 @@ fun HomeScreen(
                             }
                             Spacer(Modifier.height(6.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                LegendItem(HOLIDAY_RED, "تعطیل رسمی = دور قرمز"); LegendItem(Color(0xFF46A758), "وظیفه دور"); LegendItem(Saffron, "یادآور یادداشت")
+                                LegendItem(HOLIDAY_RED, "تعطیل رسمی"); LegendItem(Color(0xFF46A758), "وظیفه دور"); LegendItem(Saffron, "یادآور یادداشت")
                             }
                             Spacer(Modifier.height(4.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                                 WEEK_FA.forEach { w -> Text(w, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Saffron, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
                             }
                             Spacer(Modifier.height(4.dp))
-                            val leading = leadingBlanks(calJy, calJm)
-                            val len = monthLen(calJy, calJm)
-                            val cells = List(leading) { 0 } + (1..len).toList()
+                            val cells = List(leadingBlanks(calJy, calJm)) { 0 } + (1..monthLen(calJy, calJm)).toList()
                             cells.chunked(7).forEach { row ->
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                                     row.forEach { d ->
@@ -476,10 +346,10 @@ fun HomeScreen(
     if (showStats) StatsDialog(notes, counts.sumOf { it.count }) { showStats = false }
 
     if (showAddTask) AddTaskDialog(onDismiss = { showAddTask = false },
-        onSave = { title, due, pr, lead ->
+        onSave = { title, due, pr, leads ->
             scope.launch(Dispatchers.IO) {
                 val id = taskDao.insert(Task(title = title, dueDate = due, priority = pr))
-                if (due > 0) ReminderScheduler.scheduleMulti(context, id, title, due, true, setOf(lead))
+                if (due > 0) ReminderScheduler.scheduleMulti(context, id, title, due, true, leads)
             }
             showAddTask = false
             Toast.makeText(context, "وظیفه اضافه شد ✅", Toast.LENGTH_SHORT).show()
@@ -487,10 +357,10 @@ fun HomeScreen(
 
     if (newTaskOnDate > 0) {
         AddTaskDialog(initialDate = newTaskOnDate, onDismiss = { newTaskOnDate = 0L },
-            onSave = { title, due, pr, lead ->
+            onSave = { title, due, pr, leads ->
                 scope.launch(Dispatchers.IO) {
                     val id = taskDao.insert(Task(title = title, dueDate = due, priority = pr))
-                    if (due > 0) ReminderScheduler.scheduleMulti(context, id, title, due, true, setOf(lead))
+                    if (due > 0) ReminderScheduler.scheduleMulti(context, id, title, due, true, leads)
                 }
                 newTaskOnDate = 0L
                 Toast.makeText(context, "وظیفه برای ${FaDate.full(due)} اضافه شد ✅", Toast.LENGTH_SHORT).show()
@@ -532,30 +402,12 @@ fun HomeScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable private fun AddTaskDialog(initialDate: Long = 0L, onDismiss: () -> Unit, onSave: (String, Long, Priority, LeadTime) -> Unit) {
+@Composable private fun AddTaskDialog(initialDate: Long = 0L, onDismiss: () -> Unit, onSave: (String, Long, Priority, Set<LeadTime>) -> Unit) {
     var title by remember { mutableStateOf("") }
     var dueDate by remember { mutableLongStateOf(initialDate) }
-    var showCalendar by remember { mutableStateOf(false) }
-    var showTimePicker by remember { mutableStateOf(false) }
-    var pickedDate by remember { mutableLongStateOf(0L) }
+    var showPicker by remember { mutableStateOf(false) }
     var priority by remember { mutableStateOf(Priority.NORMAL) }
-    var leadTime by remember { mutableStateOf(LeadTime.HOUR_1) }
-
-    val initHour = remember(initialDate) {
-        if (initialDate > 0) {
-            val c = Calendar.getInstance()
-            c.timeInMillis = initialDate
-            c.get(Calendar.HOUR_OF_DAY)
-        } else 9
-    }
-    val initMinute = remember(initialDate) {
-        if (initialDate > 0) {
-            val c = Calendar.getInstance()
-            c.timeInMillis = initialDate
-            c.get(Calendar.MINUTE)
-        } else 0
-    }
+    var leads by remember { mutableStateOf(setOf(LeadTime.NONE, LeadTime.HOUR_1)) }
 
     AlertDialog(onDismissRequest = onDismiss,
         title = { Text("✅ وظیفه جدید", fontFamily = LalezarFont, fontSize = 20.sp) },
@@ -563,11 +415,11 @@ fun HomeScreen(
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(title, { title = it }, label = { Text("عنوان وظیفه") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(12.dp))
-                Surface(onClick = { showCalendar = true }, shape = RoundedCornerShape(12.dp), color = DeepGreenSoft, border = androidx.compose.foundation.BorderStroke(1.dp, LineGreen)) {
+                Surface(onClick = { showPicker = true }, shape = RoundedCornerShape(12.dp), color = DeepGreenSoft, border = androidx.compose.foundation.BorderStroke(1.dp, LineGreen)) {
                     Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("📅", fontSize = 18.sp); Spacer(Modifier.width(8.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("سررسید", fontSize = 10.sp, color = MutedGreenText)
+                            Text("سررسید + ساعت", fontSize = 10.sp, color = MutedGreenText)
                             Text(if (dueDate > 0) FaDate.full(dueDate) else "انتخاب نشده", fontSize = 13.sp, color = if (dueDate > 0) Saffron else PaperWhite, fontWeight = FontWeight.Bold)
                         }
                         if (dueDate > 0) { IconButton(onClick = { dueDate = 0L }, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Close, "حذف", tint = Brick, modifier = Modifier.size(14.dp)) } }
@@ -575,16 +427,16 @@ fun HomeScreen(
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    QuickDateChip("امروز ساعت ۲۱") { dueDate = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 21); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis }
-                    QuickDateChip("فردا ساعت ۱۲") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1); set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0) }.timeInMillis }
+                    QuickDateChip("امروز ۲۱:۰۰") { dueDate = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 21); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis }
+                    QuickDateChip("فردا ۱۲:۰۰") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1); set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0) }.timeInMillis }
                     QuickDateChip("هفته بعد") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 7); set(Calendar.HOUR_OF_DAY, 9); set(Calendar.MINUTE, 0) }.timeInMillis }
                 }
                 Spacer(Modifier.height(14.dp))
-                Text("🔔 هشدار قبل از موعد", fontFamily = LalezarFont, fontSize = 14.sp, color = Saffron)
+                Text("🔔 هشدارها (چند تا می‌تونی تیک بزنی)", fontFamily = LalezarFont, fontSize = 14.sp, color = Saffron)
                 Spacer(Modifier.height(6.dp))
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     LeadTime.values().forEach { lead ->
-                        LeadChip(lead.label, leadTime == lead) { leadTime = lead }
+                        LeadToggleChip(lead.label, leads.contains(lead)) { leads = if (leads.contains(lead)) leads - lead else leads + lead }
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -595,35 +447,11 @@ fun HomeScreen(
                 }
             }
         },
-        confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = { onSave(title.trim(), dueDate, priority, leadTime) }) { Text("افزودن", color = if (title.isNotBlank()) Saffron else Brick, fontWeight = FontWeight.Bold) } },
+        confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = { onSave(title.trim(), dueDate, priority, leads) }) { Text("افزودن", color = if (title.isNotBlank()) Saffron else Brick, fontWeight = FontWeight.Bold) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } })
 
-    if (showCalendar) {
-        ShamsiCalendarPickerDialog(
-            onConfirm = { pickedDate = it; showCalendar = false; showTimePicker = true },
-            onDismiss = { showCalendar = false })
-    }
-
-    if (showTimePicker) {
-        val timePickerState = rememberTimePickerState(initialHour = initHour, initialMinute = initMinute, is24Hour = true)
-        AlertDialog(
-            onDismissRequest = { showTimePicker = false },
-            title = { Text("⏰ انتخاب ساعت", fontFamily = LalezarFont, fontSize = 18.sp) },
-            text = { TimePicker(state = timePickerState) },
-            confirmButton = {
-                TextButton(onClick = {
-                    dueDate = pickedDate + timePickerState.hour.toLong() * 3600_000L + timePickerState.minute.toLong() * 60_000L
-                    showTimePicker = false
-                }) { Text("تأیید", color = Saffron, fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("انصراف") } }
-        )
-    }
-}
-
-@Composable private fun LeadChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(10.dp), color = if (selected) Saffron else DeepGreenSoft, border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) Saffron else LineGreen)) {
-        Text(label, Modifier.padding(horizontal = 10.dp, vertical = 6.dp), fontSize = 11.sp, color = if (selected) Ink else PaperWhite)
+    if (showPicker) {
+        YadavarDatePickerDialog(onConfirm = { dueDate = it; showPicker = false }, onDismiss = { showPicker = false })
     }
 }
 
