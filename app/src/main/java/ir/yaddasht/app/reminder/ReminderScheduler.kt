@@ -11,11 +11,13 @@ import android.media.RingtoneManager
 import android.os.Build
 
 enum class LeadTime(val minutes: Int, val label: String, val typeCode: Int) {
-    NONE(0, "بدون پیش‌یادآوری", 0),
+    NONE(0, "سر وقت", 0),
     MIN_10(10, "۱۰ دقیقه قبل", 1),
+    MIN_30(30, "۳۰ دقیقه قبل", 5),
     HOUR_1(60, "۱ ساعت قبل", 2),
     HOUR_3(180, "۳ ساعت قبل", 3),
-    DAY_1(1440, "۱ روز قبل", 4);
+    DAY_1(1440, "۱ روز قبل", 4),
+    WEEK_1(10080, "۱ هفته قبل", 6);
 }
 
 object ReminderScheduler {
@@ -56,14 +58,7 @@ object ReminderScheduler {
     fun schedule(context: Context, id: Long, title: String, timeMillis: Long, isTask: Boolean) =
         scheduleMulti(context, id, title, timeMillis, isTask, setOf(LeadTime.NONE))
 
-    fun scheduleMulti(
-        context: Context,
-        id: Long,
-        title: String,
-        timeMillis: Long,
-        isTask: Boolean = false,
-        leads: Set<LeadTime>
-    ) {
+    fun scheduleMulti(context: Context, id: Long, title: String, timeMillis: Long, isTask: Boolean = false, leads: Set<LeadTime>) {
         ensureChannel(context)
         val leadsToSchedule = if (leads.isEmpty()) setOf(LeadTime.NONE) else leads
         val now = System.currentTimeMillis()
@@ -77,11 +72,9 @@ object ReminderScheduler {
                 .putExtra(EXTRA_LEAD_TYPE, lead.typeCode)
                 .putExtra(EXTRA_LEAD_MINUTES, lead.minutes)
             val code = computeCode(id, isTask, lead.typeCode)
-            val pi = PendingIntent.getBroadcast(context, code, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            val pi = PendingIntent.getBroadcast(context, code, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             val am = context.getSystemService(AlarmManager::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pi)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pi)
             else am.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pi)
         }
     }
@@ -92,16 +85,13 @@ object ReminderScheduler {
     }
 
     fun cancel(context: Context, noteId: Long) = cancelAll(context, noteId, false)
-
     fun cancel(context: Context, id: Long, isTask: Boolean) = cancelAll(context, id, isTask)
 
     fun cancelAll(context: Context, id: Long, isTask: Boolean = false) {
         val am = context.getSystemService(AlarmManager::class.java)
         LeadTime.values().forEach { lead ->
             val code = computeCode(id, isTask, lead.typeCode)
-            val pi = PendingIntent.getBroadcast(context, code,
-                Intent(context, ReminderReceiver::class.java),
-                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)
+            val pi = PendingIntent.getBroadcast(context, code, Intent(context, ReminderReceiver::class.java), PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)
             if (pi != null) { am.cancel(pi); pi.cancel() }
         }
     }
