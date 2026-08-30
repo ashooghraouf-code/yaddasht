@@ -15,6 +15,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -41,7 +42,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CameraAlt
@@ -120,7 +120,6 @@ import ir.yaddasht.app.ui.theme.PaperWhite
 import ir.yaddasht.app.ui.theme.Saffron
 import ir.yaddasht.app.ui.theme.VazirFont
 import ir.yaddasht.app.ui.theme.paperColor
-import ir.yaddasht.app.util.AiAnalysisDialog
 import ir.yaddasht.app.util.AttachmentStore
 import ir.yaddasht.app.util.Checklist
 import ir.yaddasht.app.util.FaDate
@@ -596,7 +595,9 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     }
 
     if (showFocus && note != null && !isLocked) { FocusModeOverlay(body = note!!.body, onChange = { note = note?.copy(body = it) }, onExit = { showFocus = false }) }
-    if (showAi && note != null) { AiAnalysisDialog(title = note?.title ?: "", content = note?.body ?: "", isLocked = isLocked, onDismiss = { showAi = false }) }
+    
+    // AiAnalysisDialog موقتاً غیرفعال شده - اگه فایلش رو داری، این خط رو از کامنت دربیار:
+    // if (showAi && note != null) { AiAnalysisDialog(title = note?.title ?: "", content = note?.body ?: "", isLocked = isLocked, onDismiss = { showAi = false }) }
 }
 
 @Composable
