@@ -43,9 +43,11 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -93,7 +95,6 @@ import ir.yaddasht.app.ui.theme.DeepGreen
 import ir.yaddasht.app.ui.theme.DeepGreenSoft
 import ir.yaddasht.app.ui.theme.Ink
 import ir.yaddasht.app.ui.theme.InkSoft
-import androidx.compose.material3.LinearProgressIndicator
 import ir.yaddasht.app.ui.theme.LalezarFont
 import ir.yaddasht.app.ui.theme.LineGreen
 import ir.yaddasht.app.ui.theme.MutedGreenText
@@ -531,6 +532,7 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun AddTaskDialog(initialDate: Long = 0L, onDismiss: () -> Unit, onSave: (String, Long, Priority, LeadTime) -> Unit) {
     var title by remember { mutableStateOf("") }
     var dueDate by remember { mutableLongStateOf(initialDate) }
@@ -540,14 +542,14 @@ fun HomeScreen(
     var priority by remember { mutableStateOf(Priority.NORMAL) }
     var leadTime by remember { mutableStateOf(LeadTime.HOUR_1) }
 
-    val initialHour = remember(initialDate) {
+    val initHour = remember(initialDate) {
         if (initialDate > 0) {
             val c = Calendar.getInstance()
             c.timeInMillis = initialDate
             c.get(Calendar.HOUR_OF_DAY)
         } else 9
     }
-    val initialMinute = remember(initialDate) {
+    val initMinute = remember(initialDate) {
         if (initialDate > 0) {
             val c = Calendar.getInstance()
             c.timeInMillis = initialDate
@@ -573,8 +575,8 @@ fun HomeScreen(
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    QuickDateChip("امروز ۲۱:۰۰") { dueDate = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 21); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis }
-                    QuickDateChip("فردا ۱۲:۰۰") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1); set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0) }.timeInMillis }
+                    QuickDateChip("امروز ساعت ۲۱") { dueDate = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 21); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis }
+                    QuickDateChip("فردا ساعت ۱۲") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1); set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0) }.timeInMillis }
                     QuickDateChip("هفته بعد") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 7); set(Calendar.HOUR_OF_DAY, 9); set(Calendar.MINUTE, 0) }.timeInMillis }
                 }
                 Spacer(Modifier.height(14.dp))
@@ -603,11 +605,7 @@ fun HomeScreen(
     }
 
     if (showTimePicker) {
-        val timePickerState = rememberTimePickerState(
-            initialHour = initialHour,
-            initialMinute = initialMinute,
-            is24Hour = true
-        )
+        val timePickerState = rememberTimePickerState(initialHour = initHour, initialMinute = initMinute, is24Hour = true)
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
             title = { Text("⏰ انتخاب ساعت", fontFamily = LalezarFont, fontSize = 18.sp) },
