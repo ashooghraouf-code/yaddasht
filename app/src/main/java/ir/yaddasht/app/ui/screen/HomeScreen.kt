@@ -103,6 +103,7 @@ import ir.yaddasht.app.util.FaDate
 import ir.yaddasht.app.util.FullBackup
 import ir.yaddasht.app.util.NoteLock
 import ir.yaddasht.app.util.fa
+import ir.yaddasht.app.util.faDigits
 import ir.yaddasht.app.util.relativeTimeFa
 import ir.yaddasht.app.util.shareBackupFile
 import kotlinx.coroutines.CoroutineScope
@@ -176,9 +177,9 @@ private fun hijriFullFa(millis: Long): String {
 private fun fullDateTime(millis: Long): String {
     val (jy, jm, jd) = FaDate.jalali(millis)
     val c = Calendar.getInstance(); c.timeInMillis = millis
-    val h = c.get(Calendar.HOUR_OF_DAY).toString().padStart(2, '0')
-    val m = c.get(Calendar.MINUTE).toString().padStart(2, '0')
-    return "${jd.fa()} ${FaDate.monthName(jm)} ${jy.fa()} – ${h.fa()}:${m.fa()}"
+    val h = c.get(Calendar.HOUR_OF_DAY).toString().padStart(2, '0').faDigits()
+    val m = c.get(Calendar.MINUTE).toString().padStart(2, '0').faDigits()
+    return "${jd.fa()} ${FaDate.monthName(jm)} ${jy.fa()} – $h:$m"
 }
 
 private fun isIranHoliday(jy: Int, jm: Int, jd: Int): Boolean {
@@ -535,15 +536,6 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
         dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } })
     if (showCalendar) {
         YadavarDatePickerDialog(onConfirm = { dueDate = it; showCalendar = false }, onDismiss = { showCalendar = false })
-    }
-}
-
-@Composable private fun LeadToggleChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(10.dp), color = if (selected) Saffron else DeepGreenSoft, border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) Saffron else LineGreen)) {
-        Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (selected) { Text("✓ ", fontSize = 11.sp, color = Ink, fontWeight = FontWeight.Bold) }
-            Text(label, fontSize = 11.sp, color = if (selected) Ink else PaperWhite)
-        }
     }
 }
 
