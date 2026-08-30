@@ -81,6 +81,14 @@ private fun iranHijri(millis: Long): Triple<Int, Int, Int> {
     return Triple(cal.get(android.icu.util.Calendar.MONTH) + 1, cal.get(android.icu.util.Calendar.DAY_OF_MONTH), cal.get(android.icu.util.Calendar.YEAR))
 }
 
+private fun fullDateTime(millis: Long): String {
+    val (jy, jm, jd) = FaDate.jalali(millis)
+    val c = Calendar.getInstance(); c.timeInMillis = millis
+    val h = c.get(Calendar.HOUR_OF_DAY).toString().padStart(2, '0')
+    val m = c.get(Calendar.MINUTE).toString().padStart(2, '0')
+    return "${jd.fa()} ${FaDate.monthName(jm)} – ساعت ${h.fa()}:${m.fa()}"
+}
+
 private fun taskTint(due: Long, completed: Boolean): Color {
     if (completed) return Color(0xFF5E8077)
     if (due <= 0L) return Color(0xFF888888)
@@ -95,13 +103,13 @@ private fun gregorianFullFa(millis: Long): String {
     val c = Calendar.getInstance(); c.timeInMillis = millis
     val d = c.get(Calendar.DAY_OF_MONTH); val m = c.get(Calendar.MONTH) + 1; val y = c.get(Calendar.YEAR)
     val names = arrayOf("ژانویه", "فوریه", "مارس", "آوریل", "مه", "ژوئن", "ژوئیه", "اوت", "سپتامبر", "اکتبر", "نوامبر", "دسامبر")
-    return "${d.fa()} ${names.getOrElse(m - 1) { "" }} ${y.fa()} (${d.fa()}/${m.fa()}/${y.fa()})"
+    return "${d.fa()} ${names.getOrElse(m - 1) { "" }} ${y.fa()}"
 }
 
 private fun hijriFullFa(millis: Long): String {
     val (m, d, y) = iranHijri(millis)
     val names = arrayOf("محرم", "صفر", "ربیع‌الاول", "ربیع‌الثانی", "جمادی‌الاول", "جمادی‌الثانی", "رجب", "شعبان", "رمضان", "شوال", "ذی‌القعده", "ذی‌الحجه")
-    return "${d.fa()} ${names.getOrElse(m - 1) { "" }} ${y.fa()} (${d.fa()}/${m.fa()}/${y.fa()})"
+    return "${d.fa()} ${names.getOrElse(m - 1) { "" }} ${y.fa()}"
 }
 
 private fun isIranHoliday(jy: Int, jm: Int, jd: Int): Boolean {
@@ -147,7 +155,8 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
     var showStats by remember { mutableStateOf(false) }
     var hideMemory by rememberSaveable { mutableStateOf(false) }
-    var taskDialogMode by remember { mutableStateOf<TaskDialogMode>(TaskDialogMode.Closed) }
+    var showAddTask by remember { mutableStateOf(false) }
+    var editTask by remember { mutableStateOf<Task?>(null) }
     var newTaskOnDate by remember { mutableLongStateOf(0L) }
 
     val (tjy, tjm, tjd) = FaDate.jalali(System.currentTimeMillis())
@@ -183,7 +192,7 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
         floatingActionButton = {
             when (tab) {
                 0 -> NewNoteFab(onNewNote)
-                1 -> ExtendedFloatingActionButton(onClick = { taskDialogMode = TaskDialogMode.New }, containerColor = Saffron, contentColor = Ink) {
+                1 -> ExtendedFloatingActionButton(onClick = { newTaskOnDate = 0L; showAddTask = true }, containerColor = Saffron, contentColor = Ink) {
                     Icon(Icons.Filled.Add, "جدید"); Spacer(Modifier.width(8.dp)); Text("وظیفه جدید", fontFamily = LalezarFont, fontSize = 17.sp)
                 }
             }
@@ -233,443 +242,4 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                             filteredTasks.forEach { task ->
                                 item {
                                     TaskCard(task,
-                                        onClick = { taskDialogMode = TaskDialogMode.Edit(task) },
-                                        onToggle = { scope.launch(Dispatchers.IO) { taskDao.update(task.copy(isCompleted = !task.isCompleted)) } },
-                                        onDelete = { scope.launch(Dispatchers.IO) {
-                                            ReminderScheduler.cancelAll(context, task.id, true)
-                                            taskDao.deleteById(task.id)
-                                        } })
-                                    Spacer(Modifier.height(10.dp))
-                                }
-                            }
-                        }
-                    }
-                    else -> {
-                        val holidayDays = remember(calJy, calJm) { computeHolidayDays(calJy, calJm) }
-                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp)) {
-                            Spacer(Modifier.height(8.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = { if (calJm > 1) calJm-- else { calJm = 12; calJy-- } }) { Icon(Icons.Filled.ChevronRight, "قبل", tint = Saffron) }
-                                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("${FaDate.monthName(calJm)} ${calJy.fa()}", fontFamily = LalezarFont, fontSize = 20.sp, color = PaperWhite)
-                                    val infoMillis = jalaliMillis(calJy, calJm, calDay, 12)
-                                    Text("🌙 قمری: ${hijriFullFa(infoMillis)}", fontSize = 10.sp, color = MutedGreenText)
-                                    Text("🌍 میلادی: ${gregorianFullFa(infoMillis)}", fontSize = 10.sp, color = MutedGreenText)
-                                }
-                                IconButton(onClick = { if (calJm < 12) calJm++ else { calJm = 1; calJy++ } }) { Icon(Icons.Filled.ChevronLeft, "بعد", tint = Saffron) }
-                            }
-                            Spacer(Modifier.height(6.dp))
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                LegendItem(HOLIDAY_RED, "تعطیل رسمی"); LegendItem(Color(0xFF46A758), "وظیفه دور"); LegendItem(Saffron, "یادآور یادداشت")
-                            }
-                            Spacer(Modifier.height(4.dp))
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                                WEEK_FA.forEach { w -> Text(w, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Saffron, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
-                            }
-                            Spacer(Modifier.height(4.dp))
-                            val cells = List(leadingBlanks(calJy, calJm)) { 0 } + (1..monthLen(calJy, calJm)).toList()
-                            cells.chunked(7).forEach { row ->
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    row.forEach { d ->
-                                        if (d == 0) Box(Modifier.weight(1f))
-                                        else {
-                                            val dayItems = itemsByDay[Triple(calJy, calJm, d)].orEmpty()
-                                            val isToday = calJy == tjy && calJm == tjm && d == tjd
-                                            val isSel = calDay == d
-                                            val isHoliday = holidayDays.contains(d)
-                                            Box(Modifier.weight(1f).height(72.dp).clip(RoundedCornerShape(12.dp))
-                                                .background(if (isSel) DeepGreenSoft else Color.Transparent)
-                                                .border(if (isHoliday) 2.dp else if (isToday) 1.5.dp else 0.dp, if (isHoliday) HOLIDAY_RED else Saffron, RoundedCornerShape(12.dp))
-                                                .combinedClickable(onClick = { calDay = d }, onLongClick = { calDay = d; newTaskOnDate = jalaliMillis(calJy, calJm, d, 0) })
-                                                .padding(3.dp)) {
-                                                Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-                                                    Text(d.fa(), fontSize = 12.sp, color = if (isHoliday) HOLIDAY_RED else if (isToday) Saffron else PaperWhite, fontWeight = if (isToday || isSel || isHoliday) FontWeight.Bold else FontWeight.Normal)
-                                                    val taskItems = dayItems.filter { it.first.startsWith("task:") }
-                                                    val noteItems = dayItems.filter { it.first.startsWith("note:") }
-                                                    taskItems.take(2).forEach { item -> Box(Modifier.fillMaxWidth().height(6.dp).padding(top = 2.dp).clip(RoundedCornerShape(3.dp)).background(taskTint(item.second, item.third))) }
-                                                    noteItems.take((2 - taskItems.size.coerceAtMost(2)).coerceAtLeast(0)).forEach { _ -> Box(Modifier.fillMaxWidth().height(6.dp).padding(top = 2.dp).clip(RoundedCornerShape(3.dp)).background(Saffron)) }
-                                                    if (dayItems.size > 2) Text("+${(dayItems.size - 2).fa()}", fontSize = 8.sp, color = MutedGreenText)
-                                                }
-                                                Box(Modifier.align(Alignment.BottomEnd).size(18.dp).clip(CircleShape).background(Saffron)
-                                                    .clickable { calDay = d; newTaskOnDate = jalaliMillis(calJy, calJm, d, 0) }, contentAlignment = Alignment.Center) {
-                                                    Text("+", fontSize = 12.sp, color = Ink, fontWeight = FontWeight.Bold)
-                                                }
-                                            }
-                                        }
-                                    }
-                                    repeat(7 - row.size) { Box(Modifier.weight(1f)) }
-                                }
-                                Spacer(Modifier.height(3.dp))
-                            }
-                            Spacer(Modifier.height(10.dp))
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Text("📍 ${calDay.fa()} ${FaDate.monthName(calJm)}", fontFamily = LalezarFont, fontSize = 16.sp, color = Saffron, modifier = Modifier.weight(1f))
-                                Surface(onClick = { newTaskOnDate = jalaliMillis(calJy, calJm, calDay, 0) }, shape = RoundedCornerShape(10.dp), color = Saffron) {
-                                    Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Filled.Add, null, tint = Ink, modifier = Modifier.size(14.dp)); Spacer(Modifier.width(4.dp))
-                                        Text("وظیفه جدید", fontSize = 11.sp, color = Ink, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                            Spacer(Modifier.height(6.dp))
-                            val selItems = itemsByDay[Triple(calJy, calJm, calDay)].orEmpty()
-                            if (selItems.isEmpty()) Text("برای این روز یادآور یا وظیفه‌ای نیست 🌤️", fontSize = 12.sp, color = MutedGreenText)
-                            selItems.forEach { item ->
-                                if (item.first.startsWith("note:")) {
-                                    val id = item.first.removePrefix("note:").toLongOrNull() ?: -1L
-                                    val note = notes.find { it.id == id }
-                                    if (note != null) {
-                                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(DeepGreenSoft)
-                                            .border(1.5.dp, Saffron.copy(alpha = .75f), RoundedCornerShape(18.dp)).clickable { onOpenNote(note.id) }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            Text("📝", fontSize = 18.sp); Spacer(Modifier.width(8.dp))
-                                            Column(Modifier.weight(1f)) {
-                                                Text(note.title.ifBlank { "یادداشت" }, fontFamily = VazirFont, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = PaperWhite)
-                                                Text("⏰ " + FaDate.full(note.reminderAt), fontSize = 11.sp, color = Saffron)
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    val id = item.first.removePrefix("task:").toLongOrNull() ?: -1L
-                                    val task = tasks.find { it.id == id }
-                                    if (task != null) {
-                                        TaskCard(task,
-                                            onClick = { taskDialogMode = TaskDialogMode.Edit(task) },
-                                            onToggle = { scope.launch(Dispatchers.IO) { taskDao.update(task.copy(isCompleted = !task.isCompleted)) } },
-                                            onDelete = { scope.launch(Dispatchers.IO) {
-                                                ReminderScheduler.cancelAll(context, task.id, true)
-                                                taskDao.deleteById(task.id)
-                                            } })
-                                    }
-                                }
-                                Spacer(Modifier.height(8.dp))
-                            }
-                            Spacer(Modifier.height(120.dp))
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (showStats) StatsDialog(notes, counts.sumOf { it.count }) { showStats = false }
-
-    when (val mode = taskDialogMode) {
-        is TaskDialogMode.New -> {
-            val initDate = if (newTaskOnDate > 0) newTaskOnDate else 0L
-            TaskEditDialog(
-                initialTask = null,
-                initialDate = initDate,
-                onDismiss = { taskDialogMode = TaskDialogMode.Closed; newTaskOnDate = 0L },
-                onSave = { title, due, pr, leads ->
-                    scope.launch(Dispatchers.IO) {
-                        val id = taskDao.insert(Task(title = title, dueDate = due, priority = pr))
-                        if (due > 0) ReminderScheduler.scheduleMulti(context, id, title, due, true, leads)
-                        else ReminderScheduler.cancelAll(context, id, true)
-                    }
-                    taskDialogMode = TaskDialogMode.Closed
-                    newTaskOnDate = 0L
-                    Toast.makeText(context, "وظیفه اضافه شد ✅", Toast.LENGTH_SHORT).show()
-                },
-                onDelete = null
-            )
-        }
-        is TaskDialogMode.Edit -> {
-            TaskEditDialog(
-                initialTask = mode.task,
-                initialDate = 0L,
-                onDismiss = { taskDialogMode = TaskDialogMode.Closed },
-                onSave = { title, due, pr, leads ->
-                    scope.launch(Dispatchers.IO) {
-                        ReminderScheduler.cancelAll(context, mode.task.id, true)
-                        taskDao.update(mode.task.copy(title = title, dueDate = due, priority = pr))
-                        if (due > 0) ReminderScheduler.scheduleMulti(context, mode.task.id, title, due, true, leads)
-                    }
-                    taskDialogMode = TaskDialogMode.Closed
-                    Toast.makeText(context, "وظیفه به‌روز شد ✅", Toast.LENGTH_SHORT).show()
-                },
-                onDelete = {
-                    scope.launch(Dispatchers.IO) {
-                        ReminderScheduler.cancelAll(context, mode.task.id, true)
-                        taskDao.deleteById(mode.task.id)
-                    }
-                    taskDialogMode = TaskDialogMode.Closed
-                    Toast.makeText(context, "وظیفه حذف شد 🗑️", Toast.LENGTH_SHORT).show()
-                }
-            )
-        }
-        TaskDialogMode.Closed -> Unit
-    }
-
-    noteToDelete?.let { note ->
-        AlertDialog(onDismissRequest = { noteToDelete = null },
-            title = { Text("حذف یادداشت؟", fontFamily = LalezarFont, fontSize = 20.sp) },
-            text = { Text("«${note.title.ifBlank { "بدون عنوان" }}» همراه با ضمیمه‌هایش برای همیشه حذف می‌شود.") },
-            confirmButton = { TextButton(onClick = { noteToDelete = null; scope.launch(Dispatchers.IO) { val atts = dao.attachmentsByNote(note.id); dao.deleteById(note.id); atts.forEach { File(it.filePath).delete() } } }) { Text("حذف", color = Brick, fontWeight = FontWeight.Bold) } },
-            dismissButton = { TextButton(onClick = { noteToDelete = null }) { Text("انصراف") } })
-    }
-}
-
-private sealed class TaskDialogMode {
-    object Closed : TaskDialogMode()
-    object New : TaskDialogMode()
-    data class Edit(val task: Task) : TaskDialogMode()
-}
-
-@Composable private fun LegendItem(color: Color, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(10.dp).clip(RoundedCornerShape(2.dp)).background(color)); Spacer(Modifier.width(4.dp))
-        Text(label, fontSize = 9.sp, color = MutedGreenText)
-    }
-}
-
-@Composable private fun TaskCard(task: Task, onClick: () -> Unit, onToggle: () -> Unit, onDelete: () -> Unit) {
-    val tint = taskTint(task.dueDate, task.isCompleted)
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(DeepGreenSoft)
-        .border(1.5.dp, tint.copy(alpha = .75f), RoundedCornerShape(18.dp)).clickable { onClick() }.padding(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(checked = task.isCompleted, onCheckedChange = { onToggle() }, colors = CheckboxDefaults.colors(checkedColor = tint, checkmarkColor = DeepGreen))
-            Spacer(Modifier.width(6.dp))
-            Column(Modifier.weight(1f)) {
-                Text(task.title, fontFamily = VazirFont, fontWeight = FontWeight.Bold, fontSize = 14.sp,
-                    color = if (task.isCompleted) MutedGreenText else PaperWhite,
-                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null)
-                if (task.dueDate > 0) { Spacer(Modifier.height(2.dp)); Text("📅 " + FaDate.full(task.dueDate), fontSize = 11.sp, color = tint, fontWeight = FontWeight.Bold) }
-                Text("✏️ برای ویرایش ضربه بزن", fontSize = 9.sp, color = MutedGreenText.copy(alpha = .7f))
-            }
-            if (task.priority == Priority.HIGH && !task.isCompleted) Text("🔴", fontSize = 12.sp)
-            IconButton(onClick = onDelete, modifier = Modifier.size(30.dp)) { Icon(Icons.Filled.Close, "حذف", tint = Brick, modifier = Modifier.size(16.dp)) }
-        }
-    }
-}
-
-@Composable private fun TaskEditDialog(
-    initialTask: Task?,
-    initialDate: Long,
-    onDismiss: () -> Unit,
-    onSave: (String, Long, Priority, Set<LeadTime>) -> Unit,
-    onDelete: (() -> Unit)?
-) {
-    val isEdit = initialTask != null
-    var title by remember { mutableStateOf(initialTask?.title ?: "") }
-    var dueDate by remember { mutableLongStateOf(initialTask?.dueDate ?: initialDate) }
-    var showPicker by remember { mutableStateOf(false) }
-    var priority by remember { mutableStateOf(initialTask?.priority ?: Priority.NORMAL) }
-    var leads by remember { mutableStateOf<Set<LeadTime>>(setOf(LeadTime.NONE, LeadTime.HOUR_1)) }
-    var showDeleteConfirm by remember { mutableStateOf(false) }
-
-    AlertDialog(onDismissRequest = onDismiss,
-        title = { Text(if (isEdit) "✏️ ویرایش وظیفه" else "✅ وظیفه جدید", fontFamily = LalezarFont, fontSize = 20.sp) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(title, { title = it }, label = { Text("عنوان وظیفه") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(12.dp))
-                Surface(onClick = { showPicker = true }, shape = RoundedCornerShape(12.dp), color = DeepGreenSoft, border = androidx.compose.foundation.BorderStroke(1.dp, LineGreen)) {
-                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("📅", fontSize = 18.sp); Spacer(Modifier.width(8.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text("سررسید + ساعت", fontSize = 10.sp, color = MutedGreenText)
-                            Text(if (dueDate > 0) FaDate.full(dueDate) else "انتخاب نشده", fontSize = 13.sp, color = if (dueDate > 0) Saffron else PaperWhite, fontWeight = FontWeight.Bold)
-                        }
-                        if (dueDate > 0) { IconButton(onClick = { dueDate = 0L }, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.Close, "حذف", tint = Brick, modifier = Modifier.size(14.dp)) } }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    QuickDateChip("امروز ۲۱:۰۰") { dueDate = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 21); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis }
-                    QuickDateChip("فردا ۱۲:۰۰") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1); set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0) }.timeInMillis }
-                    QuickDateChip("هفته بعد") { dueDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 7); set(Calendar.HOUR_OF_DAY, 9); set(Calendar.MINUTE, 0) }.timeInMillis }
-                }
-                Spacer(Modifier.height(14.dp))
-                Text("🔔 هشدارها", fontFamily = LalezarFont, fontSize = 14.sp, color = Saffron)
-                Spacer(Modifier.height(6.dp))
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    LeadTime.values().forEach { lead ->
-                        LeadToggleChip(lead.label, leads.contains(lead)) { leads = if (leads.contains(lead)) leads - lead else leads + lead }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    DueChip("🔴 مهم", priority == Priority.HIGH) { priority = Priority.HIGH }
-                    DueChip("🟡 عادی", priority == Priority.NORMAL) { priority = Priority.NORMAL }
-                    DueChip("🟢 کم", priority == Priority.LOW) { priority = Priority.LOW }
-                }
-                if (isEdit && onDelete != null) {
-                    Spacer(Modifier.height(16.dp))
-                    Surface(onClick = { showDeleteConfirm = true }, shape = RoundedCornerShape(12.dp), color = Brick.copy(alpha = .15f), border = androidx.compose.foundation.BorderStroke(1.dp, Brick)) {
-                        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                            Icon(Icons.Filled.Delete, null, tint = Brick, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("حذف این وظیفه", color = Brick, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(enabled = title.isNotBlank(), onClick = { onSave(title.trim(), dueDate, priority, leads) }) {
-                Text(if (isEdit) "ذخیره" else "افزودن", color = if (title.isNotBlank()) Saffron else Brick, fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } })
-
-    if (showPicker) {
-        YadavarDatePickerDialog(onConfirm = { dueDate = it; showPicker = false }, onDismiss = { showPicker = false })
-    }
-
-    if (showDeleteConfirm && onDelete != null) {
-        AlertDialog(onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("حذف وظیفه؟", fontFamily = LalezarFont, fontSize = 20.sp) },
-            text = { Text("آیا مطمئنی که می‌خوای «${title.ifBlank { "بدون عنوان" }}» را حذف کنی؟") },
-            confirmButton = { TextButton(onClick = { showDeleteConfirm = false; onDelete() }) { Text("حذف", color = Brick, fontWeight = FontWeight.Bold) } },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("انصراف") } })
-    }
-}
-
-@Composable private fun QuickDateChip(label: String, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(10.dp), color = DeepGreenSoft, border = androidx.compose.foundation.BorderStroke(1.dp, LineGreen)) {
-        Text(label, Modifier.padding(horizontal = 10.dp, vertical = 6.dp), fontSize = 11.sp, color = PaperWhite)
-    }
-}
-
-@Composable private fun DueChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(10.dp), color = if (selected) Saffron else DeepGreenSoft, border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) Saffron else LineGreen)) {
-        Text(label, Modifier.padding(horizontal = 10.dp, vertical = 6.dp), fontSize = 11.sp, color = if (selected) Ink else PaperWhite)
-    }
-}
-
-@Composable private fun EmptyTasksState() {
-    Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Box(Modifier.size(110.dp).clip(CircleShape).border(2.dp, Saffron.copy(alpha = .5f), CircleShape), contentAlignment = Alignment.Center) { Text("✅", fontSize = 46.sp) }
-        Spacer(Modifier.height(20.dp)); Text("لیست وظایفت خالی است", fontFamily = LalezarFont, fontSize = 26.sp, color = PaperWhite)
-        Spacer(Modifier.height(8.dp)); Text("با دکمه «وظیفه جدید» اولین کار را اضافه کن 🎯", fontSize = 13.sp, color = MutedGreenText, textAlign = TextAlign.Center)
-    }
-}
-
-private fun pickMemory(notes: List<Note>): Note? {
-    val candidates = notes.filterNot { NoteLock.isLocked(it.body) }
-    val now = Calendar.getInstance()
-    val sameDayPastYears = candidates.filter {
-        val c = Calendar.getInstance().apply { timeInMillis = it.createdAt }
-        c.get(Calendar.MONTH) == now.get(Calendar.MONTH) && c.get(Calendar.DAY_OF_MONTH) == now.get(Calendar.DAY_OF_MONTH) && c.get(Calendar.YEAR) < now.get(Calendar.YEAR)
-    }
-    val oldNotes = candidates.filter { System.currentTimeMillis() - it.createdAt > 45L * 24 * 3600 * 1000 }
-    return sameDayPastYears.ifEmpty { oldNotes }.randomOrNull()
-}
-
-private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
-    scope.launch(Dispatchers.IO) { dao.update(note.copy(pinned = !note.pinned, updatedAt = System.currentTimeMillis())) }
-}
-
-@Composable private fun HomeHeader(count: Int, onStats: () -> Unit, onBackup: () -> Unit, onRestore: () -> Unit) {
-    Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(52.dp).clip(CircleShape).background(Saffron), contentAlignment = Alignment.Center) { Text("ی", fontFamily = LalezarFont, fontSize = 30.sp, color = Ink) }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text("چراغ راه", fontFamily = LalezarFont, fontSize = 38.sp, color = PaperWhite)
-                Text("بدون محدودیت • ${count.fa()} یادداشت • 🤝 تکان بده = جدید", fontSize = 10.sp, color = Saffron)
-            }
-            IconButton(onClick = onBackup) { Icon(Icons.Filled.FileUpload, "پشتیبان کامل", tint = MutedGreenText) }
-            IconButton(onClick = onRestore) { Icon(Icons.Filled.FileDownload, "بازیابی کامل", tint = MutedGreenText) }
-            IconButton(onClick = onStats) { Icon(Icons.Filled.BarChart, "آمار", tint = MutedGreenText) }
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(FaDate.full(System.currentTimeMillis()), fontSize = 13.sp, color = MutedGreenText, modifier = Modifier.padding(start = 2.dp))
-    }
-}
-
-@Composable private fun StatsDialog(notes: List<Note>, attachTotal: Int, onDismiss: () -> Unit) {
-    val unlocked = notes.filterNot { NoteLock.isLocked(it.body) }
-    val totalWords = unlocked.sumOf { it.body.split(Regex("\\s+")).count(String::isNotBlank) }
-    val thisWeek = notes.count { System.currentTimeMillis() - it.updatedAt < 7L * 24 * 3600 * 1000 }
-    AlertDialog(onDismissRequest = onDismiss,
-        title = { Text("📊 آمار دفترچه", fontFamily = LalezarFont, fontSize = 20.sp) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatRow("کل یادداشت‌ها", notes.size.fa()); StatRow("کلمه‌های نوشته‌شده", totalWords.fa())
-                StatRow("ویرایش در این هفته", thisWeek.fa()); StatRow("ضمیمه‌ها", attachTotal.fa())
-                StatRow("سنجاق‌شده", notes.count { it.pinned }.fa()); StatRow("قفل‌شده 🔒", notes.count { NoteLock.isLocked(it.body) }.fa())
-                StatRow("چک‌لیست فعال", notes.count { Checklist.isChecklist(it.body) }.fa())
-            }
-        },
-        confirmButton = { TextButton(onDismiss) { Text("بستن", color = Saffron, fontWeight = FontWeight.Bold) } })
-}
-
-@Composable private fun StatRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, fontSize = 13.sp, color = MutedGreenText, modifier = Modifier.weight(1f))
-        Text(value, fontFamily = LalezarFont, fontSize = 18.sp, color = Saffron)
-    }
-}
-
-@Composable private fun SearchBox(query: String, onQueryChange: (String) -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(DeepGreenSoft).border(1.dp, LineGreen, RoundedCornerShape(16.dp)).padding(horizontal = 14.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Default.Search, null, tint = Saffron); Spacer(Modifier.width(10.dp))
-        TextField(value = query, onValueChange = onQueryChange, placeholder = { Text("جستجو در یادداشت‌ها و وظایف…", color = MutedGreenText) },
-            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
-            textStyle = androidx.compose.ui.text.TextStyle(color = PaperWhite, fontSize = 14.sp), singleLine = true, modifier = Modifier.fillMaxWidth())
-    }
-}
-
-@Composable private fun PaperDots() {
-    Canvas(Modifier.fillMaxSize()) {
-        val step = 30.dp.toPx(); var y = step / 2; var row = 0
-        while (y < size.height) {
-            var x = if (row % 2 == 0) step / 2 else step
-            while (x < size.width) { drawCircle(Saffron.copy(alpha = 0.07f), radius = 1.1.dp.toPx(), center = androidx.compose.ui.geometry.Offset(x, y)); x += step }
-            y += step; row++
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable private fun NoteCard(note: Note, attachCount: Int, onClick: () -> Unit, onLongClick: () -> Unit, onDelete: () -> Unit) {
-    val angle = remember(note.id) { ((note.id % 3) - 1) * 1.3f }
-    val locked = NoteLock.isLocked(note.body)
-    val checklist = Checklist.isChecklist(note.body)
-    val hasReminder = note.reminderAt > System.currentTimeMillis()
-    Box(Modifier.padding(5.dp).fillMaxWidth().graphicsLayer { rotationZ = angle; shadowElevation = 9f; shape = RoundedCornerShape(18.dp); clip = true }) {
-        Column(Modifier.clip(RoundedCornerShape(18.dp)).background(paperColor(note.color)).combinedClickable(onClick = onClick, onLongClick = onLongClick).padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text((if (note.pinned) "📌 " else "") + note.title.ifBlank { "بدون عنوان" }, fontFamily = LalezarFont, fontSize = 17.sp, color = Ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Icon(Icons.Filled.Close, "حذف", tint = InkSoft.copy(alpha = .55f), modifier = Modifier.size(26.dp).clip(CircleShape).clickable(onClick = onDelete).padding(5.dp))
-            }
-            Spacer(Modifier.height(6.dp))
-            when {
-                locked -> Text("🔒 محتوای محرمانه", fontSize = 12.sp, color = InkSoft)
-                checklist -> {
-                    val (done, total) = Checklist.progress(note.body)
-                    Text("✅ ${done.fa()} از ${total.fa()} انجام شد", fontSize = 12.sp, color = Ink, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(4.dp))
-                    Text(note.body.lines().take(3).joinToString("\n") { it.removePrefix("☐ ").removePrefix("☑ ") }, fontSize = 11.5.sp, color = InkSoft, maxLines = 3, lineHeight = 18.sp)
-                }
-                else -> if (note.body.isNotBlank()) Text(note.body, fontFamily = VazirFont, fontSize = 12.5.sp, color = InkSoft, maxLines = 4, overflow = TextOverflow.Ellipsis, lineHeight = 20.sp)
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (attachCount > 0) Text("📎 ${attachCount.fa()}", fontSize = 11.sp, color = InkSoft)
-                if (hasReminder) Text("   ⏰", fontSize = 11.sp)
-                Spacer(Modifier.weight(1f))
-                Text(relativeTimeFa(note.updatedAt), fontSize = 10.sp, color = InkSoft.copy(alpha = .8f))
-            }
-        }
-    }
-}
-
-@Composable private fun SectionLabel(text: String) { Text(text, fontFamily = LalezarFont, fontSize = 16.sp, color = Saffron, modifier = Modifier.padding(start = 6.dp, top = 8.dp, bottom = 2.dp)) }
-
-@Composable private fun NewNoteFab(onNewNote: () -> Unit) {
-    ExtendedFloatingActionButton(onClick = onNewNote, containerColor = Saffron, contentColor = Ink) {
-        Icon(Icons.Filled.Add, "جدید"); Spacer(Modifier.width(8.dp)); Text("یادداشت جدید", fontFamily = LalezarFont, fontSize = 17.sp)
-    }
-}
-
-@Composable private fun EmptyState() {
-    Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Box(Modifier.size(110.dp).clip(CircleShape).border(2.dp, Saffron.copy(alpha = .5f), CircleShape), contentAlignment = Alignment.Center) { Text("✍️", fontSize = 46.sp) }
-        Spacer(Modifier.height(20.dp)); Text("دفترچه‌ات خالی است", fontFamily = LalezarFont, fontSize = 26.sp, color = PaperWhite)
-        Spacer(Modifier.height(8.dp)); Text("یادداشت بنویس، صدا ضبط کن، نقاشی بکش، چک‌لیست بساز و رویشان قفل بگذار ✨", fontSize = 13.sp, color = MutedGreenText, textAlign = TextAlign.Center)
-    }
-}
-
-@Composable private fun CenterMessage(text: String) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(text, fontSize = 15.sp, color = MutedGreenText) } }
+                                        onClick = { editTask =
