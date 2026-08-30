@@ -4,7 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -88,7 +87,7 @@ private fun pdMonthLen(jy: Int, jm: Int): Int {
 }
 
 private fun pdHijri(millis: Long): Triple<Int, Int, Int> {
-    val cal = android.icu.util.IslamicCalendar(); cal.timeInMillis = millis
+    val cal = android.icu.util.IslamicCalendar(); cal.timeInMillis = millis + PD_MS
     return Triple(cal.get(android.icu.util.Calendar.MONTH) + 1, cal.get(android.icu.util.Calendar.DAY_OF_MONTH), cal.get(android.icu.util.Calendar.YEAR))
 }
 
@@ -118,65 +117,4 @@ fun YadavarDatePickerDialog(onConfirm: (Long) -> Unit, onDismiss: () -> Unit) {
     var calDay by remember { mutableIntStateOf(tjd) }
     var showTime by remember { mutableStateOf(false) }
 
-    val selMillis = pdJalaliMillis(calJy, calJm, calDay, 12)
-    val (hm, hd, hy) = pdHijri(selMillis)
-    val (gm, gd, gy) = pdGreg(selMillis)
-
-    AlertDialog(onDismissRequest = onDismiss,
-        title = { Text("📅 تقویم یادآور", fontFamily = LalezarFont, fontSize = 20.sp) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { if (calJm > 1) calJm-- else { calJm = 12; calJy-- } }) { Icon(Icons.Filled.ChevronRight, "قبل", tint = Saffron) }
-                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("${FaDate.monthName(calJm)} ${calJy.fa()}", fontFamily = LalezarFont, fontSize = 18.sp, color = PaperWhite)
-                        Text("🌙 ${hd.fa()} ${PD_HIJRI.getOrElse(hm - 1) { "" }} ${hy.fa()}", fontSize = 11.sp, color = MutedGreenText)
-                        Text("🌍 ${gd.fa()} ${PD_GREG.getOrElse(gm - 1) { "" }} ${gy.fa()}", fontSize = 11.sp, color = MutedGreenText)
-                    }
-                    IconButton(onClick = { if (calJm < 12) calJm++ else { calJm = 1; calJy++ } }) { Icon(Icons.Filled.ChevronLeft, "بعد", tint = Saffron) }
-                }
-                Spacer(Modifier.height(6.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    PD_WEEK.forEach { w -> Text(w, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Saffron, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
-                }
-                Spacer(Modifier.height(4.dp))
-                val cells = List(pdLeading(calJy, calJm)) { 0 } + (1..pdMonthLen(calJy, calJm)).toList()
-                cells.chunked(7).forEach { row ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                        row.forEach { d ->
-                            if (d == 0) Box(Modifier.weight(1f))
-                            else {
-                                val isSel = calDay == d
-                                val isToday = calJy == tjy && calJm == tjm && d == tjd
-                                Box(Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSel) Saffron else Color.Transparent)
-                                    .border(if (isToday && !isSel) 1.5.dp else 0.dp, Saffron, RoundedCornerShape(10.dp))
-                                    .clickable { calDay = d }, contentAlignment = Alignment.Center) {
-                                    Text(d.fa(), fontSize = 13.sp, color = if (isSel) Ink else PaperWhite, fontWeight = if (isSel || isToday) FontWeight.Bold else FontWeight.Normal)
-                                }
-                            }
-                        }
-                        repeat(7 - row.size) { Box(Modifier.weight(1f)) }
-                    }
-                    Spacer(Modifier.height(3.dp))
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = { showTime = true }) { Text("ادامه ⏰", color = Saffron, fontWeight = FontWeight.Bold) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } })
-
-    if (showTime) {
-        val tState = rememberTimePickerState(initialHour = 9, initialMinute = 0, is24Hour = true)
-        AlertDialog(onDismissRequest = { showTime = false },
-            title = { Text("⏰ انتخاب ساعت", fontFamily = LalezarFont, fontSize = 18.sp) },
-            text = { TimePicker(state = tState) },
-            confirmButton = {
-                TextButton(onClick = {
-                    val day = pdJalaliMillis(calJy, calJm, calDay, 0)
-                    onConfirm(day + tState.hour.toLong() * 3600_000L + tState.minute.toLong() * 60_000L)
-                    showTime = false
-                }) { Text("تأیید", color = Saffron, fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = { TextButton(onClick = { showTime = false }) { Text("برگشت") } })
-    }
-}
+    val selMillis = pdJal
