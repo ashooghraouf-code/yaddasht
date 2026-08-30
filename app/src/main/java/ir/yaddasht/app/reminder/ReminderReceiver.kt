@@ -20,21 +20,24 @@ class ReminderReceiver : BroadcastReceiver() {
             .putExtra("note_id", noteId).putExtra("is_task", isTask)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val baseCode = if (isTask) noteId.toInt() + 1_000_000 else noteId.toInt()
-        val pi = PendingIntent.getActivity(context, baseCode + leadType * 10_000_000, open,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val pi = PendingIntent.getActivity(context, baseCode + leadType * 10_000_000, open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val kind = if (isTask) "وظیفه" else "یادآور"
         val (emoji, headLine) = when (leadType) {
+            6 -> "🗓️" to "یک هفته مونده: $title"
             4 -> "⏳" to "فردا: $title"
             3 -> "🔔" to "۳ ساعت مونده تا $kind"
             2 -> "🔔" to "یک ساعت مونده تا $kind"
+            5 -> "⏱️" to "۳۰ دقیقه مونده تا $kind"
             1 -> "⚡" to "۱۰ دقیقه مونده تا $kind"
             else -> (if (isTask) "✅" else "⏰") to "وقتِ $kind: $title"
         }
         val body = when (leadType) {
             0 -> "برای دیدن ضربه بزن."
+            6 -> "یک هفته تا $kind مونده: $title"
             4 -> "فردا باید انجام بشه: $title"
             3 -> "فقط ۳ ساعت مونده. آماده‌ش کن!"
             2 -> "فقط یک ساعت مونده. آماده‌ش کن!"
+            5 -> "۳۰ دقیقه دیگه وقتشه!"
             1 -> "کم مونده! ۱۰ دقیقه دیگه."
             else -> ""
         }
