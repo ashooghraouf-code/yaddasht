@@ -116,8 +116,8 @@ import java.util.Calendar
 private val HOLIDAY_RED = Color(0xFFE5484D)
 private val WEEK_FA = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
 private const val DAY_MS = 86_400_000L
-private const val FSI = "⁦"
-private const val PDI = "⁩"
+private const val RLI = "‏\u2067"
+private const val PDI = "‏\u2069"
 
 private fun jalaliMillis(jy: Int, jm: Int, jd: Int, hour: Int = 12): Long {
     var est = 1617220800000L + (jy - 1400).toLong() * 365L * DAY_MS + (jm - 1).toLong() * 30L * DAY_MS + (jd - 1).toLong() * DAY_MS
@@ -167,13 +167,13 @@ private fun gregorianFullFa(millis: Long): String {
     val c = Calendar.getInstance(); c.timeInMillis = millis
     val d = c.get(Calendar.DAY_OF_MONTH); val m = c.get(Calendar.MONTH) + 1; val y = c.get(Calendar.YEAR)
     val names = arrayOf("ژانویه", "فوریه", "مارس", "آوریل", "مه", "ژوئن", "ژوئیه", "اوت", "سپتامبر", "اکتبر", "نوامبر", "دسامبر")
-    return "$FSI${d.fa()}$PDI ${names.getOrElse(m - 1) { "" }} $FSI${y.fa()}$PDI ($FSI${d.fa()}/${m.fa()}/${y.fa()}$PDI)"
+    return RLI + "${d.fa()} ${names.getOrElse(m - 1) { "" }} ${y.fa()} (${d.fa()}/${m.fa()}/${y.fa()})" + PDI
 }
 
 private fun hijriFullFa(millis: Long): String {
     val (m, d, y) = iranHijri(millis)
     val names = arrayOf("محرم", "صفر", "ربیع‌الاول", "ربیع‌الثانی", "جمادی‌الاول", "جمادی‌الثانی", "رجب", "شعبان", "رمضان", "شوال", "ذی‌القعده", "ذی‌الحجه")
-    return "$FSI${d.fa()}$PDI ${names.getOrElse(m - 1) { "" }} $FSI${y.fa()}$PDI ($FSI${d.fa()}/${m.fa()}/${y.fa()}$PDI)"
+    return RLI + "${d.fa()} ${names.getOrElse(m - 1) { "" }} ${y.fa()} (${d.fa()}/${m.fa()}/${y.fa()})" + PDI
 }
 
 private fun fullDateTime(millis: Long): String {
@@ -181,7 +181,7 @@ private fun fullDateTime(millis: Long): String {
     val c = Calendar.getInstance(); c.timeInMillis = millis
     val h = c.get(Calendar.HOUR_OF_DAY).toString().padStart(2, '0').faDigits()
     val m = c.get(Calendar.MINUTE).toString().padStart(2, '0').faDigits()
-    return "$FSI${jd.fa()}$PDI ${FaDate.monthName(jm)} $FSI${jy.fa()}$PDI – $FSI$h:$m$PDI"
+    return RLI + "${jd.fa()} ${FaDate.monthName(jm)} ${jy.fa()} – $h:$m" + PDI
 }
 
 private fun isIranHoliday(jy: Int, jm: Int, jd: Int): Boolean {
@@ -334,8 +334,8 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("${FaDate.monthName(calJm)} ${calJy.fa()}", fontFamily = LalezarFont, fontSize = 20.sp, color = PaperWhite)
                                     val infoMillis = jalaliMillis(calJy, calJm, calDay, 12)
-                                    Text("🌙 قمری: ${hijriFullFa(infoMillis)}", fontSize = 10.sp, color = MutedGreenText)
-                                    Text("🌍 میلادی: ${gregorianFullFa(infoMillis)}", fontSize = 10.sp, color = MutedGreenText)
+                                    Text("🌙 قمری: " + hijriFullFa(infoMillis), fontSize = 10.sp, color = MutedGreenText)
+                                    Text("🌍 میلادی: " + gregorianFullFa(infoMillis), fontSize = 10.sp, color = MutedGreenText)
                                 }
                                 IconButton(onClick = { if (calJm < 12) calJm++ else { calJm = 1; calJy++ } }) { Icon(Icons.Filled.ChevronLeft, "بعد", tint = Saffron) }
                             }
