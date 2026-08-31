@@ -96,5 +96,10 @@ class NoteWidget : AppWidgetProvider() {
             val ids = mgr.getAppWidgetIds(ComponentName(context, NoteWidget::class.java))
             ids.forEach { updateAppWidget(context, mgr, it) }
         }
+
+        fun updateSingle(context: Context, widgetId: Int) {
+            val mgr = AppWidgetManager.getInstance(context)
+            updateAppWidget(context, mgr, widgetId)
+        }
     }
 }
