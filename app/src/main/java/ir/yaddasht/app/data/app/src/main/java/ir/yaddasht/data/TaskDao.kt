@@ -6,7 +6,6 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface TaskDao {
 
-    // ===== خواندن =====
     @Query("SELECT * FROM tasks ORDER BY dueDate ASC")
     fun getAllTasks(): Flow<List<Task>>
 
@@ -19,11 +18,12 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE id = :id")
     fun observeTask(id: Long): Flow<Task?>
 
-    // ✅ متد جدید: گرفتن وظایف فعال به‌صورت sync (برای BootReceiver)
     @Query("SELECT * FROM tasks WHERE dueDate > 0 AND isCompleted = 0")
     suspend fun getActiveTasksSync(): List<Task>
 
-    // ===== نوشتن =====
+    @Query("SELECT * FROM tasks WHERE isCompleted = 0 ORDER BY dueDate ASC LIMIT 20")
+    suspend fun getUpcomingTasksSync(): List<Task>
+
     @Insert
     suspend fun insert(task: Task): Long
 
@@ -36,11 +36,9 @@ interface TaskDao {
     @Delete
     suspend fun delete(task: Task)
 
-    // ✅ تیک‌زدن مستقیم از نوتیفیکیشن
     @Query("UPDATE tasks SET isCompleted = 1 WHERE id = :id")
     suspend fun markCompleted(id: Long)
 
-    // ===== ضمیمه‌های وظیفه =====
     @Insert
     suspend fun insertTaskAttachment(att: TaskAttachment)
 
