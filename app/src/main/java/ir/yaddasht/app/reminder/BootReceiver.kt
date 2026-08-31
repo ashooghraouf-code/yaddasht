@@ -30,7 +30,6 @@ class BootReceiver : BroadcastReceiver() {
                 val now = System.currentTimeMillis()
                 var rescheduled = 0
 
-                // ۱. وظایف فعال
                 db.taskDao().getActiveTasksSync().forEach { task ->
                     if (task.dueDate > now) {
                         val leads = setOf(LeadTime.NONE, LeadTime.HOUR_1, LeadTime.MIN_10)
@@ -39,7 +38,6 @@ class BootReceiver : BroadcastReceiver() {
                     }
                 }
 
-                // ۲. یادداشت‌های فعال
                 db.dao().allNotesSync().forEach { note ->
                     if (note.reminderAt > now) {
                         val leads = setOf(LeadTime.NONE, LeadTime.HOUR_1)
