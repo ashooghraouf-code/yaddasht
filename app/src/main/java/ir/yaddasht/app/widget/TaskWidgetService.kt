@@ -56,7 +56,7 @@ private class TaskWidgetFactory(
             val c = Calendar.getInstance().apply { timeInMillis = task.dueDate }
             val h = c.get(Calendar.HOUR_OF_DAY).toString().padStart(2, '0')
             val m = c.get(Calendar.MINUTE).toString().padStart(2, '0')
-            rv.setTextViewText(R.id.task_item_due, "${jd.fa()} ${FaDate.monthName(jm)} - $h:$m".fa())
+            rv.setTextViewText(R.id.task_item_due, "${jd.fa()} ${FaDate.monthName(jm)} - $h:$m")
             rv.setViewVisibility(R.id.task_item_due, View.VISIBLE)
         } else {
             rv.setViewVisibility(R.id.task_item_due, View.GONE)
