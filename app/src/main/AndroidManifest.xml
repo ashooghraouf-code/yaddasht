@@ -43,6 +43,7 @@
             </intent-filter>
         </activity>
         <receiver android:name=".reminder.ReminderReceiver" android:exported="false" />
+        <receiver android:name=".reminder.ReminderActionReceiver" android:exported="false" />
         <receiver android:name=".widget.NoteWidget" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
