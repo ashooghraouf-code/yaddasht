@@ -22,7 +22,6 @@ class ReminderActionReceiver : BroadcastReceiver() {
 
         if (id < 0) return
 
-        // پاک کردن نوتیفیکیشن
         try {
             NotificationManagerCompat.from(context).cancel(notificationId)
         } catch (_: SecurityException) {}
