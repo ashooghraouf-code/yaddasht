@@ -15,12 +15,17 @@ class ReminderReceiver : BroadcastReceiver() {
         val title = intent.getStringExtra(ReminderScheduler.EXTRA_TITLE) ?: "یادداشت"
         val isTask = intent.getBooleanExtra(ReminderScheduler.EXTRA_IS_TASK, false)
         val leadType = intent.getIntExtra(ReminderScheduler.EXTRA_LEAD_TYPE, 0)
+        val triggerTime = intent.getLongExtra("trigger_time", System.currentTimeMillis())
         ReminderScheduler.ensureChannel(context)
+
         val open = Intent(context, MainActivity::class.java)
             .putExtra("note_id", noteId).putExtra("is_task", isTask)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val baseCode = if (isTask) noteId.toInt() + 1_000_000 else noteId.toInt()
-        val pi = PendingIntent.getActivity(context, baseCode + leadType * 10_000_000, open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val notificationId = baseCode + leadType * 10_000_000
+        val openPi = PendingIntent.getActivity(context, notificationId, open,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
         val kind = if (isTask) "وظیفه" else "یادآور"
         val (emoji, headLine) = when (leadType) {
             6 -> "🗓️" to "یک هفته مونده: $title"
@@ -41,18 +46,64 @@ class ReminderReceiver : BroadcastReceiver() {
             1 -> "کم مونده! ۱۰ دقیقه دیگه."
             else -> ""
         }
-        val notification = NotificationCompat.Builder(context, ReminderScheduler.CHANNEL_ID)
+
+        val builder = NotificationCompat.Builder(context, ReminderScheduler.CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("$emoji $headLine")
             .setContentText(body)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setAutoCancel(true).setContentIntent(pi)
+            .setAutoCancel(true)
+            .setContentIntent(openPi)
             .setVibrate(longArrayOf(0, 800, 400, 800, 400, 800, 400, 800))
-            .setDefaults(Notification.DEFAULT_ALL).build()
+            .setDefaults(Notification.DEFAULT_ALL)
+
+        // ✅ دکمه‌های اکشن - فقط برای leadType=0 (هشدار اصلی)
+        if (leadType == 0) {
+            if (isTask) {
+                // انجام شد - فقط برای وظایف
+                val doneIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+                    putExtra(ReminderActionReceiver.EXTRA_ACTION, ReminderActionReceiver.ACTION_DONE)
+                    putExtra(ReminderScheduler.EXTRA_NOTE_ID, noteId)
+                    putExtra(ReminderScheduler.EXTRA_TITLE, title)
+                    putExtra(ReminderScheduler.EXTRA_IS_TASK, true)
+                    putExtra(ReminderActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+                }
+                val donePi = PendingIntent.getBroadcast(context, notificationId + 100_000_000, doneIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                builder.addAction(0, "✅ انجام شد", donePi)
+            }
+
+            // ۵ دقیقه دیگه
+            val snoozeIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+                putExtra(ReminderActionReceiver.EXTRA_ACTION, ReminderActionReceiver.ACTION_SNOOZE)
+                putExtra(ReminderScheduler.EXTRA_NOTE_ID, noteId)
+                putExtra(ReminderScheduler.EXTRA_TITLE, title)
+                putExtra(ReminderScheduler.EXTRA_IS_TASK, isTask)
+                putExtra(ReminderActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+            }
+            val snoozePi = PendingIntent.getBroadcast(context, notificationId + 200_000_000, snoozeIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            builder.addAction(0, "⏰ ۵ دقیقه", snoozePi)
+
+            // فردا
+            val tomorrowIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+                putExtra(ReminderActionReceiver.EXTRA_ACTION, ReminderActionReceiver.ACTION_TOMORROW)
+                putExtra(ReminderScheduler.EXTRA_NOTE_ID, noteId)
+                putExtra(ReminderScheduler.EXTRA_TITLE, title)
+                putExtra(ReminderScheduler.EXTRA_IS_TASK, isTask)
+                putExtra(ReminderActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+                putExtra(ReminderActionReceiver.EXTRA_ORIGINAL_TIME, triggerTime)
+            }
+            val tomorrowPi = PendingIntent.getBroadcast(context, notificationId + 300_000_000, tomorrowIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            builder.addAction(0, "📅 فردا", tomorrowPi)
+        }
+
+        val notification = builder.build()
         notification.flags = notification.flags or Notification.FLAG_INSISTENT or Notification.FLAG_SHOW_LIGHTS
-        val notificationId = baseCode + leadType * 10_000_000
-        try { NotificationManagerCompat.from(context).notify(notificationId, notification) } catch (_: SecurityException) { }
+        try { NotificationManagerCompat.from(context).notify(notificationId, notification) }
+        catch (_: SecurityException) {}
     }
 }
