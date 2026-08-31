@@ -19,6 +19,10 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE id = :id")
     fun observeTask(id: Long): Flow<Task?>
 
+    // ✅ متد جدید: گرفتن وظایف فعال به‌صورت sync (برای BootReceiver)
+    @Query("SELECT * FROM tasks WHERE dueDate > 0 AND isCompleted = 0")
+    suspend fun getActiveTasksSync(): List<Task>
+
     // ===== نوشتن =====
     @Insert
     suspend fun insert(task: Task): Long
@@ -32,7 +36,7 @@ interface TaskDao {
     @Delete
     suspend fun delete(task: Task)
 
-    // ✅ متد جدید: فقط ستون isCompleted رو مستقیم آپدیت می‌کنه (برای نوتیفیکیشن)
+    // ✅ تیک‌زدن مستقیم از نوتیفیکیشن
     @Query("UPDATE tasks SET isCompleted = 1 WHERE id = :id")
     suspend fun markCompleted(id: Long)
 
