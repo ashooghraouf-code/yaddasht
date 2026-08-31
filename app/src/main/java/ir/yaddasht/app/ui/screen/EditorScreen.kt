@@ -94,6 +94,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -433,7 +434,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                     }
                     TextField(value = note?.title.orEmpty(), onValueChange = { note = note?.copy(title = it) },
                         placeholder = { Text("عنوان یادداشت", fontFamily = LalezarFont, color = InkSoft, fontSize = 22.sp) },
-                        textStyle = TextStyle(fontFamily = LalezarFont, fontSize = 26.sp, color = Ink),
+                        textStyle = TextStyle(fontFamily = LalezarFont, fontSize = 26.sp, color = Ink, textDirection = TextDirection.Rtl),
                         colors = transparentFieldColors(), singleLine = true, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(6.dp))
                     if (!isLocked && attachments.isNotEmpty()) {
@@ -446,7 +447,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                         isChecklist -> ChecklistEditor(note!!) { note = it }
                         else -> TextField(value = note?.body.orEmpty(), onValueChange = { note = note?.copy(body = it) },
                             placeholder = { Text("اینجا بنویس یا از «دیکته» و «چک‌لیست» استفاده کن", color = InkSoft, fontSize = 15.sp) },
-                            textStyle = TextStyle(fontFamily = VazirFont, fontSize = 15.sp, color = Ink, lineHeight = 28.sp, letterSpacing = 0.2.sp, textAlign = TextAlign.Start),
+                            textStyle = TextStyle(fontFamily = VazirFont, fontSize = 15.sp, color = Ink, lineHeight = 28.sp, letterSpacing = 0.2.sp, textAlign = TextAlign.Start, textDirection = TextDirection.Rtl),
                             colors = transparentFieldColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp))
                     }
                 }
@@ -626,7 +627,7 @@ private fun ChecklistEditor(note: Note, onChange: (Note) -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(checked = checked, onCheckedChange = { onChange(note.copy(body = Checklist.toggleLine(note.body, i))) }, colors = CheckboxDefaults.colors(checkedColor = Saffron, checkmarkColor = Ink))
             TextField(value = text, onValueChange = { v -> val mark = if (checked) "☑ " else "☐ "; val list = lines.toMutableList(); list[i] = mark + v; onChange(note.copy(body = list.joinToString("\n"))) },
-                textStyle = TextStyle(fontFamily = VazirFont, fontSize = 15.sp, color = Ink, lineHeight = 26.sp, letterSpacing = 0.2.sp, textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None, textAlign = TextAlign.Start),
+                textStyle = TextStyle(fontFamily = VazirFont, fontSize = 15.sp, color = Ink, lineHeight = 26.sp, letterSpacing = 0.2.sp, textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None, textAlign = TextAlign.Start, textDirection = TextDirection.Rtl),
                 colors = transparentFieldColors(), modifier = Modifier.weight(1f))
         }
     }
@@ -720,7 +721,7 @@ private fun FocusModeOverlay(body: String, onChange: (String) -> Unit, onExit: (
                 }
                 Box(Modifier.fillMaxWidth().height(2.dp).background(Saffron.copy(alpha = .5f)))
                 TextField(value = body, onValueChange = onChange,
-                    textStyle = TextStyle(fontFamily = VazirFont, fontSize = 19.sp, color = Ink, lineHeight = 36.sp, letterSpacing = 0.2.sp, textAlign = TextAlign.Start),
+                    textStyle = TextStyle(fontFamily = VazirFont, fontSize = 19.sp, color = Ink, lineHeight = 36.sp, letterSpacing = 0.2.sp, textAlign = TextAlign.Start, textDirection = TextDirection.Rtl),
                     colors = transparentFieldColors(), placeholder = { Text("فقط بنویس", color = InkSoft.copy(alpha = .6f), fontSize = 18.sp) },
                     modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 26.dp, vertical = 10.dp))
             }
