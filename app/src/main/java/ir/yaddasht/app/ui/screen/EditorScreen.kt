@@ -703,4 +703,39 @@ private fun AudioAttachmentRow(att: Attachment, onShare: () -> Unit, onDelete: (
 
 @Composable
 private fun FocusModeOverlay(body: String, onChange: (String) -> Unit, onExit: () -> Unit) {
-    val
+    val words = remember(body) { body.split(Regex("\\s+")).count { it.isNotBlank() } }
+    Dialog(onDismissRequest = onExit, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(Modifier.fillMaxSize().background(PaperWhite)) {
+            Column(Modifier.fillMaxSize()) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onExit) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "خروج", tint = InkSoft) }
+                    Spacer(Modifier.weight(1f))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("${words.fa()} کلمه", fontFamily = LalezarFont, fontSize = 15.sp, color = InkSoft)
+                        Text("•", fontSize = 15.sp, color = InkSoft)
+                        Text("${body.length.fa()} حرف", fontFamily = LalezarFont, fontSize = 15.sp, color = InkSoft)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Text("✒️", fontSize = 20.sp)
+                }
+                Box(Modifier.fillMaxWidth().height(2.dp).background(Saffron.copy(alpha = .5f)))
+                TextField(value = body, onValueChange = onChange,
+                    textStyle = TextStyle(fontFamily = VazirFont, fontSize = 19.sp, color = Ink, lineHeight = 36.sp, letterSpacing = 0.2.sp, textAlign = TextAlign.Start),
+                    colors = transparentFieldColors(), placeholder = { Text("فقط بنویس", color = InkSoft.copy(alpha = .6f), fontSize = 18.sp) },
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 26.dp, vertical = 10.dp))
+            }
+        }
+    }
+}
+
+private fun importUris(context: Context, scope: CoroutineScope, dao: NoteDao, noteId: Long, uris: List<Uri>) {
+    if (uris.isEmpty()) return
+    scope.launch(Dispatchers.IO) {
+        uris.forEach { uri ->
+            val file = AttachmentStore.copyToPrivate(context, uri) ?: return@forEach
+            val mime = context.contentResolver.getType(uri) ?: guessMimeType(file.name)
+            dao.insertAttachment(Attachment(noteId = noteId, fileName = file.name, filePath = file.absolutePath, mimeType = mime, isImage = mime.startsWith("image/")))
+        }
+        withContext(Dispatchers.Main) { Toast.makeText(context, "ضمیمه اضافه شد ✔", Toast.LENGTH_SHORT).show() }
+    }
+}
