@@ -25,7 +25,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Yaddasht">
 
-        <!-- اپ اصلی -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -37,25 +36,17 @@
             </intent-filter>
         </activity>
 
-        <!-- 📚 کتابخوان - آیکون جداگانه در لانچر -->
+        <!-- کتابخوان: فقط از داخل برنامه فراخوانی می‌شود (امن برای آپدیت مارکت) -->
         <activity
             android:name=".ui.screen.FilePickerActivity"
             android:exported="true"
-            android:label="📚 کتابخوان"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
-        <!-- نمایشگر داخلی کتابخوان -->
         <activity
             android:name=".ui.screen.ReaderActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Material.NoActionBar" />
 
-        <!-- تنظیمات ویجت -->
         <activity
             android:name=".widget.WidgetConfigActivity"
             android:exported="true"
@@ -65,18 +56,15 @@
             </intent-filter>
         </activity>
 
-        <!-- انتخابگر رنگ ویجت -->
         <activity
             android:name=".widget.WidgetColorPickerActivity"
             android:exported="true"
             android:label="رنگ ویجت"
             android:theme="@android:style/Theme.Material.NoActionBar" />
 
-        <!-- یادآورها -->
         <receiver android:name=".reminder.ReminderReceiver" android:exported="false" />
         <receiver android:name=".reminder.ReminderActionReceiver" android:exported="false" />
 
-        <!-- حفظ یادآورها بعد از ریستارت -->
         <receiver
             android:name=".reminder.BootReceiver"
             android:exported="true"
@@ -91,18 +79,15 @@
             </intent-filter>
         </receiver>
 
-        <!-- ویجت یادداشت‌ها -->
         <receiver android:name=".widget.NoteWidget" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="ir.yaddasht.app.REFRESH_NOTES" />
                 <action android:name="ir.yaddasht.app.ADD_NOTE" />
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider"
-                android:resource="@xml/note_widget_info" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/note_widget_info" />
         </receiver>
 
-        <!-- ویجت وظایف -->
         <receiver android:name=".widget.TaskWidget" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -110,8 +95,7 @@
                 <action android:name="ir.yaddasht.app.ADD_TASK" />
                 <action android:name="ir.yaddasht.app.TOGGLE_TASK" />
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider"
-                android:resource="@xml/task_widget_info" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/task_widget_info" />
         </receiver>
 
         <provider
@@ -119,8 +103,7 @@
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
-            <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
     </application>
 </manifest>
