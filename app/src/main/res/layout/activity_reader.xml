@@ -18,7 +18,7 @@
             android:id="@+id/close_btn"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@android:color/transparent"
             android:src="@android:drawable/ic_menu_close_clear_cancel"
             android:contentDescription="بستن" />
 
@@ -37,7 +37,7 @@
             android:id="@+id/theme_btn"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@android:color/transparent"
             android:src="@android:drawable/ic_menu_manage"
             android:contentDescription="تم" />
 
@@ -45,7 +45,7 @@
             android:id="@+id/font_size_btn"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@android:color/transparent"
             android:src="@android:drawable/ic_menu_zoom"
             android:contentDescription="اندازه قلم" />
     </LinearLayout>
@@ -94,7 +94,7 @@
             android:id="@+id/prev_btn"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@android:color/transparent"
             android:src="@android:drawable/ic_media_previous"
             android:contentDescription="قبلی" />
 
@@ -109,7 +109,7 @@
             android:id="@+id/next_btn"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@android:color/transparent"
             android:src="@android:drawable/ic_media_next"
             android:contentDescription="بعدی" />
     </LinearLayout>
