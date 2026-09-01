@@ -36,7 +36,6 @@
             </intent-filter>
         </activity>
 
-        <!-- کتابخوان: فقط از داخل برنامه فراخوانی می‌شود (امن برای آپدیت مارکت) -->
         <activity
             android:name=".ui.screen.FilePickerActivity"
             android:exported="true"
@@ -47,10 +46,11 @@
             android:exported="false"
             android:theme="@android:style/Theme.Material.NoActionBar" />
 
+        <!-- تنظیمات ویجت - انتخاب رنگ قبل از قرار دادن -->
         <activity
             android:name=".widget.WidgetConfigActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden">
+            android:theme="@android:style/Theme.Material.NoActionBar">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
@@ -85,7 +85,8 @@
                 <action android:name="ir.yaddasht.app.REFRESH_NOTES" />
                 <action android:name="ir.yaddasht.app.ADD_NOTE" />
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/note_widget_info" />
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/note_widget_info" />
         </receiver>
 
         <receiver android:name=".widget.TaskWidget" android:exported="true">
@@ -95,7 +96,8 @@
                 <action android:name="ir.yaddasht.app.ADD_TASK" />
                 <action android:name="ir.yaddasht.app.TOGGLE_TASK" />
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/task_widget_info" />
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/task_widget_info" />
         </receiver>
 
         <provider
@@ -103,7 +105,8 @@
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
-            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
         </provider>
     </application>
 </manifest>
