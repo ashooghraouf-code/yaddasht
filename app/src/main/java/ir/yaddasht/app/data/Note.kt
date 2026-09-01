@@ -13,9 +13,9 @@ data class Note(
     val updatedAt: Long,
     val pinned: Boolean,
     val reminderAt: Long,
-    val notebookStyle: String = "blank", // blank, lined, grid, columns, planner
+    val notebookStyle: String = "blank",
     val fontSize: Float = 16f,
     val textColor: Int = 0xFF2C2C2C.toInt(),
     val isRTL: Boolean = true,
-    val textBoxes: String = "[]" // JSON array of TextBox data
+    val textBoxes: String = "[]"
 )
