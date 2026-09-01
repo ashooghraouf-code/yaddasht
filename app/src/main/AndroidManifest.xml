@@ -25,6 +25,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Yaddasht">
 
+        <!-- اپ اصلی -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -36,6 +37,25 @@
             </intent-filter>
         </activity>
 
+        <!-- 📚 کتابخوان - آیکون جداگانه در لانچر -->
+        <activity
+            android:name=".ui.screen.FilePickerActivity"
+            android:exported="true"
+            android:label="📚 کتابخوان"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- نمایشگر داخلی کتابخوان -->
+        <activity
+            android:name=".ui.screen.ReaderActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
+        <!-- تنظیمات ویجت -->
         <activity
             android:name=".widget.WidgetConfigActivity"
             android:exported="true"
@@ -44,6 +64,13 @@
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
+
+        <!-- انتخابگر رنگ ویجت -->
+        <activity
+            android:name=".widget.WidgetColorPickerActivity"
+            android:exported="true"
+            android:label="رنگ ویجت"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
 
         <!-- یادآورها -->
         <receiver android:name=".reminder.ReminderReceiver" android:exported="false" />
