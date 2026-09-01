@@ -73,12 +73,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ir.yaddasht.app.R
 import ir.yaddasht.app.data.Note
 import ir.yaddasht.app.data.NoteDao
 import ir.yaddasht.app.data.Priority
@@ -587,19 +589,32 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
     scope.launch(Dispatchers.IO) { dao.update(note.copy(pinned = !note.pinned, updatedAt = System.currentTimeMillis())) }
 }
 
-// ✅ تغییر اصلی اینجاست: اضافه شدن LocalContext و دکمه کتابخوان
+// ✅ اصلاح‌شده: آیکون اصلی برنامه + فونت مرتب‌شده
 @Composable private fun HomeHeader(count: Int, onStats: () -> Unit, onBackup: () -> Unit, onRestore: () -> Unit) {
     val context = LocalContext.current
     Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(52.dp).clip(CircleShape).background(Saffron), contentAlignment = Alignment.Center) { Text("ی", fontFamily = LalezarFont, fontSize = 30.sp, color = Ink) }
+            Box(Modifier.size(52.dp).clip(CircleShape).background(Saffron), contentAlignment = Alignment.Center) { 
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                    contentDescription = "لوگو چراغ راه",
+                    modifier = Modifier.size(32.dp),
+                    tint = Color.Unspecified
+                )
+            }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("چراغ راه", fontFamily = LalezarFont, fontSize = 38.sp, color = PaperWhite)
+                Text(
+                    text = "چراغ راه", 
+                    fontFamily = LalezarFont, 
+                    fontSize = 26.sp, 
+                    color = PaperWhite,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 Text("بدون محدودیت • ${count.fa()} یادداشت • 🤝 تکان بده = جدید", fontSize = 10.sp, color = Saffron)
             }
             
-            // ✅ دکمه جدید کتابخوان
             IconButton(onClick = {
                 val intent = android.content.Intent(context, FilePickerActivity::class.java)
                 context.startActivity(intent)
