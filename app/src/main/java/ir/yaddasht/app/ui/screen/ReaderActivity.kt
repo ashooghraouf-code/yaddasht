@@ -7,16 +7,20 @@ import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
-import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
 import ir.yaddasht.app.R
 import ir.yaddasht.app.util.TextExtractor
 import java.io.File
+import kotlin.math.abs
 
 class ReaderActivity : Activity() {
 
@@ -25,10 +29,9 @@ class ReaderActivity : Activity() {
     private var totalPages: Int = 0
     private var currentTheme: Int = 0
     private var fontSize: Float = 16f
+    private var isPdf: Boolean = false
 
-    private lateinit var pdfImageView: ImageView
-    private lateinit var textScrollView: ScrollView
-    private lateinit var textContent: TextView
+    private lateinit var viewPager: ViewPager2
     private lateinit var pageNumText: TextView
     private lateinit var prevBtn: ImageButton
     private lateinit var nextBtn: ImageButton
@@ -38,9 +41,9 @@ class ReaderActivity : Activity() {
     private lateinit var pageSeek: SeekBar
 
     private val themes = intArrayOf(
-        0xFFFFF8E1.toInt(), // کاغذی روشن
-        0xFFF5E6D3.toInt(), // سپیا
-        0xFF1A1A1A.toInt()  // شب
+        0xFFFFF8E1.toInt(),
+        0xFFF5E6D3.toInt(),
+        0xFF1A1A1A.toInt()
     )
     private val textColors = intArrayOf(
         0xFF2C2C2C.toInt(),
@@ -48,13 +51,14 @@ class ReaderActivity : Activity() {
         0xFFE0E0E0.toInt()
     )
 
+    private var pdfPages: List<Bitmap> = emptyList()
+    private var textPages: List<String> = emptyList()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_reader)
 
-        pdfImageView = findViewById(R.id.pdf_image_view)
-        textScrollView = findViewById(R.id.text_scroll_view)
-        textContent = findViewById(R.id.text_content)
+        viewPager = findViewById(R.id.page_viewpager)
         pageNumText = findViewById(R.id.page_num_text)
         prevBtn = findViewById(R.id.prev_btn)
         nextBtn = findViewById(R.id.next_btn)
@@ -64,7 +68,7 @@ class ReaderActivity : Activity() {
         pageSeek = findViewById(R.id.page_seek)
 
         val filePath = intent.getStringExtra("file_path")
-        val isPdf = intent.getBooleanExtra("is_pdf", false)
+        isPdf = intent.getBooleanExtra("is_pdf", false)
 
         if (filePath == null) {
             Toast.makeText(this, "فایل پیدا نشد", Toast.LENGTH_SHORT).show()
@@ -78,6 +82,7 @@ class ReaderActivity : Activity() {
             openText(filePath)
         }
 
+        setupViewPager()
         setupControls()
     }
 
@@ -95,12 +100,17 @@ class ReaderActivity : Activity() {
             totalPages = pdfRenderer?.pageCount ?: 0
             currentPage = 0
 
-            pdfImageView.visibility = View.VISIBLE
-            textScrollView.visibility = View.GONE
-            pageSeek.visibility = View.VISIBLE
+            // تبدیل همهٔ صفحات به Bitmap
+            pdfPages = (0 until totalPages).map { pageIndex ->
+                pdfRenderer?.openPage(pageIndex)?.use { page ->
+                    val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
+                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    bitmap
+                } ?: Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+            }
 
             pageSeek.max = totalPages - 1
-            updatePage()
+            pageSeek.visibility = View.VISIBLE
         } catch (e: Exception) {
             Toast.makeText(this, "خطا در باز کردن PDF: ${e.message}", Toast.LENGTH_LONG).show()
             finish()
@@ -111,32 +121,42 @@ class ReaderActivity : Activity() {
         try {
             val text = TextExtractor.extract(path)
             if (text.isBlank()) {
-                Toast.makeText(this, "متنی یافت نشد یا فرمت پشتیبانی نمی‌شود", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "متنی یافت نشد", Toast.LENGTH_SHORT).show()
                 finish()
                 return
             }
 
-            pdfImageView.visibility = View.GONE
-            textScrollView.visibility = View.VISIBLE
-            pageSeek.visibility = View.GONE
-            textContent.text = text
-            textContent.textSize = fontSize
-            pageNumText.text = "حالت مطالعه متن"
+            // تقسیم متن به صفحات (هر صفحه حدود ۵۰۰ کاراکتر)
+            val charsPerPage = 500
+            textPages = text.chunked(charsPerPage)
+            totalPages = textPages.size
+            currentPage = 0
+
+            pageSeek.max = totalPages - 1
+            pageSeek.visibility = View.VISIBLE
         } catch (e: Exception) {
             Toast.makeText(this, "خطا: ${e.message}", Toast.LENGTH_LONG).show()
             finish()
         }
     }
 
-    private fun updatePage() {
-        if (totalPages == 0) return
+    private fun setupViewPager() {
+        viewPager.adapter = PageAdapter()
+        
+        // افکت ورق زدن کتاب
+        viewPager.setPageTransformer(BookPageTransformer())
+        
+        viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                currentPage = position
+                updatePageInfo()
+            }
+        })
 
-        pdfRenderer?.openPage(currentPage)?.use { page ->
-            val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
-            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-            pdfImageView.setImageBitmap(bitmap)
-        }
+        updatePageInfo()
+    }
 
+    private fun updatePageInfo() {
         pageNumText.text = "صفحه ${currentPage + 1} از $totalPages"
         pageSeek.progress = currentPage
     }
@@ -144,23 +164,20 @@ class ReaderActivity : Activity() {
     private fun setupControls() {
         prevBtn.setOnClickListener {
             if (currentPage > 0) {
-                currentPage--
-                updatePage()
+                viewPager.setCurrentItem(currentPage - 1, true)
             }
         }
 
         nextBtn.setOnClickListener {
             if (currentPage < totalPages - 1) {
-                currentPage++
-                updatePage()
+                viewPager.setCurrentItem(currentPage + 1, true)
             }
         }
 
         pageSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
-                    currentPage = progress
-                    updatePage()
+                    viewPager.setCurrentItem(progress, false)
                 }
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -170,6 +187,7 @@ class ReaderActivity : Activity() {
         themeBtn.setOnClickListener {
             currentTheme = (currentTheme + 1) % themes.size
             applyTheme()
+            viewPager.adapter?.notifyDataSetChanged()
         }
 
         fontSizeBtn.setOnClickListener {
@@ -179,8 +197,8 @@ class ReaderActivity : Activity() {
                 fontSize < 26f -> 26f
                 else -> 14f
             }
-            textContent.textSize = fontSize
             Toast.makeText(this, "اندازه قلم: ${fontSize.toInt()}", Toast.LENGTH_SHORT).show()
+            viewPager.adapter?.notifyDataSetChanged()
         }
 
         closeBtn.setOnClickListener { finish() }
@@ -193,7 +211,6 @@ class ReaderActivity : Activity() {
         val textColor = textColors[currentTheme]
 
         findViewById<View>(R.id.reader_root).setBackgroundColor(bgColor)
-        textContent.setTextColor(textColor)
         pageNumText.setTextColor(textColor)
         
         val tintColor = ColorStateList.valueOf(textColor)
@@ -209,5 +226,64 @@ class ReaderActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         pdfRenderer?.close()
+        pdfPages.forEach { it.recycle() }
+    }
+
+    // Adapter برای ViewPager2
+    private inner class PageAdapter : RecyclerView.Adapter<PageAdapter.PageViewHolder>() {
+        
+        inner class PageViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+            val imageView: ImageView = view.findViewById(R.id.page_image)
+            val textView: TextView = view.findViewById(R.id.page_text)
+            val pageContainer: View = view.findViewById(R.id.page_container)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageViewHolder {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_reader_page, parent, false)
+            return PageViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: PageViewHolder, position: Int) {
+            val bgColor = themes[currentTheme]
+            val textColor = textColors[currentTheme]
+            
+            holder.pageContainer.setBackgroundColor(bgColor)
+
+            if (isPdf) {
+                holder.imageView.visibility = View.VISIBLE
+                holder.textView.visibility = View.GONE
+                holder.imageView.setImageBitmap(pdfPages[position])
+            } else {
+                holder.imageView.visibility = View.GONE
+                holder.textView.visibility = View.VISIBLE
+                holder.textView.text = textPages[position]
+                holder.textView.setTextColor(textColor)
+                holder.textView.textSize = fontSize
+            }
+        }
+
+        override fun getItemCount(): Int = totalPages
+    }
+
+    // PageTransformer برای افکت ورق زدن کتاب
+    private inner class BookPageTransformer : ViewPager2.PageTransformer {
+        override fun transformPage(page: View, position: Float) {
+            val absPos = abs(position)
+            
+            // چرخش صفحه (مثل ورق زدن)
+            page.rotationY = position * -30f
+            
+            // شفافیت
+            page.alpha = 1f - absPos * 0.5f
+            
+            // مقیاس
+            val scale = 1f - absPos * 0.1f
+            page.scaleX = scale
+            page.scaleY = scale
+            
+            // سایه
+            page.elevation = (1f - absPos) * 20f
+        }
     }
 }
