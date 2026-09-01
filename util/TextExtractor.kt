@@ -31,8 +31,11 @@ object TextExtractor {
                     e = z.nextEntry
                 }
             }
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) {}
         val raw = xml ?: return ""
         val regex = Regex("<w:t[^>]*>([^<]*)</w:t>")
-        return raw.split
+        return raw.split("\n").joinToString("\n") { line ->
+            regex.findAll(line).joinToString("") { it.groupValues[1] }
+        }
+    }
+}
