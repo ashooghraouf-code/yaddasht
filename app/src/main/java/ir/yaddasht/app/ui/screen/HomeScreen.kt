@@ -587,7 +587,9 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
     scope.launch(Dispatchers.IO) { dao.update(note.copy(pinned = !note.pinned, updatedAt = System.currentTimeMillis())) }
 }
 
+// ✅ تغییر اصلی اینجاست: اضافه شدن LocalContext و دکمه کتابخوان
 @Composable private fun HomeHeader(count: Int, onStats: () -> Unit, onBackup: () -> Unit, onRestore: () -> Unit) {
+    val context = LocalContext.current
     Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(52.dp).clip(CircleShape).background(Saffron), contentAlignment = Alignment.Center) { Text("ی", fontFamily = LalezarFont, fontSize = 30.sp, color = Ink) }
@@ -596,6 +598,15 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
                 Text("چراغ راه", fontFamily = LalezarFont, fontSize = 38.sp, color = PaperWhite)
                 Text("بدون محدودیت • ${count.fa()} یادداشت • 🤝 تکان بده = جدید", fontSize = 10.sp, color = Saffron)
             }
+            
+            // ✅ دکمه جدید کتابخوان
+            IconButton(onClick = {
+                val intent = android.content.Intent(context, FilePickerActivity::class.java)
+                context.startActivity(intent)
+            }) {
+                Text("📚", fontSize = 24.sp)
+            }
+
             IconButton(onClick = onBackup) { Icon(Icons.Filled.FileUpload, "پشتیبان کامل", tint = MutedGreenText) }
             IconButton(onClick = onRestore) { Icon(Icons.Filled.FileDownload, "بازیابی کامل", tint = MutedGreenText) }
             IconButton(onClick = onStats) { Icon(Icons.Filled.BarChart, "آمار", tint = MutedGreenText) }
