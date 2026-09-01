@@ -2,11 +2,11 @@ package ir.yaddasht.app.ui.screen
 
 import android.app.Activity
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.view.View
-import android.widget.Button
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -14,7 +14,7 @@ import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
-import androidx.core.content.ContextCompat
+import androidx.core.content.res.ColorStateListCompat
 import ir.yaddasht.app.R
 import ir.yaddasht.app.util.TextExtractor
 import java.io.File
@@ -37,12 +37,11 @@ class ReaderActivity : Activity() {
     private lateinit var fontSizeBtn: ImageButton
     private lateinit var closeBtn: ImageButton
     private lateinit var pageSeek: SeekBar
-    private lateinit var controlsLayout: LinearLayout
 
     private val themes = intArrayOf(
-        0xFFFFF8E1.toInt(),
-        0xFFF5E6D3.toInt(),
-        0xFF1A1A1A.toInt()
+        0xFFFFF8E1.toInt(), // کاغذی روشن
+        0xFFF5E6D3.toInt(), // سپیا
+        0xFF1A1A1A.toInt()  // شب
     )
     private val textColors = intArrayOf(
         0xFF2C2C2C.toInt(),
@@ -64,7 +63,6 @@ class ReaderActivity : Activity() {
         fontSizeBtn = findViewById(R.id.font_size_btn)
         closeBtn = findViewById(R.id.close_btn)
         pageSeek = findViewById(R.id.page_seek)
-        controlsLayout = findViewById(R.id.controls_layout)
 
         val filePath = intent.getStringExtra("file_path")
         val isPdf = intent.getBooleanExtra("is_pdf", false)
@@ -100,6 +98,7 @@ class ReaderActivity : Activity() {
 
             pdfImageView.visibility = View.VISIBLE
             textScrollView.visibility = View.GONE
+            pageSeek.visibility = View.VISIBLE
 
             pageSeek.max = totalPages - 1
             updatePage()
@@ -113,17 +112,17 @@ class ReaderActivity : Activity() {
         try {
             val text = TextExtractor.extract(path)
             if (text.isBlank()) {
-                Toast.makeText(this, "متنی یافت نشد", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "متنی یافت نشد یا فرمت پشتیبانی نمی‌شود", Toast.LENGTH_SHORT).show()
                 finish()
                 return
             }
 
             pdfImageView.visibility = View.GONE
             textScrollView.visibility = View.VISIBLE
+            pageSeek.visibility = View.GONE
             textContent.text = text
             textContent.textSize = fontSize
-            pageNumText.text = "صفحه  از ۱"
-            pageSeek.visibility = View.GONE
+            pageNumText.text = "حالت مطالعه متن"
         } catch (e: Exception) {
             Toast.makeText(this, "خطا: ${e.message}", Toast.LENGTH_LONG).show()
             finish()
@@ -197,12 +196,15 @@ class ReaderActivity : Activity() {
         findViewById<View>(R.id.reader_root).setBackgroundColor(bgColor)
         textContent.setTextColor(textColor)
         pageNumText.setTextColor(textColor)
-        prevBtn.setColorFilter(textColor)
-        nextBtn.setColorFilter(textColor)
-        themeBtn.setColorFilter(textColor)
-        fontSizeBtn.setColorFilter(textColor)
-        closeBtn.setColorFilter(textColor)
-        pageSeek.progressTintList = ContextCompat.getColorStateList(this, R.color.saffron)
+        
+        val tintColor = ColorStateListCompat.valueOf(textColor)
+        prevBtn.imageTintList = tintColor
+        nextBtn.imageTintList = tintColor
+        themeBtn.imageTintList = tintColor
+        fontSizeBtn.imageTintList = tintColor
+        closeBtn.imageTintList = tintColor
+        
+        pageSeek.progressTintList = ColorStateListCompat.valueOf(0xFFF5A524.toInt())
     }
 
     override fun onDestroy() {
