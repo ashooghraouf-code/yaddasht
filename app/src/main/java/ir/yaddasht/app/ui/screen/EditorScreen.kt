@@ -19,9 +19,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.yaddasht.app.data.Note
@@ -74,18 +75,12 @@ fun EditorScreen(
     var textColor by remember { mutableStateOf(Color(0xFF2C2C2C)) }
     var isRTL by remember { mutableStateOf(true) }
     var textBoxes by remember { mutableStateOf<List<TextBoxData>>(emptyList()) }
-    var selectedText by remember { mutableStateOf("") }
     var showTextFormatting by remember { mutableStateOf(false) }
     
     val pageStyles = listOf(
-        "blank" to "📄 خالی",
-        "lined" to "📝 خط‌دار",
-        "lined_narrow" to "📝 خط‌باریک",
-        "lined_wide" to "📝 خط‌پهن",
-        "grid" to "📐 شطرنجی",
-        "grid_narrow" to "📐 شطرنجی‌ریز",
-        "columns" to "📰 ستونی",
-        "planner" to "📅 برنامه‌ریز"
+        "blank" to "📄 خالی", "lined" to "📝 خط‌دار", "lined_narrow" to "📝 خط‌باریک",
+        "lined_wide" to "📝 خط‌پهن", "grid" to "📐 شطرنجی", "grid_narrow" to "📐 شطرنجی‌ریز",
+        "columns" to "📰 ستونی", "planner" to "📅 برنامه‌ریز"
     )
     
     val backgroundColors = listOf(
@@ -154,25 +149,16 @@ fun EditorScreen(
             )
             
             if (showTextFormatting) {
-                TextFormattingToolbar(
-                    selectedText = selectedText, onBold = {}, onItalic = {}, onUnderline = {},
-                    onHighlight = {}, onAlignChange = {}, onClose = { showTextFormatting = false }
-                )
+                TextFormattingToolbar(onClose = { showTextFormatting = false })
             }
             
             Box(Modifier.fillMaxSize().background(selectedColor).then(getPageStyleModifier(notebookStyle))) {
                 BasicTextField(
                     value = body,
-                    onValueChange = { newValue: TextFieldValue -> 
-                        body = newValue.text
-                        if (newValue.selection.start != newValue.selection.end) {
-                            selectedText = newValue.text.substring(newValue.selection.start, newValue.selection.end)
-                            showTextFormatting = true
-                        }
-                    },
+                    onValueChange = { newValue -> body = newValue },
                     modifier = Modifier.fillMaxSize().padding(16.dp)
                         .then(if (isRTL) Modifier.wrapContentWidth(Alignment.End) else Modifier.wrapContentWidth(Alignment.Start)),
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = fontSize.sp, color = textColor)
+                    textStyle = TextStyle(fontSize = fontSize.sp, color = textColor)
                 )
                 
                 textBoxes.forEach { textBox ->
@@ -236,7 +222,7 @@ fun DraggableResizableTextBox(textBox: TextBoxData, onUpdate: (TextBoxData) -> U
     
     Box(
         modifier = Modifier.offset { androidx.compose.ui.unit.IntOffset(offsetX.toInt(), offsetY.toInt()) }
-            .graphicsLayer { this.scaleX = scale; this.scaleY = scale; this.rotationZ = rotation }
+            .graphicsLayer { scaleX = scale; scaleY = scale; rotationZ = rotation }
             .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoom, rotationChange ->
                     offsetX += pan.x; offsetY += pan.y; scale *= zoom; rotation += rotationChange
@@ -244,8 +230,10 @@ fun DraggableResizableTextBox(textBox: TextBoxData, onUpdate: (TextBoxData) -> U
                 }
             }
             .pointerInput(Unit) {
-                detectDragGestures { change, _ ->
-                    offsetX += change.positionChange().x; offsetY += change.positionChange().y
+                detectDragGestures { change, dragAmount ->
+                    change.consume()
+                    offsetX += dragAmount.x
+                    offsetY += dragAmount.y
                     onUpdate(textBox.copy(x = offsetX, y = offsetY))
                 }
             }
@@ -256,8 +244,9 @@ fun DraggableResizableTextBox(textBox: TextBoxData, onUpdate: (TextBoxData) -> U
         Column {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(text = "📝", fontSize = 12.sp, modifier = Modifier.pointerInput(Unit) {
-                    detectDragGestures { change, _ ->
-                        offsetX += change.positionChange().x; offsetY += change.positionChange().y
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        offsetX += dragAmount.x; offsetY += dragAmount.y
                         onUpdate(textBox.copy(x = offsetX, y = offsetY))
                     }
                 })
@@ -267,7 +256,7 @@ fun DraggableResizableTextBox(textBox: TextBoxData, onUpdate: (TextBoxData) -> U
             }
             if (isEditing) {
                 BasicTextField(value = textBox.text, onValueChange = { newText -> onUpdate(textBox.copy(text = newText)) },
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = textBox.fontSize.sp, color = Color(textBox.textColor)))
+                    textStyle = TextStyle(fontSize = textBox.fontSize.sp, color = Color(textBox.textColor)))
             } else {
                 Text(text = textBox.text, fontSize = textBox.fontSize.sp, color = Color(textBox.textColor),
                     modifier = Modifier.fillMaxSize().clickable { isEditing = true })
@@ -336,13 +325,13 @@ fun FontSettingsDialog(fontSize: Float, textColor: Color, isRTL: Boolean, onFont
 }
 
 @Composable
-fun TextFormattingToolbar(selectedText: String, onBold: () -> Unit, onItalic: () -> Unit, onUnderline: () -> Unit, onHighlight: () -> Unit, onAlignChange: () -> Unit, onClose: () -> Unit) {
+fun TextFormattingToolbar(onClose: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth().background(Color(DeepGreenSoft.value)).padding(8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-        IconButton(onClick = onBold) { Icon(Icons.Filled.FormatBold, "Bold") }
-        IconButton(onClick = onItalic) { Icon(Icons.Filled.FormatItalic, "Italic") }
-        IconButton(onClick = onUnderline) { Icon(Icons.Filled.FormatUnderlined, "Underline") }
-        IconButton(onClick = onHighlight) { Icon(Icons.Filled.FormatColorHighlight, "Highlight") }
-        IconButton(onClick = onAlignChange) { Icon(Icons.Filled.FormatAlignRight, "Align") }
+        IconButton(onClick = { }) { Icon(Icons.Filled.FormatBold, "Bold") }
+        IconButton(onClick = { }) { Icon(Icons.Filled.FormatItalic, "Italic") }
+        IconButton(onClick = { }) { Icon(Icons.Filled.FormatUnderlined, "Underline") }
+        IconButton(onClick = { }) { Icon(Icons.Filled.FormatColorFill, "Highlight") }
+        IconButton(onClick = { }) { Icon(Icons.Filled.FormatAlignRight, "Align") }
         IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "Close") }
     }
 }
@@ -363,7 +352,7 @@ fun EditorHeader(title: String, onTitleChange: (String) -> Unit, onBack: () -> U
         }
         TextField(value = title, onValueChange = onTitleChange, placeholder = { Text("عنوان یادداشت...", color = Color(MutedGreenText.value)) },
             colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
-            textStyle = androidx.compose.ui.text.TextStyle(color = Color(PaperWhite.value), fontSize = 18.sp, fontFamily = LalezarFont),
+            textStyle = TextStyle(color = Color(PaperWhite.value), fontSize = 18.sp, fontFamily = LalezarFont),
             modifier = Modifier.fillMaxWidth())
     }
 }
