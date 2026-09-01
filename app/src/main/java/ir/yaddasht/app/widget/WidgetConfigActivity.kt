@@ -2,14 +2,15 @@ package ir.yaddasht.app.widget
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
 import android.widget.GridLayout
-import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.edit
 import ir.yaddasht.app.R
 
 class WidgetConfigActivity : Activity() {
@@ -31,16 +32,11 @@ class WidgetConfigActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // تنظیم نتیجه پیش‌فرض به CANCELED
         setResult(RESULT_CANCELED)
         setContentView(R.layout.activity_widget_config)
 
-        // گرفتن widgetId از intent
-        appWidgetId = intent?.extras?.getInt(
-            AppWidgetManager.EXTRA_APPWIDGET_ID,
-            AppWidgetManager.INVALID_APPWIDGET_ID
-        ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
+        appWidgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID) 
+            ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
             finish()
@@ -55,16 +51,13 @@ class WidgetConfigActivity : Activity() {
         buildGrid(taskGrid, taskPalette, taskNames, isNote = false)
 
         confirmBtn.setOnClickListener {
-            // ذخیره رنگ‌ها
             WidgetPreferences.setNoteColor(this, selectedNoteColor)
             WidgetPreferences.setTaskColor(this, selectedTaskColor)
 
-            // آپدیت ویجت
             val appWidgetManager = AppWidgetManager.getInstance(this)
             NoteWidget.updateAppWidget(this, appWidgetManager, appWidgetId)
             TaskWidget.updateAppWidget(this, appWidgetManager, appWidgetId)
 
-            // تأیید و بستن
             val resultValue = Intent().apply {
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             }
@@ -97,12 +90,26 @@ class WidgetConfigActivity : Activity() {
                 }
                 contentDescription = names[i]
                 setOnClickListener {
-                    if (isNote) selectedNoteColor = color
-                    else selectedTaskColor = color
+                    if (isNote) selectedNoteColor = color else selectedTaskColor = color
                     buildGrid(grid, colors, names, isNote)
                 }
             }
             grid.addView(view)
         }
     }
+}
+
+// ✅ این آبجکت اینجا قرار گرفت تا دیگر خطای Unresolved reference ندهد
+object WidgetPreferences {
+    private const val PREFS = "widget_prefs_v2"
+    private const val KEY_NOTE_BG = "note_bg_color"
+    private const val KEY_TASK_BG = "task_bg_color"
+
+    private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    fun getNoteColor(c: Context): Int = prefs(c).getInt(KEY_NOTE_BG, 0xFFFFE082.toInt())
+    fun setNoteColor(c: Context, color: Int) = prefs(c).edit { putInt(KEY_NOTE_BG, color) }
+
+    fun getTaskColor(c: Context): Int = prefs(c).getInt(KEY_TASK_BG, 0xFF80DEEA.toInt())
+    fun setTaskColor(c: Context, color: Int) = prefs(c).edit { putInt(KEY_TASK_BG, color) }
 }
