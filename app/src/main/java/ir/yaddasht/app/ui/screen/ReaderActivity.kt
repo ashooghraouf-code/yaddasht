@@ -1,6 +1,7 @@
 package ir.yaddasht.app.ui.screen
 
 import android.app.Activity
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
@@ -9,12 +10,10 @@ import android.os.ParcelFileDescriptor
 import android.view.View
 import android.widget.ImageButton
 import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
-import androidx.core.content.res.ColorStateListCompat
 import ir.yaddasht.app.R
 import ir.yaddasht.app.util.TextExtractor
 import java.io.File
@@ -197,14 +196,14 @@ class ReaderActivity : Activity() {
         textContent.setTextColor(textColor)
         pageNumText.setTextColor(textColor)
         
-        val tintColor = ColorStateListCompat.valueOf(textColor)
+        val tintColor = ColorStateList.valueOf(textColor)
         prevBtn.imageTintList = tintColor
         nextBtn.imageTintList = tintColor
         themeBtn.imageTintList = tintColor
         fontSizeBtn.imageTintList = tintColor
         closeBtn.imageTintList = tintColor
         
-        pageSeek.progressTintList = ColorStateListCompat.valueOf(0xFFF5A524.toInt())
+        pageSeek.progressTintList = ColorStateList.valueOf(0xFFF5A524.toInt())
     }
 
     override fun onDestroy() {
