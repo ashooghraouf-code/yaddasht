@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/page_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFF8E1"
+    android:padding="12dp">
+
+    <!-- لایه سایه برای افکت کتاب -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/white"
+        android:elevation="2dp" />
+
+    <!-- محتوای صفحه -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_margin="8dp"
+        android:elevation="4dp"
+        android:background="@android:color/white">
+
+        <!-- برای PDF -->
+        <ImageView
+            android:id="@+id/page_image"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter"
+            android:contentDescription="صفحه PDF"
+            android:visibility="gone" />
+
+        <!-- برای متن -->
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:scrollbars="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/page_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#FF2C2C2C"
+                android:textSize="16sp"
+                android:lineSpacingExtra="6dp"
+                android:gravity="right"
+                android:textDirection="rtl"
+                android:visibility="gone" />
+        </ScrollView>
+
+        <!-- شماره صفحه در گوشه -->
+        <TextView
+            android:id="@+id/page_number_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="8dp"
+            android:textColor="#99000000"
+            android:textSize="10sp"
+            android:visibility="gone" />
+    </FrameLayout>
+</FrameLayout>
