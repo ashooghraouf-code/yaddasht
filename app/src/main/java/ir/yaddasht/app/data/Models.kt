@@ -18,9 +18,12 @@ import androidx.room.PrimaryKey
 data class Attachment(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val noteId: Long,
-    val fileName: String,
-    val mimeType: String,
-    val isImage: Boolean,
+    val filePath: String,
+    val fileName: String = "",
+    val mimeType: String = "",
+    val isImage: Boolean = false,
+    val type: String = "file",
+    val name: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )
 
