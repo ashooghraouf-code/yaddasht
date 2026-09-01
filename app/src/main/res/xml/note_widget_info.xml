@@ -11,5 +11,4 @@
     android:initialLayout="@layout/note_widget_layout"
     android:previewLayout="@layout/note_widget_layout"
     android:resizeMode="horizontal|vertical"
-    android:widgetCategory="home_screen"
-    android:description="ویجت یادداشت‌ها با قابلیت تغییر رنگ" />
+    android:widgetCategory="home_screen" />
