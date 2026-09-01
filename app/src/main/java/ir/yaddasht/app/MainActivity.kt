@@ -53,6 +53,8 @@ import ir.yaddasht.app.ui.theme.Saffron
 import ir.yaddasht.app.ui.theme.YaddashtTheme
 import ir.yaddasht.app.util.NoteLock
 import ir.yaddasht.app.widget.NoteWidget
+import ir.yaddasht.app.widget.TaskWidget
+import ir.yaddasht.app.widget.WidgetColorPickerActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.sqrt
@@ -130,7 +132,6 @@ class MainActivity : FragmentActivity() {
                 var authChecked by remember { mutableStateOf(false) }
                 var authPassed by remember { mutableStateOf(false) }
 
-                // ✅ KeyguardManager launcher - بدون نیاز به permission
                 val keyguardLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.StartActivityForResult()
                 ) { result ->
@@ -163,7 +164,6 @@ class MainActivity : FragmentActivity() {
                         if (intent != null) {
                             keyguardLauncher.launch(intent)
                         } else {
-                            // اگر دستگاه امن نیست، مستقیم رد کن
                             authRequired = false
                             authPassed = true
                         }
@@ -182,6 +182,12 @@ class MainActivity : FragmentActivity() {
                         }
                     }
                 } else if (authChecked) {
+                    // ✅ Widget settings
+                    if (intent.getBooleanExtra("open_widget_settings", false)) {
+                        startActivity(Intent(this@MainActivity, WidgetColorPickerActivity::class.java))
+                        intent.removeExtra("open_widget_settings")
+                    }
+
                     val openNoteId = remember { intent.getLongExtra("note_id", 0L) }
                     val isTaskExtra = remember { intent.getBooleanExtra("is_task", false) }
                     var screen by rememberSaveable(stateSaver = Screen.SAVER) {
@@ -216,8 +222,15 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
-        sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let { sensorManager?.registerListener(shakeListener, it, SensorManager.SENSOR_DELAY_UI) }
+        sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let { 
+            sensorManager?.registerListener(shakeListener, it, SensorManager.SENSOR_DELAY_UI) 
+        }
+        
+        // ✅ آپدیت خودکار ویجت‌ها هنگام باز شدن اپ
+        NoteWidget.forceUpdate(this)
+        TaskWidget.forceUpdate(this)
     }
+    
     override fun onPause() {
         super.onPause()
         sensorManager?.unregisterListener(shakeListener)
