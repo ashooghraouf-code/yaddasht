@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF0A1F1A"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🎨 تنظیمات ویجت"
+            android:textColor="#FFFFFFFF"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="رنگ دلخواه را انتخاب کنید"
+            android:textColor="#FF8FA89F"
+            android:textSize="13sp"
+            android:layout_marginTop="4dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📝 رنگ ویجت یادداشت‌ها"
+            android:textColor="#FFFFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginTop="20dp" />
+
+        <GridLayout
+            android:id="@+id/config_note_grid"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:columnCount="4"
+            android:layout_marginTop="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="✅ رنگ ویجت وظایف"
+            android:textColor="#FFFFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginTop="20dp" />
+
+        <GridLayout
+            android:id="@+id/config_task_grid"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:columnCount="4"
+            android:layout_marginTop="8dp" />
+
+        <Button
+            android:id="@+id/config_confirm_btn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="✅ ساخت ویجت با این رنگ‌ها"
+            android:layout_marginTop="30dp"
+            android:textSize="16sp"
+            android:backgroundTint="#FFF5A524"
+            android:textColor="#FF000000" />
+    </LinearLayout>
+</ScrollView>
