@@ -1,14 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:minWidth="250dp"
-    android:minHeight="250dp"
-    android:minResizeWidth="110dp"
-    android:minResizeHeight="110dp"
-    android:maxResizeWidth="600dp"
-    android:maxResizeHeight="600dp"
-    android:updatePeriodMillis="1800000"
-    android:configure="ir.yaddasht.app.widget.WidgetConfigActivity"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:updatePeriodMillis="86400000"
     android:initialLayout="@layout/note_widget_layout"
-    android:previewLayout="@layout/note_widget_layout"
     android:resizeMode="horizontal|vertical"
-    android:widgetCategory="home_screen" />
+    android:widgetCategory="home_screen"
+    android:configure="ir.yaddasht.app.widget.WidgetConfigActivity" />
