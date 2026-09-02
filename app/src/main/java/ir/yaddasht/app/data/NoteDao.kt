@@ -17,7 +17,8 @@ interface NoteDao {
     @Query("SELECT * FROM notes ORDER BY updatedAt DESC LIMIT 3")
     suspend fun getRecentNotes(): List<Note>
 
-    @Query("SELECT noteId, COUNT(*) as count FROM attachments GROUP BY noteId")
+    // ✅ اصلاح: نام ستون COUNT را به attachmentCount تغییر دادیم تا با کلاس AttachmentCount تطابق داشته باشد
+    @Query("SELECT noteId, COUNT(*) as attachmentCount FROM attachments GROUP BY noteId")
     fun observeAttachmentCounts(): Flow<List<AttachmentCount>>
 
     @Query("SELECT * FROM attachments WHERE noteId = :noteId")
