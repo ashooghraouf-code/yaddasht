@@ -2,6 +2,7 @@ package ir.yaddasht.app.data
 
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import androidx.room.Ignore
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -29,10 +30,11 @@ data class Attachment(
     val isImage: Boolean
 )
 
-// ✅ هر دو فیلد count و attachmentCount به‌صورت واقعی
-// Room هر دو را از کوئری پر می‌کند (هر دو یک مقدار دارند)
+// ✅ دو فیلد اصلی + یک computed property با @Ignore
 data class AttachmentCount(
     val noteId: Long,
-    val count: Int,
-    val attachmentCount: Int
-)
+    val count: Int
+) {
+    @Ignore
+    val attachmentCount: Int get() = count
+}
