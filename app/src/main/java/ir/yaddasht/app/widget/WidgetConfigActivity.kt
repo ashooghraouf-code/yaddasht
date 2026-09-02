@@ -2,7 +2,6 @@ package ir.yaddasht.app.widget
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.GradientDrawable
@@ -63,7 +62,6 @@ class WidgetConfigActivity : Activity() {
             try {
                 Toast.makeText(this, "۱. در حال ذخیره رنگ...", Toast.LENGTH_SHORT).show()
                 
-                // مرحله ۱: ذخیره رنگ
                 val prefs = getSharedPreferences("widget_prefs_v2", Context.MODE_PRIVATE)
                 prefs.edit { 
                     putInt("note_bg_color", selectedNoteColor)
@@ -71,38 +69,26 @@ class WidgetConfigActivity : Activity() {
                 }
                 Toast.makeText(this, "۲. رنگ ذخیره شد.", Toast.LENGTH_SHORT).show()
 
-                // مرحله ۲: آپدیت مستقیم و ساده ویجت (بدون استفاده از NoteWidget.kt)
                 val appWidgetManager = AppWidgetManager.getInstance(this)
-                Toast.makeText(this, "۳. در حال ساخت ویجت به صورت مستقیم...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "۳. در حال ساخت ویجت...", Toast.LENGTH_SHORT).show()
 
-                // تشخیص نوع ویجت
                 val widgetInfo = appWidgetManager.getAppWidgetInfo(appWidgetId)
                 val providerName = widgetInfo?.provider?.className ?: ""
                 
                 if (providerName.contains("NoteWidget")) {
-                    // آپدیت مستقیم با RemoteViews (بدون Coroutine و دیتابیس)
                     val views = RemoteViews(this.packageName, R.layout.note_widget_layout)
-                    try {
-                        // تلاش برای تغییر رنگ (اگر ID وجود نداشته باشد، خطا نمی‌دهد، فقط اعمال نمی‌شود)
-                        views.setInt(R.id.note_widget_root, "setBackgroundColor", selectedNoteColor)
-                    } catch (e: Exception) {
-                        // اگر ID پیدا نشد، نادیده بگیر
-                    }
-                    views.setTextViewText(R.id.note_widget_title, "ویجت با موفقیت ساخته شد ✅")
+                    views.setInt(R.id.note_widget_root, "setBackgroundColor", selectedNoteColor)
+                    views.setTextViewText(R.id.note_widget_title, "ویجت با رنگ جدید ساخته شد ✅")
                     appWidgetManager.updateAppWidget(appWidgetId, views)
-                    
                 } else if (providerName.contains("TaskWidget")) {
                     val views = RemoteViews(this.packageName, R.layout.task_widget_layout)
-                    try {
-                        views.setInt(R.id.task_widget_root, "setBackgroundColor", selectedTaskColor)
-                    } catch (e: Exception) {}
-                    views.setTextViewText(R.id.task_widget_title, "ویجت وظایف ساخته شد ✅")
+                    views.setInt(R.id.task_widget_root, "setBackgroundColor", selectedTaskColor)
+                    views.setTextViewText(R.id.task_widget_title, "ویجت با رنگ جدید ساخته شد ✅")
                     appWidgetManager.updateAppWidget(appWidgetId, views)
                 }
 
-                Toast.makeText(this, "۴. ویجت با موفقیت آپدیت شد.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "۴. ویجت آپدیت شد.", Toast.LENGTH_SHORT).show()
 
-                // مرحله ۳: بازگرداندن نتیجه به سیستم عامل (این خط حیاتی است)
                 val resultValue = Intent().apply {
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                 }
@@ -110,7 +96,6 @@ class WidgetConfigActivity : Activity() {
                 
                 Toast.makeText(this, "✅ تمام! ویجت ساخته شد.", Toast.LENGTH_LONG).show()
                 
-                // یک تأخیر کوچک برای اینکه کاربر پیام را ببیند
                 android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                     finish()
                 }, 500)
@@ -127,7 +112,8 @@ class WidgetConfigActivity : Activity() {
         grid.removeAllViews()
         
         colors.forEachIndexed { i, color ->
-            val size = (56 * resources.displayMetrics.dency).toInt()
+            // ✅ اصلاح غلط املایی dency به density
+            val size = (56 * resources.displayMetrics.density).toInt()
             val margin = (4 * resources.displayMetrics.density).toInt()
 
             val view = View(this).apply {
