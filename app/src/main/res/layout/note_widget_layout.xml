@@ -1,30 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/note_widget_root"
+    android:id="@+id/task_widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#FFFFE082"
+    android:background="#FF80DEEA"
     android:padding="8dp">
 
     <TextView
-        android:id="@+id/note_widget_title"
+        android:id="@+id/task_widget_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="📝 یادداشت‌ها"
-        android:textColor="#FF3E2723"
+        android:text="✅ وظایف من"
+        android:textColor="#FF004D40"
         android:textSize="14sp"
         android:textStyle="bold"
         android:gravity="center"
         android:layout_marginBottom="8dp" />
 
     <TextView
-        android:id="@+id/note_body_1"
+        android:id="@+id/task_title_1"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:text="برای افزودن یادداشت جدید، روی + کلیک کنید"
-        android:textColor="#FF5D4037"
+        android:text="برای افزودن وظیفه جدید، روی + کلیک کنید"
+        android:textColor="#FF004D40"
         android:textSize="12sp"
         android:gravity="center" />
 </LinearLayout>
