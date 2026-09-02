@@ -11,7 +11,7 @@ interface NoteDao {
     @Query("SELECT * FROM notes ORDER BY updatedAt DESC")
     suspend fun allNotesSync(): List<Note>
 
-    // ✅ خط جدید برای ویجت: خواندن ۳ یادداشت آخر
+    // ✅ تابع جدید برای ویجت: خواندن ۳ یادداشت آخر
     @Query("SELECT * FROM notes ORDER BY updatedAt DESC LIMIT 3")
     suspend fun getRecentNotes(): List<Note>
 
@@ -34,5 +34,12 @@ interface NoteDao {
     suspend fun deleteById(id: Long)
 }
 
+// ✅ تعریف صحیح جدول Attachments برای رفع خطای Room
+@Entity(tableName = "attachments")
+data class Attachment(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val noteId: Long,
+    val filePath: String
+)
+
 data class AttachmentCount(val noteId: Long, val count: Int)
-data class Attachment(val noteId: Long, val filePath: String)
