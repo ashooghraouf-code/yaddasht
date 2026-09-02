@@ -9,7 +9,6 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Button
 import android.widget.GridLayout
-import android.widget.RemoteViews
 import android.widget.Toast
 import androidx.core.content.edit
 import ir.yaddasht.app.R
@@ -18,10 +17,15 @@ class WidgetConfigActivity : Activity() {
 
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
     private var selectedNoteColor: Int = 0xFFFFE082.toInt()
+    private var selectedTaskColor: Int = 0xFF80DEEA.toInt()
 
     private val notePalette = intArrayOf(
         0xFFFFE082.toInt(), 0xFFFFB74D.toInt(), 0xFFFF8A65.toInt(), 0xFFF06292.toInt(),
         0xFFBA68C8.toInt(), 0xFF9575CD.toInt(), 0xFF81C784.toInt(), 0xFFAED581.toInt()
+    )
+    private val taskPalette = intArrayOf(
+        0xFF80DEEA.toInt(), 0xFF4DD0E1.toInt(), 0xFF4FC3F7.toInt(), 0xFF64B5F6.toInt(),
+        0xFF7986CB.toInt(), 0xFF9575CD.toInt(), 0xFFA1887F.toInt(), 0xFFE0E0E0.toInt()
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,7 +35,7 @@ class WidgetConfigActivity : Activity() {
         try {
             setContentView(R.layout.activity_widget_config)
         } catch (e: Exception) {
-            Toast.makeText(this, "❌ خطا در layout: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "❌ خطا در باز کردن صفحه: ${e.message}", Toast.LENGTH_LONG).show()
             finish()
             return
         }
@@ -47,48 +51,46 @@ class WidgetConfigActivity : Activity() {
         }
 
         val noteGrid = findViewById<GridLayout>(R.id.config_note_grid)
+        val taskGrid = findViewById<GridLayout>(R.id.config_task_grid)
         val confirmBtn = findViewById<Button>(R.id.config_confirm_btn)
 
-        // مخفی کردن گرید وظایف برای تمرکز روی تست ویجت یادداشت
-        findViewById<GridLayout>(R.id.config_task_grid)?.visibility = View.GONE
-
-        buildGrid(noteGrid, notePalette)
+        buildGrid(noteGrid, notePalette, isNote = true)
+        buildGrid(taskGrid, taskPalette, isNote = false)
 
         confirmBtn.setOnClickListener {
             try {
-                // ۱. ذخیره رنگ انتخابی
+                // ۱. ذخیره رنگ‌های انتخاب‌شده
                 val prefs = getSharedPreferences("widget_prefs_v2", Context.MODE_PRIVATE)
-                prefs.edit { putInt("note_bg_color", selectedNoteColor) }
+                prefs.edit { 
+                    putInt("note_bg_color", selectedNoteColor)
+                    putInt("task_bg_color", selectedTaskColor)
+                }
 
-                // ۲. آپدیت ساده و آنی (بدون Coroutine و دیتابیس) برای اطمینان از کارکرد
+                // ۲. آپدیت ویجت از طریق متد استاندارد و امن خود کلاس‌های ویجت
                 val appWidgetManager = AppWidgetManager.getInstance(this)
-                val views = RemoteViews(this.packageName, R.layout.note_widget_layout)
-                
-                // تنظیم رنگ پس‌زمینه
-                views.setInt(R.id.note_widget_root, "setBackgroundColor", selectedNoteColor)
-                // تنظیم یک متن تستی برای اطمینان از رندر شدن
-                views.setTextViewText(R.id.note_widget_title, "ویجت تستی موفق ✅")
+                NoteWidget.updateAppWidget(this, appWidgetManager, appWidgetId)
+                TaskWidget.updateAppWidget(this, appWidgetManager, appWidgetId)
 
-                appWidgetManager.updateAppWidget(appWidgetId, views)
-
-                // ۳. بازگرداندن نتیجه به سیستم عامل اندروید (بسیار مهم)
+                // ۳. بازگرداندن نتیجه به سیستم عامل اندروید (برای اضافه شدن ویجت به صفحه)
                 val resultValue = Intent().apply {
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                 }
                 setResult(RESULT_OK, resultValue)
                 
-                // بستن اکتیویتی و بازگشت به صفحه اصلی
+                Toast.makeText(this, "✅ ویجت با موفقیت ساخته شد", Toast.LENGTH_SHORT).show()
                 finish()
                 
             } catch (e: Exception) {
-                Toast.makeText(this, "❌ خطا: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "❌ خطا در ساخت ویجت: ${e.message}", Toast.LENGTH_LONG).show()
                 e.printStackTrace()
             }
         }
     }
 
-    private fun buildGrid(grid: GridLayout, colors: IntArray) {
+    private fun buildGrid(grid: GridLayout, colors: IntArray, isNote: Boolean) {
+        val currentColor = if (isNote) selectedNoteColor else selectedTaskColor
         grid.removeAllViews()
+        
         colors.forEachIndexed { i, color ->
             val size = (56 * resources.displayMetrics.density).toInt()
             val margin = (4 * resources.displayMetrics.density).toInt()
@@ -102,13 +104,13 @@ class WidgetConfigActivity : Activity() {
                     shape = GradientDrawable.RECTANGLE
                     setColor(color)
                     cornerRadius = 14 * resources.displayMetrics.density
-                    if (color == selectedNoteColor) {
+                    if (color == currentColor) {
                         setStroke((3 * resources.displayMetrics.density).toInt(), 0xFFFFFFFF.toInt())
                     }
                 }
                 setOnClickListener {
-                    selectedNoteColor = color
-                    buildGrid(grid, colors)
+                    if (isNote) selectedNoteColor = color else selectedTaskColor = color
+                    buildGrid(grid, colors, isNote)
                 }
             }
             grid.addView(view)
@@ -116,6 +118,7 @@ class WidgetConfigActivity : Activity() {
     }
 }
 
+// ✅ ذخیره‌سازی ترجیحات ویجت
 object WidgetPreferences {
     private const val PREFS = "widget_prefs_v2"
     private const val KEY_NOTE_BG = "note_bg_color"
