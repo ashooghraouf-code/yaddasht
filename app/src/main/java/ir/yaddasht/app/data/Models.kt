@@ -29,11 +29,10 @@ data class Attachment(
     val isImage: Boolean
 )
 
-// TaskAttachment اینجا نیست چون در فایل TaskAttachment.kt تعریف شده است
-
+// ✅ هر دو فیلد count و attachmentCount به‌صورت واقعی
+// Room هر دو را از کوئری پر می‌کند (هر دو یک مقدار دارند)
 data class AttachmentCount(
     val noteId: Long,
-    val count: Int
-) {
-    val attachmentCount: Int get() = count
-}
+    val count: Int,
+    val attachmentCount: Int
+)
