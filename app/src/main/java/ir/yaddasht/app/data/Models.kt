@@ -29,12 +29,8 @@ data class Attachment(
     val isImage: Boolean
 )
 
-// ✅ فقط دو فیلد در constructor (Room فقط این‌ها را از query می‌خواند)
-// computed property بدون @Ignore (چون در constructor نیست، Room خودکار آن را نادیده می‌گیرد)
+// برای HomeScreen (it.count) و Widget
 data class AttachmentCount(
     val noteId: Long,
     val count: Int
-) {
-    val attachmentCount: Int 
-        get() = count
-}
+)
