@@ -62,6 +62,15 @@
             android:label="رنگ ویجت"
             android:theme="@android:style/Theme.Material.NoActionBar" />
 
+        <!-- ✅ Receiver جدید برای تیک زدن وظایف در ویجت -->
+        <receiver
+            android:name=".widget.TaskWidgetReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="TOGGLE_TASK" />
+            </intent-filter>
+        </receiver>
+
         <receiver android:name=".reminder.ReminderReceiver" android:exported="false" />
         <receiver android:name=".reminder.ReminderActionReceiver" android:exported="false" />
 
@@ -94,7 +103,6 @@
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="ir.yaddasht.app.REFRESH_TASKS" />
                 <action android:name="ir.yaddasht.app.ADD_TASK" />
-                <action android:name="ir.yaddasht.app.TOGGLE_TASK" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider"
                 android:resource="@xml/task_widget_info" />
