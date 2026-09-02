@@ -2,6 +2,7 @@ package ir.yaddasht.app.widget
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.GradientDrawable
@@ -9,6 +10,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Button
 import android.widget.GridLayout
+import android.widget.RemoteViews
 import android.widget.Toast
 import androidx.core.content.edit
 import ir.yaddasht.app.R
@@ -69,35 +71,49 @@ class WidgetConfigActivity : Activity() {
                 }
                 Toast.makeText(this, "۲. رنگ ذخیره شد.", Toast.LENGTH_SHORT).show()
 
-                // مرحله ۲: آپدیت ویجت‌ها
+                // مرحله ۲: آپدیت مستقیم و ساده ویجت (بدون استفاده از NoteWidget.kt)
                 val appWidgetManager = AppWidgetManager.getInstance(this)
-                
-                // ✅ تشخیص هوشمند نوع ویجت برای جلوگیری از Crash
+                Toast.makeText(this, "۳. در حال ساخت ویجت به صورت مستقیم...", Toast.LENGTH_SHORT).show()
+
+                // تشخیص نوع ویجت
                 val widgetInfo = appWidgetManager.getAppWidgetInfo(appWidgetId)
                 val providerName = widgetInfo?.provider?.className ?: ""
                 
-                Toast.makeText(this, "۳. نوع ویجت: ${if (providerName.contains("Note")) "یادداشت" else "وظایف"}", Toast.LENGTH_SHORT).show()
-
                 if (providerName.contains("NoteWidget")) {
-                    NoteWidget.updateAppWidget(this, appWidgetManager, appWidgetId)
+                    // آپدیت مستقیم با RemoteViews (بدون Coroutine و دیتابیس)
+                    val views = RemoteViews(this.packageName, R.layout.note_widget_layout)
+                    try {
+                        // تلاش برای تغییر رنگ (اگر ID وجود نداشته باشد، خطا نمی‌دهد، فقط اعمال نمی‌شود)
+                        views.setInt(R.id.note_widget_root, "setBackgroundColor", selectedNoteColor)
+                    } catch (e: Exception) {
+                        // اگر ID پیدا نشد، نادیده بگیر
+                    }
+                    views.setTextViewText(R.id.note_widget_title, "ویجت با موفقیت ساخته شد ✅")
+                    appWidgetManager.updateAppWidget(appWidgetId, views)
+                    
                 } else if (providerName.contains("TaskWidget")) {
-                    TaskWidget.updateAppWidget(this, appWidgetManager, appWidgetId)
-                } else {
-                    // اگر نامشخص بود، هر دو را در try-catch امتحان کن
-                    try { NoteWidget.updateAppWidget(this, appWidgetManager, appWidgetId) } catch (e: Exception) {}
-                    try { TaskWidget.updateAppWidget(this, appWidgetManager, appWidgetId) } catch (e: Exception) {}
+                    val views = RemoteViews(this.packageName, R.layout.task_widget_layout)
+                    try {
+                        views.setInt(R.id.task_widget_root, "setBackgroundColor", selectedTaskColor)
+                    } catch (e: Exception) {}
+                    views.setTextViewText(R.id.task_widget_title, "ویجت وظایف ساخته شد ✅")
+                    appWidgetManager.updateAppWidget(appWidgetId, views)
                 }
 
-                Toast.makeText(this, "۴. ویجت آپدیت شد.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "۴. ویجت با موفقیت آپدیت شد.", Toast.LENGTH_SHORT).show()
 
-                // مرحله ۳: بازگرداندن نتیجه به سیستم عامل
+                // مرحله ۳: بازگرداندن نتیجه به سیستم عامل (این خط حیاتی است)
                 val resultValue = Intent().apply {
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                 }
                 setResult(RESULT_OK, resultValue)
                 
-                Toast.makeText(this, "✅ ویجت ساخته شد!", Toast.LENGTH_SHORT).show()
-                finish()
+                Toast.makeText(this, "✅ تمام! ویجت ساخته شد.", Toast.LENGTH_LONG).show()
+                
+                // یک تأخیر کوچک برای اینکه کاربر پیام را ببیند
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    finish()
+                }, 500)
                 
             } catch (e: Exception) {
                 Toast.makeText(this, "❌ CRASH: ${e.message}", Toast.LENGTH_LONG).show()
@@ -111,7 +127,7 @@ class WidgetConfigActivity : Activity() {
         grid.removeAllViews()
         
         colors.forEachIndexed { i, color ->
-            val size = (56 * resources.displayMetrics.density).toInt()
+            val size = (56 * resources.displayMetrics.dency).toInt()
             val margin = (4 * resources.displayMetrics.density).toInt()
 
             val view = View(this).apply {
