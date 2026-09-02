@@ -41,4 +41,5 @@ data class TaskAttachment(
     val isImage: Boolean
 )
 
+// ✅ تغییر نام به attachmentCount برای هماهنگی با EditorScreen
 data class AttachmentCount(val noteId: Long, val attachmentCount: Int)
