@@ -15,44 +15,36 @@ class WidgetConfigActivity : Activity() {
         super.onCreate(savedInstanceState)
         setResult(RESULT_CANCELED)
 
-        // دریافت ID ویجت از لانچر
-        appWidgetId = intent?.extras?.getInt(
-            AppWidgetManager.EXTRA_APPWIDGET_ID,
-            AppWidgetManager.INVALID_APPWIDGET_ID
-        ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
+        appWidgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID) 
+            ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
             finish()
             return
         }
 
-        // ساخت یک دکمه ساده برای تأیید
         val btn = Button(this).apply {
             text = "✅ تأیید و ساخت ویجت"
             textSize = 18f
             setOnClickListener {
                 try {
-                    // ۱. ذخیره یک تنظیمات تستی (برای اطمینان از کارکرد SharedPreferences)
-                    getSharedPreferences("widget_prefs_test", MODE_PRIVATE).edit()
-                        .putString("status", "configured").apply()
+                    // ذخیره رنگ پیش‌فرض برای اطمینان از کارکرد
+                    WidgetPreferences.setNoteColor(this@WidgetConfigActivity, 0xFFFFE082.toInt())
+                    WidgetPreferences.setTaskColor(this@WidgetConfigActivity, 0xFF80DEEA.toInt())
 
-                    // ۲. ارسال سیگنال موفقیت به لانچر اندروید (حیاتی‌ترین خط کد)
                     val resultValue = Intent().apply {
                         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                     }
                     setResult(RESULT_OK, resultValue)
+                    Toast.makeText(this@WidgetConfigActivity, "در حال افزودن...", Toast.LENGTH_SHORT).show()
                     
-                    Toast.makeText(this@WidgetConfigActivity, "در حال افزودن به صفحه...", Toast.LENGTH_SHORT).show()
-                    
-                    // ۳. بستن اکتیویتی
-                    finish()
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ finish() }, 300)
                 } catch (e: Exception) {
-                    Toast.makeText(this@WidgetConfigActivity, "خطا: ${e.message}", Toast.LENGTH_LONG).show()
                     e.printStackTrace()
+                    finish()
                 }
             }
         }
-
         setContentView(btn)
     }
 }
