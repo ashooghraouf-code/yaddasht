@@ -10,7 +10,6 @@ import android.view.View
 import android.widget.Button
 import android.widget.GridLayout
 import android.widget.RemoteViews
-import android.widget.Toast
 import androidx.core.content.edit
 import ir.yaddasht.app.R
 
@@ -29,7 +28,7 @@ class WidgetConfigActivity : Activity() {
         
         try {
             setContentView(R.layout.activity_widget_config)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             finish()
             return
         }
@@ -45,34 +44,56 @@ class WidgetConfigActivity : Activity() {
         buildGrid(taskGrid, taskPalette, isNote = false)
 
         confirmBtn.setOnClickListener {
+            var success = false
             try {
+                // ۱. ذخیره رنگ (اولویت اول)
                 val prefs = getSharedPreferences("widget_prefs_v2", Context.MODE_PRIVATE)
                 prefs.edit { 
                     putInt("note_bg_color", selectedNoteColor)
                     putInt("task_bg_color", selectedTaskColor)
                 }
 
-                val appWidgetManager = AppWidgetManager.getInstance(this)
-                val widgetInfo = appWidgetManager.getAppWidgetInfo(appWidgetId)
-                val providerName = widgetInfo?.provider?.className ?: ""
-                
-                if (providerName.contains("NoteWidget")) {
-                    val views = RemoteViews(this.packageName, R.layout.note_widget_layout)
-                    views.setInt(R.id.note_widget_root, "setBackgroundColor", selectedNoteColor)
-                    views.setTextViewText(R.id.note_widget_title, "ویجت با رنگ جدید ساخته شد ✅")
-                    appWidgetManager.updateAppWidget(appWidgetId, views)
-                } else if (providerName.contains("TaskWidget")) {
-                    val views = RemoteViews(this.packageName, R.layout.task_widget_layout)
-                    views.setInt(R.id.task_widget_root, "setBackgroundColor", selectedTaskColor)
-                    views.setTextViewText(R.id.task_widget_title, "ویجت با رنگ جدید ساخته شد ✅")
-                    appWidgetManager.updateAppWidget(appWidgetId, views)
+                // ۲. تلاش برای آپدیت گرافیکی (اگر شکست خورد، مهم نیست، ادامه می‌دهیم)
+                try {
+                    val appWidgetManager = AppWidgetManager.getInstance(this)
+                    val widgetInfo = appWidgetManager.getAppWidgetInfo(appWidgetId)
+                    val providerName = widgetInfo?.provider?.className ?: ""
+                    
+                    if (providerName.contains("NoteWidget", ignoreCase = true)) {
+                        val views = RemoteViews(packageName, R.layout.note_widget_layout)
+                        try { views.setInt(R.id.note_widget_root, "setBackgroundColor", selectedNoteColor) } catch (_: Throwable) {}
+                        try { views.setTextViewText(R.id.note_widget_title, "یادداشت‌ها") } catch (_: Throwable) {}
+                        appWidgetManager.updateAppWidget(appWidgetId, views)
+                    } else if (providerName.contains("TaskWidget", ignoreCase = true)) {
+                        val views = RemoteViews(packageName, R.layout.task_widget_layout)
+                        try { views.setInt(R.id.task_widget_root, "setBackgroundColor", selectedTaskColor) } catch (_: Throwable) {}
+                        try { views.setTextViewText(R.id.task_widget_title, "وظایف") } catch (_: Throwable) {}
+                        appWidgetManager.updateAppWidget(appWidgetId, views)
+                    }
+                    success = true
+                } catch (e: Throwable) {
+                    // خطای RemoteViews را نادیده می‌گیریم تا ویجت حداقل ساخته شود
+                    e.printStackTrace()
+                    success = true // همچنان true می‌گذاریم تا ویجت ساخته شود
                 }
 
-                val resultValue = Intent().apply { putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId) }
-                setResult(RESULT_OK, resultValue)
-                finish()
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 e.printStackTrace()
+            } finally {
+                // ۳. حیاتی‌ترین بخش: تحت هر شرایطی به اندروید بگوییم ویجت را بساز
+                try {
+                    val resultValue = Intent().apply { 
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId) 
+                    }
+                    setResult(RESULT_OK, resultValue)
+                    
+                    // ۴. تأخیر کوتاه برای اطمینان از ثبت ویجت در لانچر قبل از بسته شدن
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        finish()
+                    }, 300)
+                } catch (e: Throwable) {
+                    finish()
+                }
             }
         }
     }
@@ -89,7 +110,10 @@ class WidgetConfigActivity : Activity() {
                     shape = GradientDrawable.RECTANGLE; setColor(color); cornerRadius = 14 * resources.displayMetrics.density
                     if (color == currentColor) setStroke((3 * resources.displayMetrics.density).toInt(), 0xFFFFFFFF.toInt())
                 }
-                setOnClickListener { if (isNote) selectedNoteColor = color else selectedTaskColor = color; buildGrid(grid, colors, isNote) }
+                setOnClickListener { 
+                    if (isNote) selectedNoteColor = color else selectedTaskColor = color
+                    buildGrid(grid, colors, isNote) 
+                }
             }
             grid.addView(view)
         }
