@@ -11,7 +11,7 @@ interface TaskDao {
     @Query("SELECT * FROM tasks ORDER BY dueDate ASC LIMIT 3")
     suspend fun getRecentTasks(): List<Task>
 
-    @Query("SELECT * FROM tasks")
+    @Query("SELECT * FROM tasks WHERE isCompleted = 0")
     suspend fun getActiveTasksSync(): List<Task>
 
     @Query("SELECT * FROM tasks WHERE id = :id")
@@ -32,15 +32,15 @@ interface TaskDao {
     @Query("DELETE FROM tasks WHERE id = :id")
     suspend fun deleteById(id: Long)
 
-    @Query("SELECT * FROM attachments WHERE noteId = :taskId")
-    fun observeTaskAttachments(taskId: Long): Flow<List<Attachment>>
+    @Query("SELECT * FROM task_attachments WHERE taskId = :taskId")
+    fun observeTaskAttachments(taskId: Long): Flow<List<TaskAttachment>>
 
-    @Query("SELECT * FROM attachments WHERE noteId = :taskId")
-    suspend fun taskAttachmentsByTask(taskId: Long): List<Attachment>
+    @Query("SELECT * FROM task_attachments WHERE taskId = :taskId")
+    suspend fun taskAttachmentsByTask(taskId: Long): List<TaskAttachment>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertTaskAttachment(attachment: Attachment): Long
+    suspend fun insertTaskAttachment(attachment: TaskAttachment): Long
 
     @Delete
-    suspend fun deleteTaskAttachment(attachment: Attachment)
+    suspend fun deleteTaskAttachment(attachment: TaskAttachment)
 }
