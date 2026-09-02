@@ -29,4 +29,16 @@ data class Attachment(
     val isImage: Boolean
 )
 
-data class AttachmentCount(val noteId: Long, val count: Int)
+@Entity(tableName = "task_attachments",
+    foreignKeys = [ForeignKey(entity = Task::class, parentColumns = ["id"], childColumns = ["taskId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index("taskId")])
+data class TaskAttachment(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val taskId: Long,
+    val fileName: String,
+    val filePath: String,
+    val mimeType: String,
+    val isImage: Boolean
+)
+
+data class AttachmentCount(val noteId: Long, val attachmentCount: Int)
