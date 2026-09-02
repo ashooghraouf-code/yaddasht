@@ -27,79 +27,123 @@ class WidgetConfigActivity : Activity() {
         0xFF80DEEA.toInt(), 0xFF4DD0E1.toInt(), 0xFF4FC3F7.toInt(), 0xFF64B5F6.toInt(),
         0xFF7986CB.toInt(), 0xFF9575CD.toInt(), 0xFFA1887F.toInt(), 0xFFE0E0E0.toInt()
     )
-    private val noteNames = arrayOf("طلایی", "نارنجی", "مرجانی", "صورتی", "بنفش", "یاسی", "سبز", "لیمویی")
-    private val taskNames = arrayOf("فیروزه‌ای", "آبی روشن", "آسمانی", "آبی", "نیلی", "ارغوانی", "قهوه‌ای", "نقره‌ای")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setResult(RESULT_CANCELED)
-        setContentView(R.layout.activity_widget_config)
-
-        appWidgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID) 
-            ?: AppWidgetManager.INVALID_APPWIDGET_ID
-
-        if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+        
+        try {
+            setContentView(R.layout.activity_widget_config)
+            Toast.makeText(this, "✅ صفحه تنظیمات باز شد", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "❌ خطا در باز کردن layout: ${e.message}", Toast.LENGTH_LONG).show()
             finish()
             return
         }
 
-        val noteGrid = findViewById<GridLayout>(R.id.config_note_grid)
-        val taskGrid = findViewById<GridLayout>(R.id.config_task_grid)
-        val confirmBtn = findViewById<Button>(R.id.config_confirm_btn)
+        // گرفتن widgetId
+        appWidgetId = intent?.extras?.getInt(
+            AppWidgetManager.EXTRA_APPWIDGET_ID, 
+            AppWidgetManager.INVALID_APPWIDGET_ID
+        ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
-        buildGrid(noteGrid, notePalette, noteNames, isNote = true)
-        buildGrid(taskGrid, taskPalette, taskNames, isNote = false)
+        Toast.makeText(this, "Widget ID: $appWidgetId", Toast.LENGTH_SHORT).show()
 
-        confirmBtn.setOnClickListener {
-            WidgetPreferences.setNoteColor(this, selectedNoteColor)
-            WidgetPreferences.setTaskColor(this, selectedTaskColor)
+        if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+            Toast.makeText(this, "❌ Widget ID نامعتبر است", Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
 
-            val appWidgetManager = AppWidgetManager.getInstance(this)
-            NoteWidget.updateAppWidget(this, appWidgetManager, appWidgetId)
-            TaskWidget.updateAppWidget(this, appWidgetManager, appWidgetId)
+        try {
+            val noteGrid = findViewById<GridLayout>(R.id.config_note_grid)
+            val taskGrid = findViewById<GridLayout>(R.id.config_task_grid)
+            val confirmBtn = findViewById<Button>(R.id.config_confirm_btn)
 
-            val resultValue = Intent().apply {
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            buildGrid(noteGrid, notePalette, isNote = true)
+            buildGrid(taskGrid, taskPalette, isNote = false)
+
+            confirmBtn.setOnClickListener {
+                try {
+                    saveAndFinish()
+                } catch (e: Exception) {
+                    Toast.makeText(this, "❌ خطا در ذخیره: ${e.message}", Toast.LENGTH_LONG).show()
+                    e.printStackTrace()
+                }
             }
-            setResult(RESULT_OK, resultValue)
-            Toast.makeText(this, "✅ ویجت با رنگ انتخابی ساخته شد", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "❌ خطا در ساخت گرید: ${e.message}", Toast.LENGTH_LONG).show()
             finish()
         }
     }
 
-    private fun buildGrid(grid: GridLayout, colors: IntArray, names: Array<String>, isNote: Boolean) {
-        val currentColor = if (isNote) selectedNoteColor else selectedTaskColor
-        grid.removeAllViews()
+    private fun buildGrid(grid: GridLayout, colors: IntArray, isNote: Boolean) {
+        try {
+            val currentColor = if (isNote) selectedNoteColor else selectedTaskColor
+            grid.removeAllViews()
 
-        colors.forEachIndexed { i, color ->
-            val size = (56 * resources.displayMetrics.density).toInt()
-            val margin = (4 * resources.displayMetrics.density).toInt()
+            colors.forEachIndexed { i, color ->
+                val size = (56 * resources.displayMetrics.density).toInt()
+                val margin = (4 * resources.displayMetrics.density).toInt()
 
-            val view = View(this).apply {
-                layoutParams = GridLayout.LayoutParams().apply {
-                    width = size; height = size
-                    setMargins(margin, margin, margin, margin)
-                }
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    setColor(color)
-                    cornerRadius = 14 * resources.displayMetrics.density
-                    if (color == currentColor) {
-                        setStroke((3 * resources.displayMetrics.density).toInt(), 0xFFFFFFFF.toInt())
+                val view = View(this).apply {
+                    layoutParams = GridLayout.LayoutParams().apply {
+                        width = size; height = size
+                        setMargins(margin, margin, margin, margin)
+                    }
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        setColor(color)
+                        cornerRadius = 14 * resources.displayMetrics.density
+                        if (color == currentColor) {
+                            setStroke((3 * resources.displayMetrics.density).toInt(), 0xFFFFFFFF.toInt())
+                        }
+                    }
+                    setOnClickListener {
+                        if (isNote) selectedNoteColor = color else selectedTaskColor = color
+                        buildGrid(grid, colors, isNote)
                     }
                 }
-                contentDescription = names[i]
-                setOnClickListener {
-                    if (isNote) selectedNoteColor = color else selectedTaskColor = color
-                    buildGrid(grid, colors, names, isNote)
-                }
+                grid.addView(view)
             }
-            grid.addView(view)
+        } catch (e: Exception) {
+            Toast.makeText(this, "خطا در ساخت گرید: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun saveAndFinish() {
+        Toast.makeText(this, "💾 در حال ذخیره رنگ‌ها...", Toast.LENGTH_SHORT).show()
+        
+        try {
+            // ذخیره رنگ‌ها
+            WidgetPreferences.setNoteColor(this, selectedNoteColor)
+            WidgetPreferences.setTaskColor(this, selectedTaskColor)
+            Toast.makeText(this, "✓ رنگ‌ها ذخیره شد", Toast.LENGTH_SHORT).show()
+
+            // آپدیت ویجت
+            val appWidgetManager = AppWidgetManager.getInstance(this)
+            Toast.makeText(this, "🔄 در حال آپدیت ویجت...", Toast.LENGTH_SHORT).show()
+            
+            NoteWidget.updateAppWidget(this, appWidgetManager, appWidgetId)
+            TaskWidget.updateAppWidget(this, appWidgetManager, appWidgetId)
+            Toast.makeText(this, "✓ ویجت آپدیت شد", Toast.LENGTH_SHORT).show()
+
+            // برگرداندن نتیجه
+            val resultValue = Intent().apply {
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            }
+            setResult(RESULT_OK, resultValue)
+            Toast.makeText(this, "✅ ویجت ساخته شد!", Toast.LENGTH_SHORT).show()
+            
+            finish()
+        } catch (e: Exception) {
+            Toast.makeText(this, " خطا: ${e.message}", Toast.LENGTH_LONG).show()
+            e.printStackTrace()
         }
     }
 }
 
-// ✅ این آبجکت اینجا قرار گرفت تا دیگر خطای Unresolved reference ندهد
+// ✅ WidgetPreferences object
 object WidgetPreferences {
     private const val PREFS = "widget_prefs_v2"
     private const val KEY_NOTE_BG = "note_bg_color"
