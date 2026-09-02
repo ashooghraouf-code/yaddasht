@@ -2,7 +2,6 @@ package ir.yaddasht.app.widget
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.GradientDrawable
@@ -31,7 +30,7 @@ class WidgetConfigActivity : Activity() {
         try {
             setContentView(R.layout.activity_widget_config)
         } catch (e: Exception) {
-            Toast.makeText(this, "❌ Layout error: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "❌ خطا در layout: ${e.message}", Toast.LENGTH_LONG).show()
             finish()
             return
         }
@@ -42,7 +41,7 @@ class WidgetConfigActivity : Activity() {
         ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
-            Toast.makeText(this, "❌ Invalid Widget ID", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "❌ Widget ID نامعتبر است", Toast.LENGTH_LONG).show()
             finish()
             return
         }
@@ -50,38 +49,35 @@ class WidgetConfigActivity : Activity() {
         val noteGrid = findViewById<GridLayout>(R.id.config_note_grid)
         val confirmBtn = findViewById<Button>(R.id.config_confirm_btn)
 
-        // فقط گرید یادداشت را نشان بده
-        findViewById<View>(R.id.config_task_grid)?.visibility = View.GONE
-        findViewById<View>(R.id.textView)?.let { 
-            if (it.javaClass.simpleText == "task") it.visibility = View.GONE 
-        }
+        // مخفی کردن گرید وظایف برای تست ساده‌تر
+        findViewById<GridLayout>(R.id.config_task_grid)?.visibility = View.GONE
 
         buildGrid(noteGrid, notePalette)
 
         confirmBtn.setOnClickListener {
             try {
-                // ذخیره رنگ
+                // ۱. ذخیره رنگ
                 val prefs = getSharedPreferences("widget_prefs_v2", Context.MODE_PRIVATE)
                 prefs.edit { putInt("note_bg_color", selectedNoteColor) }
                 Toast.makeText(this, "✓ رنگ ذخیره شد", Toast.LENGTH_SHORT).show()
 
-                // آپدیت فقط NoteWidget
+                // ۲. آپدیت ویجت
                 val appWidgetManager = AppWidgetManager.getInstance(this)
                 Toast.makeText(this, "🔄 در حال ساخت ویجت...", Toast.LENGTH_SHORT).show()
                 
                 NoteWidget.updateAppWidget(this, appWidgetManager, appWidgetId)
                 Toast.makeText(this, "✓ ویجت آپدیت شد", Toast.LENGTH_SHORT).show()
 
-                // برگرداندن نتیجه به سیستم عامل
+                // ۳. بازگرداندن نتیجه به سیستم عامل اندروید
                 val resultValue = Intent().apply {
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                 }
                 setResult(RESULT_OK, resultValue)
-                Toast.makeText(this, "✅ ویجت ساخته شد - به صفحه اصلی بروید", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "✅ ویجت ساخته شد! به صفحه اصلی بروید", Toast.LENGTH_LONG).show()
                 
                 finish()
             } catch (e: Exception) {
-                Toast.makeText(this, "❌ Error: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "❌ خطا: ${e.message}", Toast.LENGTH_LONG).show()
                 e.printStackTrace()
             }
         }
