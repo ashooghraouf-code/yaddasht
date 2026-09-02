@@ -101,7 +101,7 @@ class MainActivity : FragmentActivity() {
     private val shakeListener = object : SensorEventListener {
         override fun onSensorChanged(e: SensorEvent) {
             val x = e.values[0]; val y = e.values[1]; val z = e.values[2]
-            val g = sqrt(x * x + y * y + z * z)
+            val g = kotlin.math.sqrt(x * x + y * y + z * z)
             val now = System.currentTimeMillis()
             if (g > 22) {
                 if (now - lastHitTime > 700) shakeHits = 0
@@ -132,24 +132,15 @@ class MainActivity : FragmentActivity() {
                 var authChecked by remember { mutableStateOf(false) }
                 var authPassed by remember { mutableStateOf(false) }
 
-                val keyguardLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.StartActivityForResult()
-                ) { result ->
-                    if (result.resultCode == Activity.RESULT_OK) {
-                        authPassed = true
-                        authRequired = false
-                    }
+                val keyguardLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                    if (result.resultCode == Activity.RESULT_OK) { authPassed = true; authRequired = false }
                 }
 
                 LaunchedEffect(Unit) {
-                    val hasLocked = withContext(Dispatchers.IO) {
-                        dao.allNotesSync().any { NoteLock.isLocked(it.body) }
-                    }
+                    val hasLocked = withContext(Dispatchers.IO) { dao.allNotesSync().any { NoteLock.isLocked(it.body) } }
                     if (hasLocked) {
                         val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-                        if (keyguardManager.isDeviceSecure) {
-                            authRequired = true
-                        }
+                        if (keyguardManager.isDeviceSecure) authRequired = true
                     }
                     authChecked = true
                 }
@@ -157,32 +148,18 @@ class MainActivity : FragmentActivity() {
                 LaunchedEffect(authRequired) {
                     if (authRequired && !authPassed) {
                         val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-                        val intent = keyguardManager.createConfirmDeviceCredentialIntent(
-                            "قفل چراغ راه 🔒",
-                            "با اثر انگشت، رمز، الگو یا PIN گوشی باز کن"
-                        )
-                        if (intent != null) {
-                            keyguardLauncher.launch(intent)
-                        } else {
-                            authRequired = false
-                            authPassed = true
-                        }
+                        val intent = keyguardManager.createConfirmDeviceCredentialIntent("قفل چراغ راه 🔒", "با اثر انگشت یا رمز باز کن")
+                        if (intent != null) keyguardLauncher.launch(intent) else { authRequired = false; authPassed = true }
                     }
                 }
 
                 if (authRequired && !authPassed) {
                     LockScreen {
                         val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-                        val intent = keyguardManager.createConfirmDeviceCredentialIntent(
-                            "قفل چراغ راه 🔒",
-                            "با اثر انگشت، رمز، الگو یا PIN گوشی باز کن"
-                        )
-                        if (intent != null) {
-                            keyguardLauncher.launch(intent)
-                        }
+                        val intent = keyguardManager.createConfirmDeviceCredentialIntent("قفل چراغ راه 🔒", "با اثر انگشت یا رمز باز کن")
+                        if (intent != null) keyguardLauncher.launch(intent)
                     }
                 } else if (authChecked) {
-                    // ✅ Widget settings
                     if (intent.getBooleanExtra("open_widget_settings", false)) {
                         startActivity(Intent(this@MainActivity, WidgetColorPickerActivity::class.java))
                         intent.removeExtra("open_widget_settings")
@@ -204,16 +181,10 @@ class MainActivity : FragmentActivity() {
                         onDispose { onShake = null }
                     }
                     when (val s = screen) {
-                        is Screen.Home -> HomeScreen(dao = dao, taskDao = taskDao,
-                            onOpenNote = { screen = Screen.Editor(it) },
-                            onNewNote = { screen = Screen.Editor(NEW_NOTE_ID) },
-                            onOpenTask = { screen = Screen.TaskEditor(it) })
-                        is Screen.Editor -> EditorScreen(dao = dao, noteId = s.noteId,
-                            onBack = { screen = Screen.Home }, onOpenDraw = { screen = Screen.Draw(it, false) })
-                        is Screen.Draw -> DrawScreen(dao = dao, noteId = s.noteId, isTask = s.isTask, taskDao = taskDao,
-                            onBack = { screen = if (s.isTask) Screen.TaskEditor(s.noteId) else Screen.Editor(s.noteId) })
-                        is Screen.TaskEditor -> TaskEditorScreen(taskDao = taskDao, taskId = s.taskId,
-                            onBack = { screen = Screen.Home }, onOpenDraw = { screen = Screen.Draw(it, true) })
+                        is Screen.Home -> HomeScreen(dao = dao, taskDao = taskDao, onOpenNote = { screen = Screen.Editor(it) }, onNewNote = { screen = Screen.Editor(NEW_NOTE_ID) }, onOpenTask = { screen = Screen.TaskEditor(it) })
+                        is Screen.Editor -> EditorScreen(dao = dao, noteId = s.noteId, onBack = { screen = Screen.Home }, onOpenDraw = { screen = Screen.Draw(it, false) })
+                        is Screen.Draw -> DrawScreen(dao = dao, noteId = s.noteId, isTask = s.isTask, taskDao = taskDao, onBack = { screen = if (s.isTask) Screen.TaskEditor(s.noteId) else Screen.Editor(s.noteId) })
+                        is Screen.TaskEditor -> TaskEditorScreen(taskDao = taskDao, taskId = s.taskId, onBack = { screen = Screen.Home }, onOpenDraw = { screen = Screen.Draw(it, true) })
                     }
                 }
             }
@@ -225,8 +196,6 @@ class MainActivity : FragmentActivity() {
         sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let { 
             sensorManager?.registerListener(shakeListener, it, SensorManager.SENSOR_DELAY_UI) 
         }
-        
-        // ✅ آپدیت خودکار ویجت‌ها هنگام باز شدن اپ
         NoteWidget.forceUpdate(this)
         TaskWidget.forceUpdate(this)
     }
