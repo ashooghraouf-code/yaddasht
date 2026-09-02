@@ -6,7 +6,6 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.view.View
 import android.widget.RemoteViews
 import ir.yaddasht.app.MainActivity
 import ir.yaddasht.app.R
@@ -29,44 +28,45 @@ class TaskWidget : AppWidgetProvider() {
             CoroutineScope(Dispatchers.IO).launch {
                 val views = RemoteViews(context.packageName, R.layout.task_widget_layout)
                 
-                // ۱. اعمال رنگ مستقل وظایف
                 val bgColor = WidgetPreferences.getTaskColor(context)
                 try { views.setInt(R.id.task_widget_root, "setBackgroundColor", bgColor) } catch (_: Exception) {}
 
-                // ۲. خواندن از دیتابیس
+                // استفاده از متدی که خودتان اضافه کرده‌اید
                 val tasks = AppDatabase.get(context).taskDao().getRecentTasks()
                 
                 if (tasks.isNotEmpty()) {
                     val t1 = tasks.getOrNull(0)
                     views.setTextViewText(R.id.task_title_1, t1?.title ?: "بدون عنوان")
-                    val date1 = if (t1?.dueDate ?: 0L > 0) FaDate.jalali(t1.dueDate).let { "${it.third}/${it.second}/${it.first}" } else "بدون سررسید"
+                    val due1 = t1?.dueDate ?: 0L
+                    val date1 = if (due1 > 0) FaDate.jalali(due1).let { "${it.third}/${it.second}/${it.first}" } else "بدون سررسید"
                     views.setTextViewText(R.id.task_due_1, "📅 $date1")
                     views.setTextViewText(R.id.task_check_1, if (t1?.isCompleted == true) "☑" else "☐")
 
                     val t2 = tasks.getOrNull(1)
                     if (t2 != null) {
                         views.setTextViewText(R.id.task_title_2, t2.title)
-                        val date2 = if (t2.dueDate > 0) FaDate.jalali(t2.dueDate).let { "${it.third}/${it.second}/${it.first}" } else "بدون سررسید"
+                        val due2 = t2.dueDate
+                        val date2 = if (due2 > 0) FaDate.jalali(due2).let { "${it.third}/${it.second}/${it.first}" } else "بدون سررسید"
                         views.setTextViewText(R.id.task_due_2, "📅 $date2")
                         views.setTextViewText(R.id.task_check_2, if (t2.isCompleted) "☑" else "☐")
-                        views.setViewVisibility(R.id.task_item_2, View.VISIBLE)
+                        views.setViewVisibility(R.id.task_item_2, android.view.View.VISIBLE)
                     } else {
-                        views.setViewVisibility(R.id.task_item_2, View.GONE)
+                        views.setViewVisibility(R.id.task_item_2, android.view.View.GONE)
                     }
 
                     val t3 = tasks.getOrNull(2)
                     if (t3 != null) {
                         views.setTextViewText(R.id.task_title_3, t3.title)
-                        val date3 = if (t3.dueDate > 0) FaDate.jalali(t3.dueDate).let { "${it.third}/${it.second}/${it.first}" } else "بدون سررسید"
+                        val due3 = t3.dueDate
+                        val date3 = if (due3 > 0) FaDate.jalali(due3).let { "${it.third}/${it.second}/${it.first}" } else "بدون سررسید"
                         views.setTextViewText(R.id.task_due_3, "📅 $date3")
                         views.setTextViewText(R.id.task_check_3, if (t3.isCompleted) "☑" else "☐")
-                        views.setViewVisibility(R.id.task_item_3, View.VISIBLE)
+                        views.setViewVisibility(R.id.task_item_3, android.view.View.VISIBLE)
                     } else {
-                        views.setViewVisibility(R.id.task_item_3, View.GONE)
+                        views.setViewVisibility(R.id.task_item_3, android.view.View.GONE)
                     }
                 }
 
-                // ۳. تنظیم کلیک‌ها
                 val intentMain = Intent(context, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK }
                 val pendingMain = PendingIntent.getActivity(context, 0, intentMain, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                 
