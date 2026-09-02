@@ -17,10 +17,15 @@ class WidgetConfigActivity : Activity() {
 
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
     private var selectedNoteColor: Int = 0xFFFFE082.toInt()
+    private var selectedTaskColor: Int = 0xFF80DEEA.toInt()
 
     private val notePalette = intArrayOf(
         0xFFFFE082.toInt(), 0xFFFFB74D.toInt(), 0xFFFF8A65.toInt(), 0xFFF06292.toInt(),
         0xFFBA68C8.toInt(), 0xFF9575CD.toInt(), 0xFF81C784.toInt(), 0xFFAED581.toInt()
+    )
+    private val taskPalette = intArrayOf(
+        0xFF80DEEA.toInt(), 0xFF4DD0E1.toInt(), 0xFF4FC3F7.toInt(), 0xFF64B5F6.toInt(),
+        0xFF7986CB.toInt(), 0xFF9575CD.toInt(), 0xFFA1887F.toInt(), 0xFFE0E0E0.toInt()
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,7 +35,6 @@ class WidgetConfigActivity : Activity() {
         try {
             setContentView(R.layout.activity_widget_config)
         } catch (e: Exception) {
-            Toast.makeText(this, "❌ خطا در layout: ${e.message}", Toast.LENGTH_LONG).show()
             finish()
             return
         }
@@ -41,41 +45,37 @@ class WidgetConfigActivity : Activity() {
         ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
-            Toast.makeText(this, "❌ Widget ID نامعتبر است", Toast.LENGTH_LONG).show()
             finish()
             return
         }
 
         val noteGrid = findViewById<GridLayout>(R.id.config_note_grid)
+        val taskGrid = findViewById<GridLayout>(R.id.config_task_grid)
         val confirmBtn = findViewById<Button>(R.id.config_confirm_btn)
 
-        // مخفی کردن گرید وظایف برای تست ساده‌تر
-        findViewById<GridLayout>(R.id.config_task_grid)?.visibility = View.GONE
-
-        buildGrid(noteGrid, notePalette)
+        buildGrid(noteGrid, notePalette, isNote = true)
+        buildGrid(taskGrid, taskPalette, isNote = false)
 
         confirmBtn.setOnClickListener {
             try {
-                // ۱. ذخیره رنگ
+                // ۱. ذخیره رنگ‌ها
                 val prefs = getSharedPreferences("widget_prefs_v2", Context.MODE_PRIVATE)
-                prefs.edit { putInt("note_bg_color", selectedNoteColor) }
-                Toast.makeText(this, "✓ رنگ ذخیره شد", Toast.LENGTH_SHORT).show()
+                prefs.edit { 
+                    putInt("note_bg_color", selectedNoteColor)
+                    putInt("task_bg_color", selectedTaskColor)
+                }
 
-                // ۲. آپدیت ویجت
-                val appWidgetManager = AppWidgetManager.getInstance(this)
-                Toast.makeText(this, "🔄 در حال ساخت ویجت...", Toast.LENGTH_SHORT).show()
-                
-                NoteWidget.updateAppWidget(this, appWidgetManager, appWidgetId)
-                Toast.makeText(this, "✓ ویجت آپدیت شد", Toast.LENGTH_SHORT).show()
-
-                // ۳. بازگرداندن نتیجه به سیستم عامل اندروید
+                // ۲. بازگرداندن نتیجه به لانچر اندروید
+                // ⚠️ نکته مهم: به محض ارسال RESULT_OK، خودِ اندروید به‌صورت خودکار 
+                // متد onUpdate ویجت را فراخوانی می‌کند. نیازی به فراخوانی دستی نیست!
                 val resultValue = Intent().apply {
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                 }
                 setResult(RESULT_OK, resultValue)
-                Toast.makeText(this, "✅ ویجت ساخته شد! به صفحه اصلی بروید", Toast.LENGTH_LONG).show()
                 
+                // ۳. بستن اکتیویتی
                 finish()
+                
             } catch (e: Exception) {
                 Toast.makeText(this, "❌ خطا: ${e.message}", Toast.LENGTH_LONG).show()
                 e.printStackTrace()
@@ -83,8 +83,10 @@ class WidgetConfigActivity : Activity() {
         }
     }
 
-    private fun buildGrid(grid: GridLayout, colors: IntArray) {
+    private fun buildGrid(grid: GridLayout, colors: IntArray, isNote: Boolean) {
         grid.removeAllViews()
+        val currentColor = if (isNote) selectedNoteColor else selectedTaskColor
+
         colors.forEachIndexed { i, color ->
             val size = (56 * resources.displayMetrics.density).toInt()
             val margin = (4 * resources.displayMetrics.density).toInt()
@@ -98,13 +100,13 @@ class WidgetConfigActivity : Activity() {
                     shape = GradientDrawable.RECTANGLE
                     setColor(color)
                     cornerRadius = 14 * resources.displayMetrics.density
-                    if (color == selectedNoteColor) {
+                    if (color == currentColor) {
                         setStroke((3 * resources.displayMetrics.density).toInt(), 0xFFFFFFFF.toInt())
                     }
                 }
                 setOnClickListener {
-                    selectedNoteColor = color
-                    buildGrid(grid, colors)
+                    if (isNote) selectedNoteColor = color else selectedTaskColor = color
+                    buildGrid(grid, colors, isNote)
                 }
             }
             grid.addView(view)
