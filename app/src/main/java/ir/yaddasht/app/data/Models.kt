@@ -2,7 +2,6 @@ package ir.yaddasht.app.data
 
 import androidx.room.Entity
 import androidx.room.ForeignKey
-import androidx.room.Ignore
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -30,11 +29,12 @@ data class Attachment(
     val isImage: Boolean
 )
 
-// ✅ دو فیلد اصلی + یک computed property با @Ignore
+// ✅ فقط دو فیلد در constructor (Room فقط این‌ها را از query می‌خواند)
+// computed property بدون @Ignore (چون در constructor نیست، Room خودکار آن را نادیده می‌گیرد)
 data class AttachmentCount(
     val noteId: Long,
     val count: Int
 ) {
-    @Ignore
-    val attachmentCount: Int get() = count
+    val attachmentCount: Int 
+        get() = count
 }
