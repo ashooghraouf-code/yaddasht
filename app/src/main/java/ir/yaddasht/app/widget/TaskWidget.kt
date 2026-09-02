@@ -1,10 +1,13 @@
 package ir.yaddasht.app.widget
 
+import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.widget.RemoteViews
+import ir.yaddasht.app.MainActivity
 import ir.yaddasht.app.R
 
 class TaskWidget : AppWidgetProvider() {
@@ -17,9 +20,35 @@ class TaskWidget : AppWidgetProvider() {
     companion object {
         fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
             val views = RemoteViews(context.packageName, R.layout.task_widget_layout)
+            
+            // ۱. اعمال رنگ پس‌زمینه
             val bgColor = WidgetPreferences.getTaskColor(context)
-            try { views.setInt(R.id.widget_root, "setBackgroundColor", bgColor) } catch (_: Exception) {}
-            try { views.setTextViewText(R.id.widget_text, "✅ وظایف") } catch (_: Exception) {}
+            try { views.setInt(R.id.task_widget_root, "setBackgroundColor", bgColor) } catch (_: Exception) {}
+            try { views.setTextViewText(R.id.task_widget_title, "✅ وظایف من") } catch (_: Exception) {}
+
+            // ۲. تنظیم کلیک‌ها
+            val intentMain = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            val pendingMain = PendingIntent.getActivity(context, 0, intentMain, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            
+            val intentAdd = Intent(context, MainActivity::class.java).apply {
+                putExtra("open_new_task", true)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            val pendingAdd = PendingIntent.getActivity(context, 1, intentAdd, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+            try {
+                views.setOnClickPendingIntent(R.id.task_widget_root, pendingMain)
+                views.setOnClickPendingIntent(R.id.task_refresh, pendingMain)
+                views.setOnClickPendingIntent(R.id.task_add, pendingAdd)
+                
+                views.setOnClickPendingIntent(R.id.task_item_1, pendingMain)
+                views.setOnClickPendingIntent(R.id.task_item_2, pendingMain)
+                views.setOnClickPendingIntent(R.id.task_item_3, pendingMain)
+            } catch (_: Exception) {}
+
+            // ۳. آپدیت ویجت
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }
 
