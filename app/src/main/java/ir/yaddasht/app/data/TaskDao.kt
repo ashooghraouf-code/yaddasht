@@ -17,8 +17,9 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE id = :id")
     suspend fun getTaskById(id: Long): Task?
 
-    @Query("UPDATE tasks SET isCompleted = :isCompleted WHERE id = :id")
-    suspend fun markCompleted(id: Long, isCompleted: Boolean)
+    // ✅ فقط یک پارامتر (سازگار با ReminderActionReceiver که فقط id می‌فرستد)
+    @Query("UPDATE tasks SET isCompleted = 1 WHERE id = :id")
+    suspend fun markCompleted(id: Long)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(task: Task): Long
