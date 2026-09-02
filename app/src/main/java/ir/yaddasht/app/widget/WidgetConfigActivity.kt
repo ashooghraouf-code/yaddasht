@@ -27,7 +27,6 @@ class WidgetConfigActivity : Activity() {
         appWidgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID) ?: AppWidgetManager.INVALID_APPWIDGET_ID
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) { finish(); return }
 
-        // تشخیص هوشمند: آیا کاربر در حال اضافه کردن ویجت یادداشت است یا وظایف؟
         val appWidgetManager = AppWidgetManager.getInstance(this)
         val widgetInfo = appWidgetManager.getAppWidgetInfo(appWidgetId)
         isNoteWidget = widgetInfo?.provider?.className?.contains("NoteWidget", ignoreCase = true) ?: true
@@ -37,14 +36,12 @@ class WidgetConfigActivity : Activity() {
         val grid = findViewById<GridLayout>(R.id.config_note_grid)
         val confirmBtn = findViewById<Button>(R.id.config_confirm_btn)
         
-        // مخفی کردن گرید دوم برای جلوگیری از گیج شدن و تداخل
         findViewById<GridLayout>(R.id.config_task_grid).visibility = View.GONE
 
         buildGrid(grid, if (isNoteWidget) notePalette else taskPalette)
 
         confirmBtn.setOnClickListener {
             try {
-                // ذخیره رنگ فقط برای همان ویجتی که در حال ساخته شدن است
                 if (isNoteWidget) WidgetPreferences.setNoteColor(this, selectedColor)
                 else WidgetPreferences.setTaskColor(this, selectedColor)
 
