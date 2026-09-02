@@ -9,7 +9,6 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Button
 import android.widget.GridLayout
-import android.widget.RemoteViews
 import android.widget.Toast
 import androidx.core.content.edit
 import ir.yaddasht.app.R
@@ -68,25 +67,28 @@ class WidgetConfigActivity : Activity() {
                     putInt("note_bg_color", selectedNoteColor)
                     putInt("task_bg_color", selectedTaskColor)
                 }
-                Toast.makeText(this, "۲. رنگ ذخیره شد. در حال آپدیت NoteWidget...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "۲. رنگ ذخیره شد.", Toast.LENGTH_SHORT).show()
 
                 // مرحله ۲: آپدیت ویجت‌ها
                 val appWidgetManager = AppWidgetManager.getInstance(this)
                 
-                // تست ایمن: اگر متد پیچیده NoteWidget خطا داد، یک آپدیت ساده انجام می‌دهیم
-                try {
+                // ✅ تشخیص هوشمند نوع ویجت برای جلوگیری از Crash
+                val widgetInfo = appWidgetManager.getAppWidgetInfo(appWidgetId)
+                val providerName = widgetInfo?.provider?.className ?: ""
+                
+                Toast.makeText(this, "۳. نوع ویجت: ${if (providerName.contains("Note")) "یادداشت" else "وظایف"}", Toast.LENGTH_SHORT).show()
+
+                if (providerName.contains("NoteWidget")) {
                     NoteWidget.updateAppWidget(this, appWidgetManager, appWidgetId)
-                    Toast.makeText(this, "۳. NoteWidget آپدیت شد. در حال آپدیت TaskWidget...", Toast.LENGTH_SHORT).show()
+                } else if (providerName.contains("TaskWidget")) {
                     TaskWidget.updateAppWidget(this, appWidgetManager, appWidgetId)
-                } catch (widgetError: Exception) {
-                    Toast.makeText(this, "⚠️ خطا در آپدیت پیچیده، استفاده از حالت ساده...", Toast.LENGTH_SHORT).show()
-                    val views = RemoteViews(this.packageName, R.layout.note_widget_layout)
-                    views.setInt(R.id.note_widget_root, "setBackgroundColor", selectedNoteColor)
-                    views.setTextViewText(R.id.note_widget_title, "ویجت تستی ✅")
-                    appWidgetManager.updateAppWidget(appWidgetId, views)
+                } else {
+                    // اگر نامشخص بود، هر دو را در try-catch امتحان کن
+                    try { NoteWidget.updateAppWidget(this, appWidgetManager, appWidgetId) } catch (e: Exception) {}
+                    try { TaskWidget.updateAppWidget(this, appWidgetManager, appWidgetId) } catch (e: Exception) {}
                 }
 
-                Toast.makeText(this, "۴. در حال بازگشت به صفحه اصلی...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "۴. ویجت آپدیت شد.", Toast.LENGTH_SHORT).show()
 
                 // مرحله ۳: بازگرداندن نتیجه به سیستم عامل
                 val resultValue = Intent().apply {
@@ -98,8 +100,7 @@ class WidgetConfigActivity : Activity() {
                 finish()
                 
             } catch (e: Exception) {
-                // این پیام دقیقاً به ما می‌گوید کجا crash شده است
-                Toast.makeText(this, "❌ CRASH در مرحله: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "❌ CRASH: ${e.message}", Toast.LENGTH_LONG).show()
                 e.printStackTrace()
             }
         }
