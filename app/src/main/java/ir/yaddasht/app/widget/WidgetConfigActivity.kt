@@ -8,13 +8,14 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Button
 import android.widget.GridLayout
-import android.widget.TextView
 import ir.yaddasht.app.R
 
 class WidgetConfigActivity : Activity() {
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
     private var selectedColor: Int = 0
-    private var isNoteWidget: Boolean = true
+    private var widgetType: WidgetType = WidgetType.NOTE
+
+    enum class WidgetType { NOTE, TASK, JOURNALIST }
 
     private val notePalette = intArrayOf(
         0xFFFFE082.toInt(), 0xFFFFB74D.toInt(), 0xFFFF8A65.toInt(), 0xFFF06292.toInt(),
@@ -24,6 +25,10 @@ class WidgetConfigActivity : Activity() {
         0xFF80DEEA.toInt(), 0xFF4DD0E1.toInt(), 0xFF4FC3F7.toInt(), 0xFF64B5F6.toInt(),
         0xFF7986CB.toInt(), 0xFF9575CD.toInt(), 0xFFA1887F.toInt(), 0xFFE0E0E0.toInt()
     )
+    private val journalistPalette = intArrayOf(
+        0xFFFF5252.toInt(), 0xFFFF1744.toInt(), 0xFFFF6D00.toInt(), 0xFFFFAB00.toInt(),
+        0xFFD50000.toInt(), 0xFFFF3D00.toInt(), 0xFFBF360C.toInt(), 0xFF212121.toInt()
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,39 +36,57 @@ class WidgetConfigActivity : Activity() {
 
         try { setContentView(R.layout.activity_widget_config) } catch (e: Exception) { finish(); return }
 
-        appWidgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID) 
+        appWidgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
             ?: AppWidgetManager.INVALID_APPWIDGET_ID
-        
+
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) { finish(); return }
 
-        // ✅ تشخیص هوشمند نوع ویجت
         val providerName = AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId)?.provider?.className ?: ""
-        isNoteWidget = providerName.contains("NoteWidget", ignoreCase = true)
+        widgetType = when {
+            providerName.contains("NoteWidget", ignoreCase = true) -> WidgetType.NOTE
+            providerName.contains("TaskWidget", ignoreCase = true) -> WidgetType.TASK
+            providerName.contains("JournalistWidget", ignoreCase = true) -> WidgetType.JOURNALIST
+            else -> WidgetType.NOTE
+        }
 
-        // ✅ خواندن رنگ قبلی یا استفاده از پیش‌فرض
-        selectedColor = if (isNoteWidget) WidgetPreferences.getNoteColor(this) else WidgetPreferences.getTaskColor(this)
+        selectedColor = when (widgetType) {
+            WidgetType.NOTE -> WidgetPreferences.getNoteColor(this)
+            WidgetType.TASK -> WidgetPreferences.getTaskColor(this)
+            WidgetType.JOURNALIST -> WidgetPreferences.getJournalistColor(this)
+        }
 
-        val grid = findViewById<GridLayout>(R.id.config_note_grid)
-        val titleText = findViewById<TextView>(android.R.id.title) // اگر عنوانی در لی‌اوت دارید
+        val noteGrid = findViewById<GridLayout>(R.id.config_note_grid)
+        val taskGrid = findViewById<GridLayout>(R.id.config_task_grid)
         val confirmBtn = findViewById<Button>(R.id.config_confirm_btn)
 
-        // مخفی کردن گرید دوم برای جلوگیری از تداخل
-        findViewById<GridLayout>(R.id.config_task_grid)?.visibility = View.GONE
-        
-        // تغییر عنوان بر اساس نوع ویجت (اختیاری)
-        titleText?.text = if (isNoteWidget) "انتخاب رنگ یادداشت" else "انتخاب رنگ وظایف"
-
-        buildGrid(grid, if (isNoteWidget) notePalette else taskPalette)
+        when (widgetType) {
+            WidgetType.NOTE -> {
+                noteGrid.visibility = View.VISIBLE
+                taskGrid.visibility = View.GONE
+                buildGrid(noteGrid, notePalette)
+            }
+            WidgetType.TASK -> {
+                noteGrid.visibility = View.GONE
+                taskGrid.visibility = View.VISIBLE
+                buildGrid(taskGrid, taskPalette)
+            }
+            WidgetType.JOURNALIST -> {
+                noteGrid.visibility = View.GONE
+                taskGrid.visibility = View.VISIBLE
+                buildGrid(taskGrid, journalistPalette)
+            }
+        }
 
         confirmBtn.setOnClickListener {
-            // ✅ ذخیره رنگ فقط برای ویجت مربوطه
-            if (isNoteWidget) WidgetPreferences.setNoteColor(this, selectedColor)
-            else WidgetPreferences.setTaskColor(this, selectedColor)
+            when (widgetType) {
+                WidgetType.NOTE -> WidgetPreferences.setNoteColor(this, selectedColor)
+                WidgetType.TASK -> WidgetPreferences.setTaskColor(this, selectedColor)
+                WidgetType.JOURNALIST -> WidgetPreferences.setJournalistColor(this, selectedColor)
+            }
 
             val resultValue = Intent().apply { putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId) }
             setResult(RESULT_OK, resultValue)
-            
-            // تأخیر کوتاه برای اطمینان از ذخیره SharedPreferences قبل از بسته شدن
+
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ finish() }, 200)
         }
     }
@@ -74,8 +97,8 @@ class WidgetConfigActivity : Activity() {
             val size = (56 * resources.displayMetrics.density).toInt()
             val margin = (4 * resources.displayMetrics.density).toInt()
             val view = View(this).apply {
-                layoutParams = GridLayout.LayoutParams().apply { 
-                    width = size; height = size; setMargins(margin, margin, margin, margin) 
+                layoutParams = GridLayout.LayoutParams().apply {
+                    width = size; height = size; setMargins(margin, margin, margin, margin)
                 }
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
@@ -83,9 +106,9 @@ class WidgetConfigActivity : Activity() {
                     cornerRadius = 14 * resources.displayMetrics.density
                     if (color == selectedColor) setStroke((3 * resources.displayMetrics.density).toInt(), 0xFFFFFFFF.toInt())
                 }
-                setOnClickListener { 
+                setOnClickListener {
                     selectedColor = color
-                    buildGrid(grid, colors) 
+                    buildGrid(grid, colors)
                 }
             }
             grid.addView(view)
