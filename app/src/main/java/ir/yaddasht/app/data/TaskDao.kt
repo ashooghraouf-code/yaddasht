@@ -17,7 +17,6 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE id = :id")
     suspend fun getTaskById(id: Long): Task?
 
-    // ✅ فقط یک پارامتر (سازگار با ReminderActionReceiver که فقط id می‌فرستد)
     @Query("UPDATE tasks SET isCompleted = 1 WHERE id = :id")
     suspend fun markCompleted(id: Long)
 
