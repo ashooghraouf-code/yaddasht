@@ -188,28 +188,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     val isLocked = note?.body?.let(NoteLock::isLocked) == true
     val isChecklist = note?.body?.let(Checklist::isChecklist) == true
 
-    // ✅ تغییر ویجت خبرنگاری - فقط این بخش تغییر کرده
-    LaunchedEffect(Unit) {
-        if (noteId == NEW_NOTE_ID) {
-            realId = withContext(Dispatchers.IO) { dao.insert(Note()) }
-
-            val activity = context as? Activity
-            // ✅ auto_camera از ویجت خبرنگاری
-            if (activity?.intent?.getBooleanExtra("auto_camera", false) == true) {
-                val file = AttachmentStore.createCameraFile(context)
-                pendingCameraFile = file
-                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                takePicture.launch(uri)
-                activity.intent.removeExtra("auto_camera")
-            }
-            // ✅ auto_dictation از ویجت خبرنگاری
-            if (activity?.intent?.getBooleanExtra("auto_dictation", false) == true) {
-                launchSpeech()
-                activity.intent.removeExtra("auto_dictation")
-            }
-        }
-        ready = true
-    }
+    // ─── تعاریف اولیه (بدون LaunchedEffect خبرنگاری) ───
 
     LaunchedEffect(ready, realId) {
         if (!ready) return@LaunchedEffect
@@ -257,6 +236,8 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     }
     BackHandler(onBack = exit)
 
+    // ─── Launcherها ───
+
     val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val file = pendingCameraFile
         if (ok && file != null && file.length() > 0) {
@@ -278,6 +259,8 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         }
     }
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    // ─── توابع ───
 
     fun startRecording() {
         val file = AttachmentStore.createAudioFile(context)
@@ -423,6 +406,30 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             withContext(Dispatchers.Main) { shareBackupFile(context, file) }
         }
     }
+
+    // ─── ✅ ویجت خبرنگاری - AFTER takePicture and launchSpeech are defined ───
+
+    LaunchedEffect(Unit) {
+        if (noteId == NEW_NOTE_ID) {
+            realId = withContext(Dispatchers.IO) { dao.insert(Note()) }
+
+            val activity = context as? Activity
+            if (activity?.intent?.getBooleanExtra("auto_camera", false) == true) {
+                val file = AttachmentStore.createCameraFile(context)
+                pendingCameraFile = file
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                takePicture.launch(uri)
+                activity.intent.removeExtra("auto_camera")
+            }
+            if (activity?.intent?.getBooleanExtra("auto_dictation", false) == true) {
+                launchSpeech()
+                activity.intent.removeExtra("auto_dictation")
+            }
+        }
+        ready = true
+    }
+
+    // ─── UI ───
 
     Scaffold(containerColor = DeepGreen) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
