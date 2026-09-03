@@ -17,7 +17,6 @@ interface NoteDao {
     @Query("SELECT * FROM notes ORDER BY updatedAt DESC LIMIT 3")
     suspend fun getRecentNotes(): List<Note>
 
-    // ✅ تابع جدید که EditorScreen در خط 230 انتظار دارد
     @Query("SELECT COUNT(*) FROM attachments WHERE noteId = :noteId")
     suspend fun attachmentCount(noteId: Long): Int
 
