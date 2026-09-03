@@ -29,7 +29,6 @@ data class Attachment(
     val isImage: Boolean
 )
 
-// برای HomeScreen (it.count) و Widget
 data class AttachmentCount(
     val noteId: Long,
     val count: Int
