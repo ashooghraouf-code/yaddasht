@@ -46,7 +46,6 @@
             android:exported="false"
             android:theme="@android:style/Theme.Material.NoActionBar" />
 
-        <!-- تنظیمات ویجت - انتخاب رنگ قبل از قرار دادن -->
         <activity
             android:name=".widget.WidgetConfigActivity"
             android:exported="true"
@@ -62,7 +61,6 @@
             android:label="رنگ ویجت"
             android:theme="@android:style/Theme.Material.NoActionBar" />
 
-        <!-- ✅ Receiver جدید برای تیک زدن وظایف در ویجت -->
         <receiver
             android:name=".widget.TaskWidgetReceiver"
             android:exported="false">
@@ -106,6 +104,15 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider"
                 android:resource="@xml/task_widget_info" />
+        </receiver>
+
+        <!-- ✅ ویجت خبرنگاری -->
+        <receiver android:name=".widget.JournalistWidget" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/journalist_widget_info" />
         </receiver>
 
         <provider
