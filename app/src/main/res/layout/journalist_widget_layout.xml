@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/journalist_widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#FFFF5252"
+    android:padding="12dp"
+    android:gravity="center">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🎤 خبرنگار"
+        android:textColor="#FFFFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="12dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/journalist_camera_btn"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:text="📷"
+            android:textSize="28sp"
+            android:gravity="center"
+            android:background="#40FFFFFF"
+            android:layout_marginEnd="6dp" />
+
+        <TextView
+            android:id="@+id/journalist_mic_btn"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:text="🎙️"
+            android:textSize="28sp"
+            android:gravity="center"
+            android:background="#40FFFFFF"
+            android:layout_marginStart="6dp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/journalist_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="آماده برای گزارش"
+        android:textColor="#E0FFFFFF"
+        android:textSize="11sp"
+        android:layout_marginTop="8dp" />
+</LinearLayout>
