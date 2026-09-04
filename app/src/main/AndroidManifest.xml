@@ -116,16 +116,7 @@
                 android:resource="@xml/task_widget_info" />
         </receiver>
 
-        <receiver
-            android:name=".widget.JournalistWidget"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/journalist_widget_info" />
-        </receiver>
+        <!-- ❌ JournalistWidget حذف شد -->
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -136,13 +127,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-        <!-- ✅ Activity شفاف برای ویجت خبرنگاری -->
-<activity
-    android:name=".widget.JournalistActionActivity"
-    android:exported="false"
-    android:theme="@android:style/Theme.Translucent.NoTitleBar"
-    android:excludeFromRecents="true"
-    android:noHistory="true" />
 
     </application>
 </manifest>
