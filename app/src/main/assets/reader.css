@@ -1,0 +1,113 @@
+:root {
+    --bg: #FFFFF8E1;
+    --fg: #FF2C2C2C;
+    --muted: #FF888888;
+    --accent: #FFFFB74D;
+    --font-size: 16px;
+    --line-height: 1.85;
+    --columns: 1;
+    --column-gap: 48px;
+    --padding: 24px;
+    --progress: 0%;
+    --font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+    line-height: var(--line-height);
+    direction: rtl;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+body {
+    padding: var(--padding);
+    transition: background 0.3s ease, color 0.3s ease;
+}
+
+#content {
+    column-count: var(--columns);
+    column-gap: var(--column-gap);
+    column-rule: 1px solid rgba(0, 0, 0, 0.08);
+    text-align: justify;
+    text-align-last: right;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* ─── Themes ─── */
+body.theme-light {
+    --bg: #FFFFF8E1;
+    --fg: #FF2C2C2C;
+    --muted: #FF888888;
+    --accent: #FFFFB74D;
+}
+
+body.theme-sepia {
+    --bg: #FFF4ECD8;
+    --fg: #FF5B4636;
+    --muted: #FF8B7355;
+    --accent: #FFA67B5B;
+}
+
+body.theme-night {
+    --bg: #FF1A1A1A;
+    --fg: #FFB8B8B8;
+    --muted: #FF666666;
+    --accent: #FFFFB74D;
+}
+
+/* ─── Highlights ─── */
+.highlight {
+    padding: 2px 0;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.highlight.yellow  { background-color: rgba(255, 235, 59,  0.40); }
+.highlight.pink    { background-color: rgba(255, 105, 180, 0.35); }
+.highlight.green   { background-color: rgba(129, 199, 132, 0.40); }
+.highlight.blue    { background-color: rgba(129, 212, 250, 0.45); }
+.highlight.orange  { background-color: rgba(255, 183, 77,  0.45); }
+
+body.theme-night .highlight.yellow  { background-color: rgba(255, 235, 59,  0.25); }
+body.theme-night .highlight.pink    { background-color: rgba(255, 105, 180, 0.22); }
+body.theme-night .highlight.green   { background-color: rgba(129, 199, 132, 0.25); }
+body.theme-night .highlight.blue    { background-color: rgba(129, 212, 250, 0.28); }
+body.theme-night .highlight.orange  { background-color: rgba(255, 183, 77,  0.28); }
+
+/* ─── Text Selection ─── */
+::selection {
+    background: rgba(255, 183, 77, 0.45);
+    color: inherit;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: var(--muted);
+    border-radius: 3px;
+}
+
+/* ─── Top Progress Bar ─── */
+body::after {
+    content: "";
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 3px;
+    width: var(--progress, 0%);
+    background: var(--accent);
+    transition: width 0.3s ease;
+    z-index: 9999;
+    pointer-events: none;
+}
