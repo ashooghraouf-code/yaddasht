@@ -10,6 +10,7 @@ object AppThemePreferences {
     data class ThemeColor(val name: String, val emoji: String, val colorValue: Long)
 
     val themeColors = listOf(
+        // ═══ رنگ‌های کلاسیک ═══
         ThemeColor("سبز جنگلی", "🌲", 0xFF06100E),
         ThemeColor("ارغوانی شاهانه", "🔮", 0xFF1B0A3C),
         ThemeColor("نیلی اقیانوس", "🌊", 0xFF0A1628),
@@ -20,6 +21,14 @@ object AppThemePreferences {
         ThemeColor("بنفش کهکشانی", "🪐", 0xFF1A0830),
         ThemeColor("آبی نیمه‌شب", "🌙", 0xFF081428),
         ThemeColor("مشکی مخملی", "🖤", 0xFF0C0C0C),
+
+        // ═══ ✨ رنگ‌های شاد فانتزی ✨ ═══
+        ThemeColor("صورتی جادویی", "💖", 0xFFAD1457),
+        ThemeColor("پسته‌ای رویایی", "🌿", 0xFF558B2F),
+        ThemeColor("زرد طلایی", "✨", 0xFFF57F17),
+        ThemeColor("آبی آسمانی", "🦋", 0xFF0277BD),
+        ThemeColor("بنفش یاسی", "💜", 0xFF7B1FA2),
+        ThemeColor("نارنجی پرتقالی", "🍊", 0xFFD84315),
     )
 
     private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
