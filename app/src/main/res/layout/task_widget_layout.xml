@@ -5,40 +5,40 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="#FF80DEEA"
-    android:padding="8dp">
+    android:padding="10dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="6dp">
+        android:layout_marginBottom="8dp">
         <TextView
             android:id="@+id/task_widget_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="✅ وظایف امروز"
-            android:textColor="#FF00363A"
-            android:textSize="13sp"
+            android:textColor="#FF002226"
+            android:textSize="15sp"
             android:textStyle="bold"
             android:maxLines="1"
             android:ellipsize="end" />
         <TextView
             android:id="@+id/task_refresh"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:text="⟳"
-            android:textColor="#FF00363A"
-            android:textSize="18sp"
+            android:textColor="#FF002226"
+            android:textSize="20sp"
             android:gravity="center" />
         <TextView
             android:id="@+id/task_add"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:text="+"
-            android:textColor="#FF00363A"
-            android:textSize="22sp"
+            android:textColor="#FF002226"
+            android:textSize="24sp"
             android:textStyle="bold"
             android:gravity="center" />
     </LinearLayout>
@@ -49,30 +49,30 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:orientation="horizontal"
-        android:background="#30000000"
-        android:padding="6dp"
+        android:background="#25000000"
+        android:padding="8dp"
         android:gravity="center_vertical"
-        android:layout_marginBottom="3dp">
+        android:layout_marginBottom="4dp">
         <TextView
             android:id="@+id/task_check_1"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
             android:text="☐"
-            android:textColor="#FF00363A"
-            android:textSize="18sp"
+            android:textColor="#FF002226"
+            android:textSize="20sp"
             android:gravity="center" />
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:layout_marginStart="6dp">
+            android:layout_marginStart="8dp">
             <TextView
                 android:id="@+id/task_title_1"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="#FF00363A"
-                android:textSize="12sp"
+                android:textColor="#FF002226"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 android:maxLines="1"
                 android:ellipsize="end" />
@@ -81,22 +81,22 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginTop="2dp">
+                android:layout_marginTop="3dp">
                 <TextView
                     android:id="@+id/task_time_1"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="#FF00695C"
-                    android:textSize="9sp"
+                    android:textColor="#FF005549"
+                    android:textSize="11sp"
                     android:maxLines="1" />
                 <TextView
                     android:id="@+id/task_priority_1"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
+                    android:layout_marginStart="8dp"
                     android:text="●"
                     android:textColor="#FFBDBDBD"
-                    android:textSize="10sp" />
+                    android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
@@ -107,30 +107,30 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:orientation="horizontal"
-        android:background="#30000000"
-        android:padding="6dp"
+        android:background="#25000000"
+        android:padding="8dp"
         android:gravity="center_vertical"
-        android:layout_marginBottom="3dp">
+        android:layout_marginBottom="4dp">
         <TextView
             android:id="@+id/task_check_2"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
             android:text="☐"
-            android:textColor="#FF00363A"
-            android:textSize="18sp"
+            android:textColor="#FF002226"
+            android:textSize="20sp"
             android:gravity="center" />
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:layout_marginStart="6dp">
+            android:layout_marginStart="8dp">
             <TextView
                 android:id="@+id/task_title_2"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="#FF00363A"
-                android:textSize="12sp"
+                android:textColor="#FF002226"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 android:maxLines="1"
                 android:ellipsize="end" />
@@ -139,22 +139,22 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginTop="2dp">
+                android:layout_marginTop="3dp">
                 <TextView
                     android:id="@+id/task_time_2"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="#FF00695C"
-                    android:textSize="9sp"
+                    android:textColor="#FF005549"
+                    android:textSize="11sp"
                     android:maxLines="1" />
                 <TextView
                     android:id="@+id/task_priority_2"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
+                    android:layout_marginStart="8dp"
                     android:text="●"
                     android:textColor="#FFBDBDBD"
-                    android:textSize="10sp" />
+                    android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
@@ -165,29 +165,29 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:orientation="horizontal"
-        android:background="#30000000"
-        android:padding="6dp"
+        android:background="#25000000"
+        android:padding="8dp"
         android:gravity="center_vertical">
         <TextView
             android:id="@+id/task_check_3"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
             android:text="☐"
-            android:textColor="#FF00363A"
-            android:textSize="18sp"
+            android:textColor="#FF002226"
+            android:textSize="20sp"
             android:gravity="center" />
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:layout_marginStart="6dp">
+            android:layout_marginStart="8dp">
             <TextView
                 android:id="@+id/task_title_3"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="#FF00363A"
-                android:textSize="12sp"
+                android:textColor="#FF002226"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 android:maxLines="1"
                 android:ellipsize="end" />
@@ -196,22 +196,22 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginTop="2dp">
+                android:layout_marginTop="3dp">
                 <TextView
                     android:id="@+id/task_time_3"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="#FF00695C"
-                    android:textSize="9sp"
+                    android:textColor="#FF005549"
+                    android:textSize="11sp"
                     android:maxLines="1" />
                 <TextView
                     android:id="@+id/task_priority_3"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
+                    android:layout_marginStart="8dp"
                     android:text="●"
                     android:textColor="#FFBDBDBD"
-                    android:textSize="10sp" />
+                    android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
