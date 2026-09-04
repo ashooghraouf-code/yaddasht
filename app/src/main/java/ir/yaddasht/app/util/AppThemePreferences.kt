@@ -19,7 +19,7 @@ object AppThemePreferences {
         ThemeColor("بنفش کهکشانی", "🪐", 0xFF1A0830),
         ThemeColor("مشکی مخملی", "🖤", 0xFF0C0C0C),
         ThemeColor("آبی آسمانی", "🦋", 0xFF0277BD),
-        ThemeColor(" نقره یاسمین زهرا", "🤍", 0xFF9B8EBF),
+        ThemeColor(" سرمه ای یاسمین زهرا", "💙", 0xFF2C2C54),
     
     )
 
