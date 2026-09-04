@@ -4,23 +4,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import ir.yaddasht.app.R
-import ir.yaddasht.app.util.AppThemePreferences
 
-// ✅ فونت لاله‌زار
 val LalezarFont = FontFamily(Font(R.font.lalezar))
 
-// ✅ فونت وزیرمتن (نام واقعی فایل: vazirmatn.ttf)
 val VazirFont = FontFamily(
     Font(R.font.vazirmatn, FontWeight.Normal),
     Font(R.font.vazirmatn_bold, FontWeight.Bold)
 )
 
-// ✅ رنگ‌های ثابت
 val DeepGreen = Color(0xFF06100E)
 val DeepGreenSoft = Color(0xFF0E1F1A)
 val Saffron = Color(0xFFFFB74D)
@@ -31,7 +26,6 @@ val Brick = Color(0xFFC62828)
 val LineGreen = Color(0xFF2E7D52)
 val MutedGreenText = Color(0xFF8FAF9F)
 
-// ✅ رنگ‌های کاغذ یادداشت
 val PaperColors = listOf(
     Color(0xFFFFF8E1),
     Color(0xFFFFE0B2),
@@ -48,12 +42,7 @@ fun paperColor(index: Int): Color {
 }
 
 @Composable
-fun YaddashtTheme(content: @Composable () -> Unit) {
-    val context = LocalContext.current
-
-    val bgColorValue = AppThemePreferences.getBgColorValue(context)
-    val bgColor = Color(bgColorValue)
-
+fun YaddashtTheme(bgColor: Color = DeepGreen, content: @Composable () -> Unit) {
     val colorScheme = darkColorScheme(
         primary = Saffron,
         onPrimary = Color.Black,
