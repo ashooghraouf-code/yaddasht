@@ -16,13 +16,10 @@ object AppThemePreferences {
         ThemeColor("نیلی اقیانوس", "🌊", 0xFF0A1628),
         ThemeColor("شرابی لوکس", "🍷", 0xFF2C0A1A),
         ThemeColor("قهوه‌ای چرم", "🟤", 0xFF1C1008),
-        ThemeColor("خاکستری فولاد", "⚙️", 0xFF121820),
         ThemeColor("سبز زیتونی", "🫒", 0xFF121C08),
         ThemeColor("بنفش کهکشانی", "🪐", 0xFF1A0830),
         ThemeColor("آبی نیمه‌شب", "🌙", 0xFF081428),
         ThemeColor("مشکی مخملی", "🖤", 0xFF0C0C0C),
-
-        // ═══ ✨ رنگ‌های شاد فانتزی ✨ ═══
         ThemeColor("صورتی جادویی", "💖", 0xFFAD1457),
         ThemeColor("پسته‌ای رویایی", "🌿", 0xFF558B2F),
         ThemeColor("زرد طلایی", "✨", 0xFFF57F17),
