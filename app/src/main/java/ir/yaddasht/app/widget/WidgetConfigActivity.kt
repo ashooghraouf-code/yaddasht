@@ -67,17 +67,23 @@ class WidgetConfigActivity : Activity() {
         }
 
         confirmBtn.setOnClickListener {
-            // ✅ commit() تضمین می‌کند رنگ قبل از finish() ذخیره شود
+            // ✅ ۱. ذخیره رنگ با commit() (سنکرون)
             when (widgetType) {
                 WidgetType.NOTE -> WidgetPreferences.setNoteColor(this, selectedColor)
                 WidgetType.TASK -> WidgetPreferences.setTaskColor(this, selectedColor)
             }
 
+            // ✅ ۲. آپدیت فوری ویجت با رنگ جدید (چون onUpdate فراخوانی نمی‌شود)
+            val appWidgetManager = AppWidgetManager.getInstance(this)
+            when (widgetType) {
+                WidgetType.NOTE -> NoteWidget.updateAppWidget(this, appWidgetManager, appWidgetId)
+                WidgetType.TASK -> TaskWidget.updateAppWidget(this, appWidgetManager, appWidgetId)
+            }
+
+            // ✅ ۳. setResult و finish
             val resultValue = Intent().apply { putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId) }
             setResult(RESULT_OK, resultValue)
-
-            // ✅ تأخیر بیشتر برای اطمینان از ذخیره
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ finish() }, 500)
+            finish()
         }
     }
 
