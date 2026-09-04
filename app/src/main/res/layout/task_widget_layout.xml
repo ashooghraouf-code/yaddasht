@@ -41,7 +41,6 @@
             android:gravity="center" />
     </LinearLayout>
 
-    <!-- آیتم ۱ -->
     <LinearLayout
         android:id="@+id/task_item_1"
         android:layout_width="match_parent"
@@ -88,17 +87,18 @@
                     android:textColor="#FF00796B"
                     android:textSize="9sp"
                     android:maxLines="1" />
-                <View
+                <TextView
                     android:id="@+id/task_priority_1"
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
                     android:layout_marginStart="6dp"
-                    android:background="@drawable/dot_none" />
+                    android:text="●"
+                    android:textColor="#FFBDBDBD"
+                    android:textSize="10sp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 
-    <!-- آیتم ۲ -->
     <LinearLayout
         android:id="@+id/task_item_2"
         android:layout_width="match_parent"
@@ -145,17 +145,18 @@
                     android:textColor="#FF00796B"
                     android:textSize="9sp"
                     android:maxLines="1" />
-                <View
+                <TextView
                     android:id="@+id/task_priority_2"
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
                     android:layout_marginStart="6dp"
-                    android:background="@drawable/dot_none" />
+                    android:text="●"
+                    android:textColor="#FFBDBDBD"
+                    android:textSize="10sp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 
-    <!-- آیتم ۳ -->
     <LinearLayout
         android:id="@+id/task_item_3"
         android:layout_width="match_parent"
@@ -201,12 +202,14 @@
                     android:textColor="#FF00796B"
                     android:textSize="9sp"
                     android:maxLines="1" />
-                <View
+                <TextView
                     android:id="@+id/task_priority_3"
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
                     android:layout_marginStart="6dp"
-                    android:background="@drawable/dot_none" />
+                    android:text="●"
+                    android:textColor="#FFBDBDBD"
+                    android:textSize="10sp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
