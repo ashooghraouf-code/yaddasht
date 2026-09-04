@@ -7,7 +7,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
-import ir.yaddasht.app.MainActivity
 import ir.yaddasht.app.R
 
 class JournalistWidget : AppWidgetProvider() {
@@ -25,8 +24,9 @@ class JournalistWidget : AppWidgetProvider() {
             val bgColor = WidgetPreferences.getJournalistColor(context)
             try { views.setInt(R.id.journalist_widget_root, "setBackgroundColor", bgColor) } catch (_: Exception) {}
 
-            val cameraIntent = Intent(context, MainActivity::class.java).apply {
-                action = "JOURNALIST_CAMERA"
+            // ✅ مستقیم به JournalistActionActivity - بدون باز کردن اپ اصلی
+            val cameraIntent = Intent(context, JournalistActionActivity::class.java).apply {
+                action = JournalistActionActivity.ACTION_CAMERA
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             }
             val cameraPending = PendingIntent.getActivity(
@@ -35,8 +35,8 @@ class JournalistWidget : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.journalist_camera_btn, cameraPending)
 
-            val micIntent = Intent(context, MainActivity::class.java).apply {
-                action = "JOURNALIST_MIC"
+            val micIntent = Intent(context, JournalistActionActivity::class.java).apply {
+                action = JournalistActionActivity.ACTION_MIC
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             }
             val micPending = PendingIntent.getActivity(
