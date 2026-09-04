@@ -5,40 +5,40 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="#FFFFE082"
-    android:padding="8dp">
+    android:padding="10dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="6dp">
+        android:layout_marginBottom="8dp">
         <TextView
             android:id="@+id/note_widget_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="📝 یادداشت‌ها"
-            android:textColor="#FF3E2723"
-            android:textSize="13sp"
+            android:textColor="#FF2A1A00"
+            android:textSize="15sp"
             android:textStyle="bold"
             android:maxLines="1"
             android:ellipsize="end" />
         <TextView
             android:id="@+id/note_refresh"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:text="⟳"
-            android:textColor="#FF3E2723"
-            android:textSize="18sp"
+            android:textColor="#FF2A1A00"
+            android:textSize="20sp"
             android:gravity="center" />
         <TextView
             android:id="@+id/note_add"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:text="+"
-            android:textColor="#FF3E2723"
-            android:textSize="22sp"
+            android:textColor="#FF2A1A00"
+            android:textSize="24sp"
             android:textStyle="bold"
             android:gravity="center" />
     </LinearLayout>
@@ -49,15 +49,15 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:orientation="vertical"
-        android:background="#30000000"
-        android:padding="6dp"
-        android:layout_marginBottom="3dp">
+        android:background="#25000000"
+        android:padding="8dp"
+        android:layout_marginBottom="4dp">
         <TextView
             android:id="@+id/note_title_1"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#FF3E2723"
-            android:textSize="12sp"
+            android:textColor="#FF2A1A00"
+            android:textSize="14sp"
             android:textStyle="bold"
             android:maxLines="1"
             android:ellipsize="end" />
@@ -65,11 +65,11 @@
             android:id="@+id/note_body_1"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#FF5D4037"
-            android:textSize="10sp"
+            android:textColor="#FF4A3520"
+            android:textSize="11sp"
             android:maxLines="2"
             android:ellipsize="end"
-            android:layout_marginTop="2dp" />
+            android:layout_marginTop="3dp" />
     </LinearLayout>
 
     <LinearLayout
@@ -78,15 +78,15 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:orientation="vertical"
-        android:background="#30000000"
-        android:padding="6dp"
-        android:layout_marginBottom="3dp">
+        android:background="#25000000"
+        android:padding="8dp"
+        android:layout_marginBottom="4dp">
         <TextView
             android:id="@+id/note_title_2"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#FF3E2723"
-            android:textSize="12sp"
+            android:textColor="#FF2A1A00"
+            android:textSize="14sp"
             android:textStyle="bold"
             android:maxLines="1"
             android:ellipsize="end" />
@@ -94,11 +94,11 @@
             android:id="@+id/note_body_2"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#FF5D4037"
-            android:textSize="10sp"
+            android:textColor="#FF4A3520"
+            android:textSize="11sp"
             android:maxLines="2"
             android:ellipsize="end"
-            android:layout_marginTop="2dp" />
+            android:layout_marginTop="3dp" />
     </LinearLayout>
 
     <LinearLayout
@@ -107,14 +107,14 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:orientation="vertical"
-        android:background="#30000000"
-        android:padding="6dp">
+        android:background="#25000000"
+        android:padding="8dp">
         <TextView
             android:id="@+id/note_title_3"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#FF3E2723"
-            android:textSize="12sp"
+            android:textColor="#FF2A1A00"
+            android:textSize="14sp"
             android:textStyle="bold"
             android:maxLines="1"
             android:ellipsize="end" />
@@ -122,10 +122,10 @@
             android:id="@+id/note_body_3"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#FF5D4037"
-            android:textSize="10sp"
+            android:textColor="#FF4A3520"
+            android:textSize="11sp"
             android:maxLines="2"
             android:ellipsize="end"
-            android:layout_marginTop="2dp" />
+            android:layout_marginTop="3dp" />
     </LinearLayout>
 </LinearLayout>
