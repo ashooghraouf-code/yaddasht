@@ -123,6 +123,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+
         setContent {
             YaddashtTheme {
                 val context = LocalContext.current
@@ -193,13 +194,14 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
-        sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let { 
-            sensorManager?.registerListener(shakeListener, it, SensorManager.SENSOR_DELAY_UI) 
+        sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
+            sensorManager?.registerListener(shakeListener, it, SensorManager.SENSOR_DELAY_UI)
         }
+        // ✅ فقط NoteWidget و TaskWidget - بدون JournalistWidget
         NoteWidget.forceUpdate(this)
         TaskWidget.forceUpdate(this)
     }
-    
+
     override fun onPause() {
         super.onPause()
         sensorManager?.unregisterListener(shakeListener)
