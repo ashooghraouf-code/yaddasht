@@ -277,7 +277,8 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
         list.groupBy { val (a, b, c) = FaDate.jalali(it.second); Triple(a, b, c) }
     }
 
-    Scaffold(containerColor = DeepGreen,
+    // ✅ بدون containerColor ثابت — از MaterialTheme.colorScheme.background پیروی می‌کند
+    Scaffold(
         floatingActionButton = {
             when (tab) {
                 0 -> NewNoteFab(onNewNote)
@@ -634,12 +635,12 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
     scope.launch(Dispatchers.IO) { dao.update(note.copy(pinned = !note.pinned, updatedAt = System.currentTimeMillis())) }
 }
 
-// ✅ اصلاح‌شده: آیکون اصلی برنامه + دکمهٔ تغییر رنگ تم
+// ✅ اصلاح‌شده: عنوان افقی می‌ماند + دکمهٔ تغییر رنگ تم
 @Composable private fun HomeHeader(count: Int, onStats: () -> Unit, onBackup: () -> Unit, onRestore: () -> Unit, onThemePicker: () -> Unit) {
     val context = LocalContext.current
     Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(52.dp).clip(CircleShape).background(Saffron), contentAlignment = Alignment.Center) { 
+            Box(Modifier.size(52.dp).clip(CircleShape).background(Saffron), contentAlignment = Alignment.Center) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_launcher_foreground),
                     contentDescription = "لوگو چراغ راه",
@@ -648,33 +649,33 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
                 )
             }
             Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f, fill = false)) {
                 Text(
-                    text = "چراغ راه", 
-                    fontFamily = LalezarFont, 
-                    fontSize = 26.sp, 
+                    text = "چراغ راه",
+                    fontFamily = LalezarFont,
+                    fontSize = 26.sp,
                     color = PaperWhite,
                     maxLines = 1,
+                    softWrap = false,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text("بدون محدودیت • ${count.fa()} یادداشت • 🤝 تکان بده = جدید", fontSize = 10.sp, color = Saffron)
+                Text("بدون محدودیت • ${count.fa()} یادداشت • 🤝 تکان بده = جدید", fontSize = 10.sp, color = Saffron, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-
-            // ✅ دکمه تغییر رنگ تم
-            IconButton(onClick = onThemePicker) {
-                Text("🎨", fontSize = 22.sp)
+            Spacer(Modifier.width(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+                IconButton(onClick = onThemePicker, modifier = Modifier.size(36.dp)) {
+                    Text("🎨", fontSize = 18.sp)
+                }
+                IconButton(onClick = {
+                    val intent = android.content.Intent(context, FilePickerActivity::class.java)
+                    context.startActivity(intent)
+                }, modifier = Modifier.size(36.dp)) {
+                    Text("📚", fontSize = 18.sp)
+                }
+                IconButton(onClick = onBackup, modifier = Modifier.size(36.dp)) { Icon(Icons.Filled.FileUpload, "پشتیبان", tint = MutedGreenText, modifier = Modifier.size(20.dp)) }
+                IconButton(onClick = onRestore, modifier = Modifier.size(36.dp)) { Icon(Icons.Filled.FileDownload, "بازیابی", tint = MutedGreenText, modifier = Modifier.size(20.dp)) }
+                IconButton(onClick = onStats, modifier = Modifier.size(36.dp)) { Icon(Icons.Filled.BarChart, "آمار", tint = MutedGreenText, modifier = Modifier.size(20.dp)) }
             }
-
-            IconButton(onClick = {
-                val intent = android.content.Intent(context, FilePickerActivity::class.java)
-                context.startActivity(intent)
-            }) {
-                Text("📚", fontSize = 24.sp)
-            }
-
-            IconButton(onClick = onBackup) { Icon(Icons.Filled.FileUpload, "پشتیبان کامل", tint = MutedGreenText) }
-            IconButton(onClick = onRestore) { Icon(Icons.Filled.FileDownload, "بازیابی کامل", tint = MutedGreenText) }
-            IconButton(onClick = onStats) { Icon(Icons.Filled.BarChart, "آمار", tint = MutedGreenText) }
         }
         Spacer(Modifier.height(6.dp))
         Text(FaDate.full(System.currentTimeMillis()), fontSize = 13.sp, color = MutedGreenText, modifier = Modifier.padding(start = 2.dp))
