@@ -405,7 +405,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         }
     }
 
-    // ✅ خروجی عکس PNG از یادداشت
+    // ✅ خروجی عکس PNG
     fun exportImage() {
         val n = note ?: return
         scope.launch(Dispatchers.IO) {
@@ -428,14 +428,12 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                 val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                 val canvas = Canvas(bitmap)
 
-                // پس‌زمینه کاغذی
                 canvas.drawColor(0xFFFAF5E8.toInt())
 
-                // نوار بالای رنگی
-                val headerPaint = Paint().apply { color = paperColor(n.color).toInt() }
+                // ✅ toArgb() به جای toInt()
+                val headerPaint = Paint().apply { color = paperColor(n.color).toArgb() }
                 canvas.drawRect(0f, 0f, width.toFloat(), 12f, headerPaint)
 
-                // عنوان
                 val titlePaint = Paint().apply {
                     color = 0xFF2D2D2D.toInt()
                     textSize = titleSize
@@ -445,7 +443,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                 }
                 canvas.drawText(n.title.ifBlank { "بدون عنوان" }, (width - padding).toFloat(), (padding + titleSize).toFloat(), titlePaint)
 
-                // خط جداکننده
                 val linePaint = Paint().apply {
                     color = 0xFFFFB74D.toInt()
                     strokeWidth = 4f
@@ -453,7 +450,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                 val lineY = padding + titleSize + 30f
                 canvas.drawLine(padding.toFloat(), lineY, (width - padding).toFloat(), lineY, linePaint)
 
-                // متن بدنه
                 val bodyPaint = Paint().apply {
                     color = 0xFF3D3D3D.toInt()
                     textSize = bodySize
@@ -465,7 +461,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                     y += lineHeight
                 }
 
-                // تاریخ پایین
                 val datePaint = Paint().apply {
                     color = 0xFF888888.toInt()
                     textSize = dateSize
@@ -474,7 +469,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                 val dateStr = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.US).format(Date(n.updatedAt))
                 canvas.drawText(dateStr, padding.toFloat(), (height - padding).toFloat(), datePaint)
 
-                // لوگو
                 val logoPaint = Paint().apply {
                     color = 0xFFFFB74D.toInt()
                     textSize = 28f
@@ -586,7 +580,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     if (showExport && note != null) {
         val n = note!!
         AlertDialog(onDismissRequest = { showExport = false },
-            // ✅ رنگ عنوان خواناتر: Saffron به جای Ink، سایز 22 به جای 20
             title = { Text("📤 ارسال / خروجی", fontFamily = LalezarFont, fontSize = 22.sp, color = Saffron) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -594,7 +587,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                     ExportItem("📄 خروجی PDF") { if (!isLocked) exportPdf(); showExport = false }
                     ExportItem("📝 خروجی Word") { if (!isLocked) exportWord(); showExport = false }
                     ExportItem("🧾 خروجی JSON") { exportJsonNote(); showExport = false }
-                    // ✅ گزینهٔ جدید: خروجی عکس
                     ExportItem("🖼️ خروجی عکس") { if (!isLocked) exportImage(); showExport = false }
                 }
             },
