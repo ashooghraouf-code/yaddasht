@@ -5,6 +5,10 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.net.Uri
@@ -188,8 +192,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     val isLocked = note?.body?.let(NoteLock::isLocked) == true
     val isChecklist = note?.body?.let(Checklist::isChecklist) == true
 
-    // ─── تعاریف اولیه (بدون LaunchedEffect خبرنگاری) ───
-
     LaunchedEffect(ready, realId) {
         if (!ready) return@LaunchedEffect
         dao.observeNote(realId).collect { n ->
@@ -236,8 +238,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     }
     BackHandler(onBack = exit)
 
-    // ─── Launcherها ───
-
     val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val file = pendingCameraFile
         if (ok && file != null && file.length() > 0) {
@@ -259,8 +259,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         }
     }
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-
-    // ─── توابع ───
 
     fun startRecording() {
         val file = AttachmentStore.createAudioFile(context)
@@ -407,29 +405,105 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         }
     }
 
-    // ─── ✅ ویجت خبرنگاری - AFTER takePicture and launchSpeech are defined ───
+    // ✅ خروجی عکس PNG از یادداشت
+    fun exportImage() {
+        val n = note ?: return
+        scope.launch(Dispatchers.IO) {
+            try {
+                val dir = File(context.filesDir, "exports")
+                if (!dir.exists()) dir.mkdirs()
+                val file = File(dir, "${safeName(n.title)}.png")
 
-    LaunchedEffect(Unit) {
-        if (noteId == NEW_NOTE_ID) {
-            realId = withContext(Dispatchers.IO) { dao.insert(Note()) }
+                val width = 1080
+                val lineHeight = 60
+                val padding = 60
+                val titleSize = 64f
+                val bodySize = 42f
+                val dateSize = 32f
 
-            val activity = context as? Activity
-            if (activity?.intent?.getBooleanExtra("auto_camera", false) == true) {
-                val file = AttachmentStore.createCameraFile(context)
-                pendingCameraFile = file
-                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                takePicture.launch(uri)
-                activity.intent.removeExtra("auto_camera")
-            }
-            if (activity?.intent?.getBooleanExtra("auto_dictation", false) == true) {
-                launchSpeech()
-                activity.intent.removeExtra("auto_dictation")
+                val lines = if (isLocked) listOf("🔒 این یادداشت قفل است") else n.body.split("\n")
+                val totalLines = lines.size.coerceAtMost(30)
+                val height = (padding + 100 + 40 + totalLines * lineHeight + 80 + padding).coerceAtLeast(800)
+
+                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bitmap)
+
+                // پس‌زمینه کاغذی
+                canvas.drawColor(0xFFFAF5E8.toInt())
+
+                // نوار بالای رنگی
+                val headerPaint = Paint().apply { color = paperColor(n.color).toInt() }
+                canvas.drawRect(0f, 0f, width.toFloat(), 12f, headerPaint)
+
+                // عنوان
+                val titlePaint = Paint().apply {
+                    color = 0xFF2D2D2D.toInt()
+                    textSize = titleSize
+                    isFakeBoldText = true
+                    textAlign = Paint.Align.RIGHT
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                }
+                canvas.drawText(n.title.ifBlank { "بدون عنوان" }, (width - padding).toFloat(), (padding + titleSize).toFloat(), titlePaint)
+
+                // خط جداکننده
+                val linePaint = Paint().apply {
+                    color = 0xFFFFB74D.toInt()
+                    strokeWidth = 4f
+                }
+                val lineY = padding + titleSize + 30f
+                canvas.drawLine(padding.toFloat(), lineY, (width - padding).toFloat(), lineY, linePaint)
+
+                // متن بدنه
+                val bodyPaint = Paint().apply {
+                    color = 0xFF3D3D3D.toInt()
+                    textSize = bodySize
+                    textAlign = Paint.Align.RIGHT
+                }
+                var y = lineY + 50f
+                for (line in lines.take(30)) {
+                    canvas.drawText(line.ifEmpty { " " }, (width - padding).toFloat(), y, bodyPaint)
+                    y += lineHeight
+                }
+
+                // تاریخ پایین
+                val datePaint = Paint().apply {
+                    color = 0xFF888888.toInt()
+                    textSize = dateSize
+                    textAlign = Paint.Align.LEFT
+                }
+                val dateStr = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.US).format(Date(n.updatedAt))
+                canvas.drawText(dateStr, padding.toFloat(), (height - padding).toFloat(), datePaint)
+
+                // لوگو
+                val logoPaint = Paint().apply {
+                    color = 0xFFFFB74D.toInt()
+                    textSize = 28f
+                    textAlign = Paint.Align.RIGHT
+                }
+                canvas.drawText("چراغ راه 🏮", (width - padding).toFloat(), (height - padding).toFloat(), logoPaint)
+
+                file.outputStream().use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                }
+                bitmap.recycle()
+
+                withContext(Dispatchers.Main) {
+                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "image/png"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        putExtra(Intent.EXTRA_SUBJECT, n.title.ifBlank { "یادداشت" })
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری عکس یادداشت"))
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "خطا در ساخت عکس: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
         }
-        ready = true
     }
-
-    // ─── UI ───
 
     Scaffold(containerColor = DeepGreen) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
@@ -512,13 +586,16 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     if (showExport && note != null) {
         val n = note!!
         AlertDialog(onDismissRequest = { showExport = false },
-            title = { Text("📤 ارسال / خروجی", fontFamily = LalezarFont, fontSize = 20.sp, color = Ink) },
+            // ✅ رنگ عنوان خواناتر: Saffron به جای Ink، سایز 22 به جای 20
+            title = { Text("📤 ارسال / خروجی", fontFamily = LalezarFont, fontSize = 22.sp, color = Saffron) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ExportItem("📤 اشتراک متن یادداشت") { shareNoteText(context, n.title, if (isLocked) "🔒 (محتوا قفل است)" else n.body); showExport = false }
                     ExportItem("📄 خروجی PDF") { if (!isLocked) exportPdf(); showExport = false }
                     ExportItem("📝 خروجی Word") { if (!isLocked) exportWord(); showExport = false }
                     ExportItem("🧾 خروجی JSON") { exportJsonNote(); showExport = false }
+                    // ✅ گزینهٔ جدید: خروجی عکس
+                    ExportItem("🖼️ خروجی عکس") { if (!isLocked) exportImage(); showExport = false }
                 }
             },
             confirmButton = { TextButton(onClick = { showExport = false }) { Text("بستن", color = Saffron, fontWeight = FontWeight.Bold) } })
