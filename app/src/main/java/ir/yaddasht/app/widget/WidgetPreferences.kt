@@ -9,11 +9,11 @@ object WidgetPreferences {
 
     fun getNoteColor(c: Context): Int = prefs(c).getInt("note_bg_color", 0xFFFFE082.toInt())
     fun setNoteColor(c: Context, color: Int) {
-        prefs(c).edit().putInt("note_bg_color", color).commit() // ✅ commit() نه apply()
+        prefs(c).edit().putInt("note_bg_color", color).commit()
     }
 
     fun getTaskColor(c: Context): Int = prefs(c).getInt("task_bg_color", 0xFF80DEEA.toInt())
     fun setTaskColor(c: Context, color: Int) {
-        prefs(c).edit().putInt("task_bg_color", color).commit() // ✅ commit() نه apply()
+        prefs(c).edit().putInt("task_bg_color", color).commit()
     }
 }
