@@ -44,40 +44,39 @@ class TaskWidget : AppWidgetProvider() {
                     set(Calendar.SECOND, 59)
                 }.timeInMillis
 
-                val tasks = AppDatabase.get(context).taskDao().getRecentTasks()
-                    .filter { it.dueDate <= today && !it.isCompleted }
+                // ✅ همهٔ وظایف امروز (انجام‌شده و نشده) برای دیدن بیلان کار
+                val allTasks = AppDatabase.get(context).taskDao().getRecentTasks()
+                    .filter { it.dueDate <= today }
                     .take(3)
 
                 val timeFormat = SimpleDateFormat("HH:mm", Locale.US)
 
-                if (tasks.isNotEmpty()) {
-                    // ─── آیتم ۱ ───
-                    val t1 = tasks.getOrNull(0)
+                if (allTasks.isNotEmpty()) {
+                    val t1 = allTasks.getOrNull(0)
                     if (t1 != null) {
-                        // ✅ خط‌خوردگی برای وظایف انجام‌شده
+                        // ✅ خط‌خوردگی برای انجام‌شده، متن عادی برای نشده
                         val title1 = if (t1.isCompleted) {
                             SpannableString(t1.title).also { it.setSpan(StrikethroughSpan(), 0, it.length, 0) }
-                        } else {
-                            SpannableString(t1.title)
-                        }
+                        } else { SpannableString(t1.title) }
                         views.setTextViewText(R.id.task_title_1, title1)
                         views.setTextViewText(R.id.task_check_1, if (t1.isCompleted) "☑" else "☐")
 
-                        // ✅ ساعت وظیفه
+                        // ✅ رنگ متن: خاکستری برای انجام‌شده، تیره برای نشده
+                        val titleColor1 = if (t1.isCompleted) 0xFF78909C.toInt() else 0xFF004D40.toInt()
+                        views.setTextColor(R.id.task_title_1, titleColor1)
+
                         val time1 = if (t1.dueDate > 0) "⏰ " + timeFormat.format(Date(t1.dueDate)) else ""
                         views.setTextViewText(R.id.task_time_1, time1)
 
-                        // ✅ نقطه رنگی اهمیت
-                        val priorityRes1 = when {
-                            t1.dueDate > 0 && t1.dueDate - System.currentTimeMillis() < 3600000 -> R.drawable.dot_high
-                            t1.dueDate > 0 && t1.dueDate - System.currentTimeMillis() < 86400000 -> R.drawable.dot_medium
-                            t1.dueDate > 0 -> R.drawable.dot_low
-                            else -> R.drawable.dot_none
+                        val priorityColor1 = when {
+                            t1.isCompleted -> 0xFFBDBDBD.toInt()
+                            t1.dueDate > 0 && t1.dueDate - System.currentTimeMillis() < 3600000 -> 0xFFFF1744.toInt()
+                            t1.dueDate > 0 && t1.dueDate - System.currentTimeMillis() < 86400000 -> 0xFFFF9100.toInt()
+                            t1.dueDate > 0 -> 0xFF00C853.toInt()
+                            else -> 0xFFBDBDBD.toInt()
                         }
-                        views.setViewVisibility(R.id.task_priority_1, View.VISIBLE)
-                        views.setInt(R.id.task_priority_1, "setBackgroundResource", priorityRes1)
+                        views.setTextColor(R.id.task_priority_1, priorityColor1)
 
-                        // PendingIntent تیک زدن
                         val toggleIntent1 = Intent(context, TaskWidgetReceiver::class.java).apply {
                             action = "TOGGLE_TASK"
                             putExtra("task_id", t1.id)
@@ -85,7 +84,6 @@ class TaskWidget : AppWidgetProvider() {
                         val togglePending1 = PendingIntent.getBroadcast(context, t1.id.toInt(), toggleIntent1, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                         views.setOnClickPendingIntent(R.id.task_check_1, togglePending1)
 
-                        // PendingIntent باز کردن در اپ
                         val openIntent1 = Intent(context, MainActivity::class.java).apply {
                             putExtra("open_task", t1.id)
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -96,28 +94,28 @@ class TaskWidget : AppWidgetProvider() {
                         views.setViewVisibility(R.id.task_item_1, View.VISIBLE)
                     }
 
-                    // ─── آیتم ۲ ───
-                    val t2 = tasks.getOrNull(1)
+                    val t2 = allTasks.getOrNull(1)
                     if (t2 != null) {
                         val title2 = if (t2.isCompleted) {
                             SpannableString(t2.title).also { it.setSpan(StrikethroughSpan(), 0, it.length, 0) }
-                        } else {
-                            SpannableString(t2.title)
-                        }
+                        } else { SpannableString(t2.title) }
                         views.setTextViewText(R.id.task_title_2, title2)
                         views.setTextViewText(R.id.task_check_2, if (t2.isCompleted) "☑" else "☐")
+
+                        val titleColor2 = if (t2.isCompleted) 0xFF78909C.toInt() else 0xFF004D40.toInt()
+                        views.setTextColor(R.id.task_title_2, titleColor2)
 
                         val time2 = if (t2.dueDate > 0) "⏰ " + timeFormat.format(Date(t2.dueDate)) else ""
                         views.setTextViewText(R.id.task_time_2, time2)
 
-                        val priorityRes2 = when {
-                            t2.dueDate > 0 && t2.dueDate - System.currentTimeMillis() < 3600000 -> R.drawable.dot_high
-                            t2.dueDate > 0 && t2.dueDate - System.currentTimeMillis() < 86400000 -> R.drawable.dot_medium
-                            t2.dueDate > 0 -> R.drawable.dot_low
-                            else -> R.drawable.dot_none
+                        val priorityColor2 = when {
+                            t2.isCompleted -> 0xFFBDBDBD.toInt()
+                            t2.dueDate > 0 && t2.dueDate - System.currentTimeMillis() < 3600000 -> 0xFFFF1744.toInt()
+                            t2.dueDate > 0 && t2.dueDate - System.currentTimeMillis() < 86400000 -> 0xFFFF9100.toInt()
+                            t2.dueDate > 0 -> 0xFF00C853.toInt()
+                            else -> 0xFFBDBDBD.toInt()
                         }
-                        views.setViewVisibility(R.id.task_priority_2, View.VISIBLE)
-                        views.setInt(R.id.task_priority_2, "setBackgroundResource", priorityRes2)
+                        views.setTextColor(R.id.task_priority_2, priorityColor2)
 
                         val toggleIntent2 = Intent(context, TaskWidgetReceiver::class.java).apply {
                             action = "TOGGLE_TASK"
@@ -138,28 +136,28 @@ class TaskWidget : AppWidgetProvider() {
                         views.setViewVisibility(R.id.task_item_2, View.GONE)
                     }
 
-                    // ─── آیتم ۳ ───
-                    val t3 = tasks.getOrNull(2)
+                    val t3 = allTasks.getOrNull(2)
                     if (t3 != null) {
                         val title3 = if (t3.isCompleted) {
                             SpannableString(t3.title).also { it.setSpan(StrikethroughSpan(), 0, it.length, 0) }
-                        } else {
-                            SpannableString(t3.title)
-                        }
+                        } else { SpannableString(t3.title) }
                         views.setTextViewText(R.id.task_title_3, title3)
                         views.setTextViewText(R.id.task_check_3, if (t3.isCompleted) "☑" else "☐")
+
+                        val titleColor3 = if (t3.isCompleted) 0xFF78909C.toInt() else 0xFF004D40.toInt()
+                        views.setTextColor(R.id.task_title_3, titleColor3)
 
                         val time3 = if (t3.dueDate > 0) "⏰ " + timeFormat.format(Date(t3.dueDate)) else ""
                         views.setTextViewText(R.id.task_time_3, time3)
 
-                        val priorityRes3 = when {
-                            t3.dueDate > 0 && t3.dueDate - System.currentTimeMillis() < 3600000 -> R.drawable.dot_high
-                            t3.dueDate > 0 && t3.dueDate - System.currentTimeMillis() < 86400000 -> R.drawable.dot_medium
-                            t3.dueDate > 0 -> R.drawable.dot_low
-                            else -> R.drawable.dot_none
+                        val priorityColor3 = when {
+                            t3.isCompleted -> 0xFFBDBDBD.toInt()
+                            t3.dueDate > 0 && t3.dueDate - System.currentTimeMillis() < 3600000 -> 0xFFFF1744.toInt()
+                            t3.dueDate > 0 && t3.dueDate - System.currentTimeMillis() < 86400000 -> 0xFFFF9100.toInt()
+                            t3.dueDate > 0 -> 0xFF00C853.toInt()
+                            else -> 0xFFBDBDBD.toInt()
                         }
-                        views.setViewVisibility(R.id.task_priority_3, View.VISIBLE)
-                        views.setInt(R.id.task_priority_3, "setBackgroundResource", priorityRes3)
+                        views.setTextColor(R.id.task_priority_3, priorityColor3)
 
                         val toggleIntent3 = Intent(context, TaskWidgetReceiver::class.java).apply {
                             action = "TOGGLE_TASK"
@@ -179,8 +177,13 @@ class TaskWidget : AppWidgetProvider() {
                     } else {
                         views.setViewVisibility(R.id.task_item_3, View.GONE)
                     }
+
+                    // ✅ شمارندهٔ بیلان کار
+                    val doneCount = allTasks.count { it.isCompleted }
+                    val totalCount = allTasks.size
+                    views.setTextViewText(R.id.task_widget_title, "✅ وظایف امروز ($doneCount/$totalCount)")
                 } else {
-                    views.setTextViewText(R.id.task_title_1, "وظیفه‌ای برای امروز نیست")
+                    views.setTextViewText(R.id.task_widget_title, "✅ وظیفه‌ای برای امروز نیست")
                     views.setViewVisibility(R.id.task_check_1, View.GONE)
                     views.setViewVisibility(R.id.task_time_1, View.GONE)
                     views.setViewVisibility(R.id.task_priority_1, View.GONE)
