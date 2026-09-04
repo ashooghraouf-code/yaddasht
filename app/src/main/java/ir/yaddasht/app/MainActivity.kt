@@ -1,4 +1,104 @@
-آ
+package ir.yaddasht.app
+
+import android.app.Activity
+import android.app.KeyguardManager
+import android.content.Context
+import android.content.Intent
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.os.Build
+import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.fragment.app.FragmentActivity
+import ir.yaddasht.app.data.AppDatabase
+import ir.yaddasht.app.ui.screen.DrawScreen
+import ir.yaddasht.app.ui.screen.EditorScreen
+import ir.yaddasht.app.ui.screen.HomeScreen
+import ir.yaddasht.app.ui.screen.TaskEditorScreen
+import ir.yaddasht.app.ui.theme.DeepGreen
+import ir.yaddasht.app.ui.theme.LalezarFont
+import ir.yaddasht.app.ui.theme.MutedGreenText
+import ir.yaddasht.app.ui.theme.PaperWhite
+import ir.yaddasht.app.ui.theme.Saffron
+import ir.yaddasht.app.ui.theme.YaddashtTheme
+import ir.yaddasht.app.util.AppThemePreferences
+import ir.yaddasht.app.util.NoteLock
+import ir.yaddasht.app.widget.NoteWidget
+import ir.yaddasht.app.widget.TaskWidget
+import ir.yaddasht.app.widget.WidgetColorPickerActivity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+const val NEW_NOTE_ID = -1L
+
+sealed class Screen {
+    data object Home : Screen()
+    data class Editor(val noteId: Long) : Screen()
+    data class Draw(val noteId: Long, val isTask: Boolean = false) : Screen()
+    data class TaskEditor(val taskId: Long) : Screen()
+    companion object {
+        val SAVER: Saver<Screen, String> = Saver(
+            save = { s ->
+                when (s) {
+                    is Home -> "home"
+                    is Editor -> "e:${s.noteId}"
+                    is Draw -> "d:${s.noteId}:${if (s.isTask) 1 else 0}"
+                    is TaskEditor -> "t:${s.taskId}"
+                }
+            },
+            restore = { str ->
+                when {
+                    str.startsWith("e:") -> Editor(str.removePrefix("e:").toLongOrNull() ?: NEW_NOTE_ID)
+                    str.startsWith("d:") -> {
+                        val parts = str.removePrefix("d:").split(":")
+                        Draw(parts.getOrNull(0)?.toLongOrNull() ?: NEW_NOTE_ID, parts.getOrNull(1) == "1")
+                    }
+                    str.startsWith("t:") -> TaskEditor(str.removePrefix("t:").toLongOrNull() ?: 0L)
+                    else -> Home
+                }
+            }
+        )
+    }
+}
+
+class MainActivity : FragmentActivity() {
+    private var sensorManager: SensorManager? = null
+    private var shakeHits = 0
+    private var lastHitTime = 0L
+    private var lastTrigger = 0L
+    private var onShake: (() -> Unit)? = null
+
     private val shakeListener = object : SensorEventListener {
         override fun onSensorChanged(e: SensorEvent) {
             val x = e.values[0]; val y = e.values[1]; val z = e.values[2]
@@ -29,7 +129,14 @@
             // ✅ state برای trigger recomposition هنگام تغییر رنگ
             var themeVersion by remember { mutableIntStateOf(0) }
 
-            YaddashtTheme {
+            // ✅ خواندن رنگ از SharedPreferences با کلید themeVersion
+            val appContext = LocalContext.current.applicationContext
+            val bgColor = remember(themeVersion) {
+                AppThemePreferences.getBgColor(appContext)
+            }
+
+            // ✅ پاس دادن bgColor به تم
+            YaddashtTheme(bgColor = bgColor) {
                 val context = LocalContext.current
                 val dao = remember { AppDatabase.get(context.applicationContext).dao() }
                 val taskDao = remember { AppDatabase.get(context.applicationContext).taskDao() }
