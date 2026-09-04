@@ -659,7 +659,7 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text("بدون محدودیت • ${count.fa()} یادداشت • 🤝 تکان بده = جدید", fontSize = 10.sp, color = Saffron, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                
             }
             Spacer(Modifier.width(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
