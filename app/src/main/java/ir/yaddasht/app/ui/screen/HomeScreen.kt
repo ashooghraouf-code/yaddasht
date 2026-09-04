@@ -100,6 +100,7 @@ import ir.yaddasht.app.ui.theme.PaperWhite
 import ir.yaddasht.app.ui.theme.Saffron
 import ir.yaddasht.app.ui.theme.VazirFont
 import ir.yaddasht.app.ui.theme.paperColor
+import ir.yaddasht.app.util.AppThemePreferences
 import ir.yaddasht.app.util.Checklist
 import ir.yaddasht.app.util.FaDate
 import ir.yaddasht.app.util.FullBackup
@@ -227,7 +228,7 @@ private fun computeHolidayDays(jy: Int, jm: Int): Set<Int> {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNewNote: () -> Unit, onOpenTask: (Long) -> Unit) {
+fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNewNote: () -> Unit, onOpenTask: (Long) -> Unit, onThemeChanged: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val notes by dao.observeNotes().collectAsState(initial = emptyList())
@@ -243,6 +244,9 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
     var showAddTask by remember { mutableStateOf(false) }
     var editTask by remember { mutableStateOf<Task?>(null) }
     var newTaskOnDate by remember { mutableLongStateOf(0L) }
+
+    // ✅ state برای دیالوگ انتخاب رنگ تم
+    var showThemePicker by remember { mutableStateOf(false) }
 
     val (tjy, tjm, tjd) = FaDate.jalali(System.currentTimeMillis())
     var calJy by remember { mutableIntStateOf(tjy) }
@@ -285,7 +289,7 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
         Box(Modifier.fillMaxSize().padding(padding)) {
             PaperDots()
             Column(Modifier.fillMaxSize()) {
-                HomeHeader(count = notes.size, onStats = { showStats = true }, onBackup = { doBackup() }, onRestore = { restoreLauncher.launch(arrayOf("*/*")) })
+                HomeHeader(count = notes.size, onStats = { showStats = true }, onBackup = { doBackup() }, onRestore = { restoreLauncher.launch(arrayOf("*/*")) }, onThemePicker = { showThemePicker = true })
                 TabRow(selectedTabIndex = tab, containerColor = Color.Transparent, modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)) {
                     Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("📝 یادداشت‌ها", fontFamily = LalezarFont, fontSize = 14.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
                     Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("✅ وظایف", fontFamily = LalezarFont, fontSize = 14.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
@@ -474,6 +478,47 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
             confirmButton = { TextButton(onClick = { noteToDelete = null; scope.launch(Dispatchers.IO) { val atts = dao.attachmentsByNote(note.id); dao.deleteById(note.id); atts.forEach { File(it.filePath).delete() } } }) { Text("حذف", color = Brick, fontWeight = FontWeight.Bold) } },
             dismissButton = { TextButton(onClick = { noteToDelete = null }) { Text("انصراف") } })
     }
+
+    // ✅ دیالوگ انتخاب رنگ تم اپ
+    if (showThemePicker) {
+        AlertDialog(
+            onDismissRequest = { showThemePicker = false },
+            title = { Text("🎨 رنگ دفترچه", fontFamily = LalezarFont, fontSize = 20.sp, color = Saffron) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AppThemePreferences.themeColors.forEach { pair ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    AppThemePreferences.setBgColor(context, pair.colorValue)
+                                    onThemeChanged()
+                                    showThemePicker = false
+                                }
+                                .padding(vertical = 4.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(Color(pair.colorValue), RoundedCornerShape(10.dp))
+                                    .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(pair.emoji, fontSize = 18.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Text(pair.name, color = PaperWhite, fontSize = 15.sp, fontFamily = VazirFont)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showThemePicker = false }) {
+                    Text("بستن", color = Saffron, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
 }
 
 @Composable private fun LegendItem(color: Color, label: String) {
@@ -589,8 +634,8 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
     scope.launch(Dispatchers.IO) { dao.update(note.copy(pinned = !note.pinned, updatedAt = System.currentTimeMillis())) }
 }
 
-// ✅ اصلاح‌شده: آیکون اصلی برنامه + فونت مرتب‌شده
-@Composable private fun HomeHeader(count: Int, onStats: () -> Unit, onBackup: () -> Unit, onRestore: () -> Unit) {
+// ✅ اصلاح‌شده: آیکون اصلی برنامه + دکمهٔ تغییر رنگ تم
+@Composable private fun HomeHeader(count: Int, onStats: () -> Unit, onBackup: () -> Unit, onRestore: () -> Unit, onThemePicker: () -> Unit) {
     val context = LocalContext.current
     Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -614,7 +659,12 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
                 )
                 Text("بدون محدودیت • ${count.fa()} یادداشت • 🤝 تکان بده = جدید", fontSize = 10.sp, color = Saffron)
             }
-            
+
+            // ✅ دکمه تغییر رنگ تم
+            IconButton(onClick = onThemePicker) {
+                Text("🎨", fontSize = 22.sp)
+            }
+
             IconButton(onClick = {
                 val intent = android.content.Intent(context, FilePickerActivity::class.java)
                 context.startActivity(intent)
