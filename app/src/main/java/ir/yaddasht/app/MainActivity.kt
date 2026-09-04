@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
@@ -125,6 +126,9 @@ class MainActivity : FragmentActivity() {
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
 
         setContent {
+            // ✅ state برای trigger recomposition هنگام تغییر رنگ
+            var themeVersion by remember { mutableIntStateOf(0) }
+
             YaddashtTheme {
                 val context = LocalContext.current
                 val dao = remember { AppDatabase.get(context.applicationContext).dao() }
@@ -182,7 +186,13 @@ class MainActivity : FragmentActivity() {
                         onDispose { onShake = null }
                     }
                     when (val s = screen) {
-                        is Screen.Home -> HomeScreen(dao = dao, taskDao = taskDao, onOpenNote = { screen = Screen.Editor(it) }, onNewNote = { screen = Screen.Editor(NEW_NOTE_ID) }, onOpenTask = { screen = Screen.TaskEditor(it) })
+                        is Screen.Home -> HomeScreen(
+                            dao = dao, taskDao = taskDao,
+                            onOpenNote = { screen = Screen.Editor(it) },
+                            onNewNote = { screen = Screen.Editor(NEW_NOTE_ID) },
+                            onOpenTask = { screen = Screen.TaskEditor(it) },
+                            onThemeChanged = { themeVersion++ }
+                        )
                         is Screen.Editor -> EditorScreen(dao = dao, noteId = s.noteId, onBack = { screen = Screen.Home }, onOpenDraw = { screen = Screen.Draw(it, false) })
                         is Screen.Draw -> DrawScreen(dao = dao, noteId = s.noteId, isTask = s.isTask, taskDao = taskDao, onBack = { screen = if (s.isTask) Screen.TaskEditor(s.noteId) else Screen.Editor(s.noteId) })
                         is Screen.TaskEditor -> TaskEditorScreen(taskDao = taskDao, taskId = s.taskId, onBack = { screen = Screen.Home }, onOpenDraw = { screen = Screen.Draw(it, true) })
@@ -197,7 +207,6 @@ class MainActivity : FragmentActivity() {
         sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
             sensorManager?.registerListener(shakeListener, it, SensorManager.SENSOR_DELAY_UI)
         }
-        // ✅ فقط NoteWidget و TaskWidget - بدون JournalistWidget
         NoteWidget.forceUpdate(this)
         TaskWidget.forceUpdate(this)
     }
