@@ -18,10 +18,9 @@ object AppThemePreferences {
         ThemeColor("سبز زیتونی", "🫒", 0xFF121C08),
         ThemeColor("بنفش کهکشانی", "🪐", 0xFF1A0830),
         ThemeColor("مشکی مخملی", "🖤", 0xFF0C0C0C),
-        ThemeColor("یاسی نقره‌ای", "✨", 0xFFAEA2C9),
         ThemeColor("آبی آسمانی", "🦋", 0xFF0277BD),
-        ThemeColor("بنفش یاسمین زهرا", "💜", 0xFFC6B4CE),
-        ThemeColor("نارنجی هلویی", "🍊", 0xFFFFDAB9),
+        ThemeColor(" نقره یاسمین زهرا", "🤍", 0xFF9B8EBF),
+    
     )
 
     private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
