@@ -7,12 +7,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import ir.yaddasht.app.R
 import ir.yaddasht.app.util.AppThemePreferences
 
-// ✅ فونت‌ها (این‌ها در نسخهٔ قبلی من حذف شده بودند!)
+// ✅ فونت لاله‌زار
 val LalezarFont = FontFamily(Font(R.font.lalezar))
-val VazirFont = FontFamily(Font(R.font.vazir))
+
+// ✅ فونت وزیرمتن (نام واقعی فایل: vazirmatn.ttf)
+val VazirFont = FontFamily(
+    Font(R.font.vazirmatn, FontWeight.Normal),
+    Font(R.font.vazirmatn_bold, FontWeight.Bold)
+)
 
 // ✅ رنگ‌های ثابت
 val DeepGreen = Color(0xFF06100E)
@@ -45,11 +51,9 @@ fun paperColor(index: Int): Color {
 fun YaddashtTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
 
-    // ✅ خواندن رنگ پس‌زمینه از SharedPreferences
     val bgColorValue = AppThemePreferences.getBgColorValue(context)
     val bgColor = Color(bgColorValue)
 
-    // ✅ ساخت ColorScheme با رنگ پس‌زمینهٔ داینامیک
     val colorScheme = darkColorScheme(
         primary = Saffron,
         onPrimary = Color.Black,
