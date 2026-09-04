@@ -136,6 +136,13 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+        <!-- ✅ Activity شفاف برای ویجت خبرنگاری -->
+<activity
+    android:name=".widget.JournalistActionActivity"
+    android:exported="false"
+    android:theme="@android:style/Theme.Translucent.NoTitleBar"
+    android:excludeFromRecents="true"
+    android:noHistory="true" />
 
     </application>
 </manifest>
