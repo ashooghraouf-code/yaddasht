@@ -89,6 +89,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -405,7 +406,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         }
     }
 
-    // ✅ خروجی عکس PNG
     fun exportImage() {
         val n = note ?: return
         scope.launch(Dispatchers.IO) {
@@ -430,7 +430,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
 
                 canvas.drawColor(0xFFFAF5E8.toInt())
 
-                // ✅ toArgb() به جای toInt()
                 val headerPaint = Paint().apply { color = paperColor(n.color).toArgb() }
                 canvas.drawRect(0f, 0f, width.toFloat(), 12f, headerPaint)
 
