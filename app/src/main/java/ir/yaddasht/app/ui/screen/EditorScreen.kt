@@ -255,7 +255,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
             val text = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
             if (!text.isNullOrBlank()) {
                 val current = note?.body.orEmpty()
-                note = note?.copy(body = if (current.isBlank()) text else "$current\n$text")
+                note = (note ?: Note(id = realId)).copy(body = if (current.isBlank()) text else "$current\n$text")
             }
         }
     }
@@ -498,12 +498,43 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         }
     }
 
+    // ✅ ویجت خبرنگاری + fallback خواندن مستقیم
+    LaunchedEffect(Unit) {
+        if (noteId == NEW_NOTE_ID) {
+            realId = withContext(Dispatchers.IO) { dao.insert(Note()) }
+
+            val activity = context as? Activity
+            if (activity?.intent?.getBooleanExtra("auto_camera", false) == true) {
+                val file = AttachmentStore.createCameraFile(context)
+                pendingCameraFile = file
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                takePicture.launch(uri)
+                activity.intent.removeExtra("auto_camera")
+            }
+            if (activity?.intent?.getBooleanExtra("auto_dictation", false) == true) {
+                launchSpeech()
+                activity.intent.removeExtra("auto_dictation")
+            }
+        }
+        ready = true
+
+        // ✅ FALLBACK: اگر تا ۶۰۰ms note نیامد، مستقیم از DB بخوان
+        delay(600)
+        if (note == null) {
+            val n = withContext(Dispatchers.IO) { dao.allNotesSync().firstOrNull { it.id == realId } }
+            if (n != null) {
+                note = n
+                if (lastSaved == null) lastSaved = n
+            }
+        }
+    }
+
     Scaffold(containerColor = DeepGreen) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = exit) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = PaperWhite) }
                 Text(if (isLocked) "🔒 یادداشت محرمانه" else "یادداشت", fontFamily = LalezarFont, fontSize = 20.sp, color = PaperWhite, modifier = Modifier.weight(1f).padding(start = 4.dp))
-                IconButton(onClick = { note = note?.copy(pinned = !(note?.pinned ?: false)) }) { Icon(Icons.Filled.PushPin, "سنجاق", tint = if (note?.pinned == true) Saffron else Color(0xFF5E8077)) }
+                IconButton(onClick = { note = (note ?: Note(id = realId)).copy(pinned = !(note?.pinned ?: false)) }) { Icon(Icons.Filled.PushPin, "سنجاق", tint = if (note?.pinned == true) Saffron else Color(0xFF5E8077)) }
                 IconButton(onClick = { showExport = true }) { Icon(Icons.Filled.Share, "ارسال و خروجی", tint = PaperWhite) }
                 IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Filled.Delete, "حذف", tint = Brick) }
             }
@@ -525,7 +556,10 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                         }
                         Spacer(Modifier.height(10.dp))
                     }
-                    TextField(value = note?.title.orEmpty(), onValueChange = { note = note?.copy(title = it) },
+                    // ✅ onValueChange دفاعی برای عنوان
+                    TextField(value = note?.title.orEmpty(), onValueChange = { newTitle ->
+                        note = (note ?: Note(id = realId)).copy(title = newTitle)
+                    },
                         placeholder = { Text("عنوان یادداشت", fontFamily = LalezarFont, color = InkSoft, fontSize = 22.sp) },
                         textStyle = TextStyle(fontFamily = LalezarFont, fontSize = 26.sp, color = Ink, textDirection = TextDirection.Rtl),
                         colors = transparentFieldColors(), singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -537,8 +571,11 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                     }
                     when {
                         isLocked -> LockedBox { lockError = ""; pass1 = ""; lockMode = LockMode.Unlock }
-                        isChecklist -> ChecklistEditor(note!!) { note = it }
-                        else -> TextField(value = note?.body.orEmpty(), onValueChange = { note = note?.copy(body = it) },
+                        isChecklist && note != null -> ChecklistEditor(note!!) { note = it }
+                        else -> TextField(value = note?.body.orEmpty(), onValueChange = { newBody ->
+                            // ✅ onValueChange دفاعی برای بدنه — هرگز روی null بی‌اثر نمی‌ماند
+                            note = (note ?: Note(id = realId)).copy(body = newBody)
+                        },
                             placeholder = { Text("اینجا بنویس یا از «دیکته» و «چک‌لیست» استفاده کن", color = InkSoft, fontSize = 15.sp) },
                             textStyle = TextStyle(fontFamily = VazirFont, fontSize = 15.sp, color = Ink, lineHeight = 28.sp, letterSpacing = 0.2.sp, textAlign = TextAlign.Start, textDirection = TextDirection.Rtl),
                             colors = transparentFieldColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp))
@@ -552,7 +589,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                         PaperColors.forEachIndexed { i, c ->
                             Box(Modifier.size(32.dp).clip(CircleShape).background(c)
                                 .border(if ((note?.color ?: 0) == i) 3.dp else 1.dp, if ((note?.color ?: 0) == i) Saffron else Color.Black.copy(alpha = .2f), CircleShape)
-                                .clickable { note = note?.copy(color = i) })
+                                .clickable { note = (note ?: Note(id = realId)).copy(color = i) })
                         }
                     }
                 }
@@ -666,7 +703,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         }
     }
 
-    if (showFocus && note != null && !isLocked) { FocusModeOverlay(body = note!!.body, onChange = { note = note?.copy(body = it) }, onExit = { showFocus = false }) }
+    if (showFocus && note != null && !isLocked) { FocusModeOverlay(body = note!!.body, onChange = { newBody -> note = (note ?: Note(id = realId)).copy(body = newBody) }, onExit = { showFocus = false }) }
     if (showAi && note != null) { AiAnalysisDialog(title = note?.title ?: "", content = note?.body ?: "", isLocked = isLocked, onDismiss = { showAi = false }) }
 }
 
