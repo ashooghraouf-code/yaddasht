@@ -81,13 +81,15 @@ fun ReaderSettingsSheet(
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
                 Text("حالت کتاب (دو صفحه‌ای) 📖", color = Color(0xFFB8B8B8), fontSize = 14.sp, modifier = Modifier.weight(1f))
-                // ✅ اصلاح: استفاده از نام‌های صحیح در Material3 جدید
+                // ✅ اصلاح: استفاده از پارامترهای صحیح در Material3 جدید
                 Switch(
                     checked = columns == 2,
                     onCheckedChange = { onColumns(if (it) 2 else 1) },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = Color(0xFFFFB74D),
-                        checkedTrackColor = Color(0xFFFFB74D).copy(alpha = 0.4f)
+                        checkedTrackColor = Color(0xFFFFB74D).copy(alpha = 0.4f),
+                        uncheckedThumbColor = Color.Gray,
+                        uncheckedTrackColor = Color.Gray.copy(alpha = 0.3f)
                     )
                 )
             }
