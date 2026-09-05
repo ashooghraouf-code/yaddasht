@@ -124,3 +124,55 @@ fun HighlightPickDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف", color = Color(0xFF999999)) } }
     )
 }
+
+@Composable
+fun PdfPageNoteDialog(
+    pageNumber: Int,
+    existingNote: String?,
+    onSave: (String) -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var note by remember { mutableStateOf(existingNote ?: "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF202020),
+        title = { Text("📝 یادداشت روی صفحهٔ $pageNumber", color = Color.White, fontFamily = LalezarFont) },
+        text = {
+            Column {
+                Text(
+                    "چون PDF متن قابل‌انتخاب ندارد، می‌توانی روی هر صفحه یادداشت بگذاری.",
+                    color = Color(0xFF999999),
+                    fontSize = 12.sp
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text("یادداشت", color = Color(0xFF999999)) },
+                    modifier = Modifier.padding(horizontal = 0.dp),
+                    minLines = 3,
+                    maxLines = 5
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(note) }) {
+                Text("ذخیره", color = Color(0xFFFFB74D))
+            }
+        },
+        dismissButton = {
+            Row {
+                if (existingNote != null) {
+                    TextButton(onClick = onDelete) {
+                        Text("حذف", color = Color(0xFFE57373))
+                    }
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("انصراف", color = Color(0xFF999999))
+                }
+            }
+        }
+    )
+}
