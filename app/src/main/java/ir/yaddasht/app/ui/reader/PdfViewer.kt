@@ -1,134 +1,142 @@
-package ir.yaddasht.app.util
+package ir.yaddasht.app.ui.reader
 
-import android.content.Context
-import org.json.JSONArray
-import org.json.JSONObject
+import android.graphics.Bitmap
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
-data class ReaderProgress(
-    val pageOrScroll: Int,
-    val timestamp: Long
-)
+class PdfSession(private val renderer: PdfRenderer, private val pfd: ParcelFileDescriptor) {
+    val pageCount: Int get() = try { renderer.pageCount } catch (_: Exception) { 0 }
 
-data class Highlight(
-    val id: String,
-    val text: String,
-    val startOffset: Int,
-    val endOffset: Int,
-    val color: String,
-    val note: String,
-    val timestamp: Long
-)
-
-data class ReaderSettings(
-    val themeIndex: Int = 0,
-    val fontSize: Int = 16,
-    val columns: Int = 1
-)
-
-object ReaderStore {
-    private const val PREFS = "reader_store"
-    private const val KEY_PROGRESS_POS = "progress:pos:"
-    private const val KEY_PROGRESS_TS = "progress:ts:"
-    private const val KEY_HIGHLIGHTS = "highlights:"
-    private const val KEY_SETTINGS_THEME = "settings:theme"
-    private const val KEY_SETTINGS_FONT = "settings:font"
-    private const val KEY_SETTINGS_COLS = "settings:cols"
-
-    private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-
-    private fun fileKey(path: String): String {
-        val name = File(path).nameWithoutExtension
-        val hash = Integer.toHexString(path.hashCode())
-        return "${name}_$hash"
-    }
-
-    fun saveProgress(c: Context, path: String, pageOrScroll: Int) {
-        val k = fileKey(path)
-        prefs(c).edit()
-            .putInt(KEY_PROGRESS_POS + k, pageOrScroll)
-            .putLong(KEY_PROGRESS_TS + k, System.currentTimeMillis())
-            .apply()
-    }
-
-    fun getProgress(c: Context, path: String): ReaderProgress? {
-        val k = fileKey(path)
-        val p = prefs(c)
-        if (!p.contains(KEY_PROGRESS_POS + k)) return null
-        return ReaderProgress(
-            p.getInt(KEY_PROGRESS_POS + k, 0),
-            p.getLong(KEY_PROGRESS_TS + k, 0)
-        )
-    }
-
-    fun saveHighlight(c: Context, path: String, h: Highlight) {
-        val list = getHighlights(c, path).toMutableList()
-        list.removeAll { it.id == h.id }
-        list.add(h)
-        writeHighlights(c, path, list)
-    }
-
-    fun removeHighlight(c: Context, path: String, id: String) {
-        val list = getHighlights(c, path).filterNot { it.id == id }
-        writeHighlights(c, path, list)
-    }
-
-    fun getHighlights(c: Context, path: String): List<Highlight> {
-        val json = prefs(c).getString(KEY_HIGHLIGHTS + fileKey(path), "[]") ?: "[]"
+    fun renderPage(index: Int, targetWidth: Int): Bitmap? {
         return try {
-            val arr = JSONArray(json)
-            (0 until arr.length()).mapNotNull { i ->
-                try { jsonToHighlight(arr.getJSONObject(i)) } catch (_: Exception) { null }
+            synchronized(renderer) {
+                renderer.openPage(index).use { page ->
+                    val scale = targetWidth.toFloat() / page.width
+                    val w = (page.width * scale).toInt().coerceAtLeast(1)
+                    val h = (page.height * scale).toInt().coerceAtLeast(1)
+                    val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                    bmp.eraseColor(android.graphics.Color.WHITE)
+                    page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    bmp
+                }
             }
-        } catch (_: Exception) { emptyList() }
+        } catch (_: Exception) { null }
     }
 
-    fun getHighlightsJson(c: Context, path: String): String {
-        return prefs(c).getString(KEY_HIGHLIGHTS + fileKey(path), "[]") ?: "[]"
+    fun close() {
+        try { renderer.close() } catch (_: Exception) {}
+        try { pfd.close() } catch (_: Exception) {}
+    }
+}
+
+fun openPdfSession(path: String): PdfSession? {
+    return try {
+        val pfd = ParcelFileDescriptor.open(File(path), ParcelFileDescriptor.MODE_READ_ONLY)
+        PdfSession(PdfRenderer(pfd), pfd)
+    } catch (_: Exception) { null }
+}
+
+@Composable
+fun PdfViewer(
+    session: PdfSession,
+    initialPage: Int,
+    zoom: Float,
+    twoPage: Boolean,
+    onPageChanged: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val total = session.pageCount.coerceAtLeast(1)
+
+    key(twoPage) {
+        val spreadCount = if (twoPage) (total + 1) / 2 else total
+        val initial = (if (twoPage) initialPage / 2 else initialPage).coerceIn(0, spreadCount - 1)
+        val pagerState = rememberPagerState(initialPage = initial) { spreadCount }
+
+        LaunchedEffect(pagerState) {
+            snapshotFlow { pagerState.currentPage }.collect { s ->
+                onPageChanged(if (twoPage) (s * 2).coerceAtMost(total - 1) else s)
+            }
+        }
+
+        HorizontalPager(state = pagerState, modifier = modifier.fillMaxSize(), pageSpacing = 12.dp) { spread ->
+            if (twoPage) {
+                Row(Modifier.fillMaxSize()) {
+                    Box(Modifier.weight(1f)) { PdfPageImage(session, spread * 2, zoom) }
+                    Box(Modifier.weight(1f)) {
+                        val second = spread * 2 + 1
+                        if (second < total) PdfPageImage(session, second, zoom)
+                    }
+                }
+            } else {
+                PdfPageImage(session, spread, zoom)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PdfPageImage(session: PdfSession, index: Int, zoom: Float) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val screenWidthPx = remember { context.resources.displayMetrics.widthPixels }
+    val screenWidthDp = with(density) { screenWidthPx.toDp() }
+    val targetWidth = (screenWidthPx * zoom).toInt().coerceAtLeast(1)
+
+    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+    val vScroll = rememberScrollState()
+    val hScroll = rememberScrollState()
+
+    LaunchedEffect(index, targetWidth) {
+        bitmap = withContext(Dispatchers.Default) { session.renderPage(index, targetWidth) }
     }
 
-    private fun writeHighlights(c: Context, path: String, list: List<Highlight>) {
-        val arr = JSONArray()
-        list.forEach { arr.put(highlightToJson(it)) }
-        prefs(c).edit()
-            .putString(KEY_HIGHLIGHTS + fileKey(path), arr.toString())
-            .apply()
-    }
-
-    private fun highlightToJson(h: Highlight): JSONObject = JSONObject().apply {
-        put("id", h.id)
-        put("text", h.text)
-        put("startOffset", h.startOffset)
-        put("endOffset", h.endOffset)
-        put("color", h.color)
-        put("note", h.note)
-        put("timestamp", h.timestamp)
-    }
-
-    private fun jsonToHighlight(j: JSONObject): Highlight = Highlight(
-        id = j.getString("id"),
-        text = j.getString("text"),
-        startOffset = j.getInt("startOffset"),
-        endOffset = j.getInt("endOffset"),
-        color = j.getString("color"),
-        note = j.optString("note", ""),
-        timestamp = j.getLong("timestamp")
-    )
-
-    fun saveSettings(c: Context, s: ReaderSettings) {
-        prefs(c).edit()
-            .putInt(KEY_SETTINGS_THEME, s.themeIndex)
-            .putInt(KEY_SETTINGS_FONT, s.fontSize)
-            .putInt(KEY_SETTINGS_COLS, s.columns)
-            .apply()
-    }
-
-    fun getSettings(c: Context): ReaderSettings {
-        val p = prefs(c)
-        return ReaderSettings(
-            themeIndex = p.getInt(KEY_SETTINGS_THEME, 0),
-            fontSize = p.getInt(KEY_SETTINGS_FONT, 16),
-            columns = p.getInt(KEY_SETTINGS_COLS, 1)
-        )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF3A3A3A))
+            .verticalScroll(vScroll),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        bitmap?.let { bmp ->
+            Box(modifier = if (zoom > 1f) Modifier.horizontalScroll(hScroll) else Modifier) {
+                Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.FillWidth,
+                    modifier = Modifier.width(screenWidthDp * zoom)
+                )
+            }
+        }
     }
 }
