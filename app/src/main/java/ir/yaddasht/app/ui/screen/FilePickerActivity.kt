@@ -38,7 +38,6 @@ class FilePickerActivity : Activity() {
             val uri = data?.data
             if (uri != null) {
                 try {
-                    // ✅ ذخیره دائمی در filesDir (نه cacheDir) تا پیشرفت و هایلایت‌ها پایدار بمانند
                     val readerDir = File(filesDir, "reader").apply { mkdirs() }
                     val fileName = getFileName(uri) ?: "file"
                     val targetFile = File(readerDir, fileName)
