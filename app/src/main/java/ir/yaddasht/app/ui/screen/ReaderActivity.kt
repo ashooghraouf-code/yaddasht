@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.yaddasht.app.ui.reader.HighlightPickDialog
 import ir.yaddasht.app.ui.reader.HighlightsSheet
+import ir.yaddasht.app.ui.reader.PdfPageNoteDialog
 import ir.yaddasht.app.ui.reader.PdfViewer
 import ir.yaddasht.app.ui.reader.ReaderBridge
 import ir.yaddasht.app.ui.reader.ReaderSettingsSheet
@@ -131,6 +132,7 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
     var showHighlights by remember { mutableStateOf(false) }
     var highlightsVersion by remember { mutableIntStateOf(0) }
     var pendingSelection by remember { mutableStateOf<JSONObject?>(null) }
+    var pendingPdfNote by remember { mutableStateOf<Int?>(null) }
 
     var speaking by remember { mutableStateOf(false) }
     val tts = remember { TtsController() }
@@ -199,6 +201,26 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
         }
     }
 
+    fun savePdfPageNote(pageNum: Int, note: String) {
+        val key = "__pdf_page_${pageNum}__"
+        ReaderStore.getHighlights(context, path).find { it.id == key }?.let {
+            ReaderStore.removeHighlight(context, path, key)
+        }
+        if (note.isNotBlank()) {
+            val h = Highlight(
+                id = key,
+                text = "صفحهٔ $pageNum",
+                startOffset = pageNum,
+                endOffset = pageNum,
+                color = "blue",
+                note = note,
+                timestamp = System.currentTimeMillis()
+            )
+            ReaderStore.saveHighlight(context, path, h)
+        }
+        highlightsVersion++
+    }
+
     val bridge = remember { ReaderBridge() }
     DisposableEffect(Unit) {
         bridge.onScroll = { y ->
@@ -226,7 +248,12 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
             val t = withContext(Dispatchers.Default) { TextExtractor.extract(path) }
             fullText = t
             if (t.isBlank()) {
-                Toast.makeText(context, "متنی یافت نشد", Toast.LENGTH_SHORT).show()
+                val reason = TextExtractor.lastError ?: "دلیل ناشناخته"
+                Toast.makeText(
+                    context,
+                    "❌ فایل باز نشد:\n$reason",
+                    Toast.LENGTH_LONG
+                ).show()
                 onBack()
             }
         }
@@ -250,7 +277,6 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
     }
 
     Column(Modifier.fillMaxSize().background(barBg)) {
-        // ─── نوار بالا ───
         Row(
             Modifier.fillMaxWidth().background(barBg).padding(horizontal = 4.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -277,7 +303,6 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
             )
         }
 
-        // ─── محتوا ───
         Box(Modifier.weight(1f)) {
             if (isPdf) {
                 pdfSession?.let { session ->
@@ -306,7 +331,6 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
             }
         }
 
-        // ─── نوار پایین ───
         Row(
             Modifier.fillMaxWidth().background(barBg).padding(horizontal = 4.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -318,6 +342,9 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
                 }
                 IconButton(onClick = { zoomIndex = (zoomIndex + 1).coerceAtMost(zoomLevels.size - 1) }) {
                     Icon(Icons.Filled.Add, "بزرگ‌نمایی", tint = barFg)
+                }
+                IconButton(onClick = { pendingPdfNote = currentPage + 1 }) {
+                    Icon(Icons.Filled.Brush, "یادداشت صفحه", tint = barFg)
                 }
             } else {
                 IconButton(onClick = { if (!speaking) startTts() }) {
@@ -346,7 +373,8 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
         }
     }
 
-    // ─── دیالوگ‌ها و شیت‌ها ───
+    val highlights = remember(highlightsVersion) { ReaderStore.getHighlights(context, path) }
+
     if (showSettings) {
         ReaderSettingsSheet(
             themeIndex = themeIndex,
@@ -372,7 +400,6 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
         )
     }
 
-    val highlights = remember(highlightsVersion) { ReaderStore.getHighlights(context, path) }
     if (showHighlights) {
         HighlightsSheet(
             highlights = highlights,
@@ -405,6 +432,24 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
                 pendingSelection = null
             },
             onDismiss = { pendingSelection = null }
+        )
+    }
+
+    pendingPdfNote?.let { pageNum ->
+        val existing = highlights.find { it.id == "__pdf_page_${pageNum}__" }?.note
+        PdfPageNoteDialog(
+            pageNumber = pageNum,
+            existingNote = existing,
+            onSave = { note ->
+                savePdfPageNote(pageNum, note)
+                pendingPdfNote = null
+            },
+            onDelete = {
+                ReaderStore.removeHighlight(context, path, "__pdf_page_${pageNum}__")
+                highlightsVersion++
+                pendingPdfNote = null
+            },
+            onDismiss = { pendingPdfNote = null }
         )
     }
 }
