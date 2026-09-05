@@ -37,14 +37,12 @@ object ReaderStore {
 
     private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    // Unique key: filename + path hash (prevents collisions between identically named files)
     private fun fileKey(path: String): String {
         val name = File(path).nameWithoutExtension
         val hash = Integer.toHexString(path.hashCode())
         return "${name}_$hash"
     }
 
-    // ─── Reading Progress ───
     fun saveProgress(c: Context, path: String, pageOrScroll: Int) {
         val k = fileKey(path)
         prefs(c).edit()
@@ -63,7 +61,6 @@ object ReaderStore {
         )
     }
 
-    // ─── Highlights ───
     fun saveHighlight(c: Context, path: String, h: Highlight) {
         val list = getHighlights(c, path).toMutableList()
         list.removeAll { it.id == h.id }
@@ -118,7 +115,6 @@ object ReaderStore {
         timestamp = j.getLong("timestamp")
     )
 
-    // ─── Settings ───
     fun saveSettings(c: Context, s: ReaderSettings) {
         prefs(c).edit()
             .putInt(KEY_SETTINGS_THEME, s.themeIndex)
