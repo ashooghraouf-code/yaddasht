@@ -4,22 +4,25 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
+import java.io.File
 
 class FilePickerActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "*/*"
-            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(
-                "application/pdf",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                "application/msword",
-                "text/plain"
-            ))
+            putExtra(
+                Intent.EXTRA_MIME_TYPES, arrayOf(
+                    "application/pdf",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "application/msword",
+                    "text/plain"
+                )
+            )
         }
-        
+
         try {
             startActivityForResult(intent, PICK_FILE_REQUEST)
         } catch (e: Exception) {
@@ -27,26 +30,26 @@ class FilePickerActivity : Activity() {
             finish()
         }
     }
-    
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        
+
         if (requestCode == PICK_FILE_REQUEST && resultCode == RESULT_OK) {
             val uri = data?.data
             if (uri != null) {
                 try {
-                    // کپی فایل به فضای خصوصی اپ
-                    val inputStream = contentResolver.openInputStream(uri)
+                    // ✅ ذخیره دائمی در filesDir (نه cacheDir) تا پیشرفت و هایلایت‌ها پایدار بمانند
+                    val readerDir = File(filesDir, "reader").apply { mkdirs() }
                     val fileName = getFileName(uri) ?: "file"
-                    val tempFile = java.io.File(cacheDir, fileName)
-                    tempFile.outputStream().use { output ->
-                        inputStream?.copyTo(output)
+                    val targetFile = File(readerDir, fileName)
+
+                    contentResolver.openInputStream(uri)?.use { input ->
+                        targetFile.outputStream().use { output -> input.copyTo(output) }
                     }
-                    
-                    // باز کردن با ReaderActivity
+
                     val isPdf = fileName.endsWith(".pdf", ignoreCase = true)
                     val readerIntent = Intent(this, ReaderActivity::class.java).apply {
-                        putExtra("file_path", tempFile.absolutePath)
+                        putExtra("file_path", targetFile.absolutePath)
                         putExtra("is_pdf", isPdf)
                     }
                     startActivity(readerIntent)
@@ -55,10 +58,9 @@ class FilePickerActivity : Activity() {
                 }
             }
         }
-        
         finish()
     }
-    
+
     private fun getFileName(uri: android.net.Uri): String? {
         var name: String? = null
         contentResolver.query(uri, null, null, null, null)?.use { cursor ->
@@ -69,7 +71,7 @@ class FilePickerActivity : Activity() {
         }
         return name
     }
-    
+
     companion object {
         private const val PICK_FILE_REQUEST = 1001
     }
