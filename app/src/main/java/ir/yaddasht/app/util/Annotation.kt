@@ -32,38 +32,22 @@ data class Annotation(
     val updatedAt: Long = System.currentTimeMillis()
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
-        put("id", id)
-        put("fileKey", fileKey)
-        put("type", type.name)
-        put("colorKey", colorKey)
-        put("selectedText", selectedText)
-        put("note", note)
-        put("startOffset", startOffset)
-        put("endOffset", endOffset)
-        put("pageIndex", pageIndex)
-        put("relX", relX.toDouble())
-        put("relY", relY.toDouble())
-        put("relW", relW.toDouble())
-        put("relH", relH.toDouble())
-        put("createdAt", createdAt)
-        put("updatedAt", updatedAt)
+        put("id", id); put("fileKey", fileKey); put("type", type.name); put("colorKey", colorKey)
+        put("selectedText", selectedText); put("note", note)
+        put("startOffset", startOffset); put("endOffset", endOffset); put("pageIndex", pageIndex)
+        put("relX", relX.toDouble()); put("relY", relY.toDouble())
+        put("relW", relW.toDouble()); put("relH", relH.toDouble())
+        put("createdAt", createdAt); put("updatedAt", updatedAt)
     }
-
     companion object {
         fun fromJson(j: JSONObject): Annotation = Annotation(
-            id = j.getString("id"),
-            fileKey = j.getString("fileKey"),
-            type = AnnotationType.valueOf(j.getString("type")),
-            colorKey = j.getString("colorKey"),
-            selectedText = j.optString("selectedText", ""),
-            note = j.optString("note", ""),
-            startOffset = j.optInt("startOffset", 0),
-            endOffset = j.optInt("endOffset", 0),
+            id = j.getString("id"), fileKey = j.getString("fileKey"),
+            type = AnnotationType.valueOf(j.getString("type")), colorKey = j.getString("colorKey"),
+            selectedText = j.optString("selectedText", ""), note = j.optString("note", ""),
+            startOffset = j.optInt("startOffset", 0), endOffset = j.optInt("endOffset", 0),
             pageIndex = j.optInt("pageIndex", 0),
-            relX = j.optDouble("relX", 0.0).toFloat(),
-            relY = j.optDouble("relY", 0.0).toFloat(),
-            relW = j.optDouble("relW", 0.0).toFloat(),
-            relH = j.optDouble("relH", 0.0).toFloat(),
+            relX = j.optDouble("relX", 0.0).toFloat(), relY = j.optDouble("relY", 0.0).toFloat(),
+            relW = j.optDouble("relW", 0.0).toFloat(), relH = j.optDouble("relH", 0.0).toFloat(),
             createdAt = j.optLong("createdAt", System.currentTimeMillis()),
             updatedAt = j.optLong("updatedAt", System.currentTimeMillis())
         )
@@ -71,23 +55,11 @@ data class Annotation(
 }
 
 data class AnnotationColor(
-    val key: String,
-    val name: String,
-    val emoji: String,
-    val hex: String,
-    val lightAlpha: Float,
-    val sepiaAlpha: Float,
-    val nightAlpha: Float
+    val key: String, val name: String, val emoji: String, val hex: String,
+    val lightAlpha: Float, val sepiaAlpha: Float, val nightAlpha: Float
 ) {
-    val color: Color
-        get() = Color(android.graphics.Color.parseColor(hex))
-
-    fun alpha(themeIndex: Int): Float = when (themeIndex) {
-        0 -> lightAlpha
-        1 -> sepiaAlpha
-        else -> nightAlpha
-    }
-
+    val color: Color get() = Color(android.graphics.Color.parseColor(hex))
+    fun alpha(themeIndex: Int): Float = when (themeIndex) { 0 -> lightAlpha; 1 -> sepiaAlpha; else -> nightAlpha }
     fun colorForTheme(themeIndex: Int): Color = color.copy(alpha = alpha(themeIndex))
 }
 
@@ -104,52 +76,36 @@ object AnnotationPalette {
         AnnotationColor("indigo", "نیلی", "🌌", "#7986CB", 0.40f, 0.45f, 0.35f),
         AnnotationColor("slate", "خاکستری", "📝", "#90A4AE", 0.40f, 0.45f, 0.35f)
     )
-
     fun find(key: String): AnnotationColor = colors.firstOrNull { it.key == key } ?: colors[0]
 }
 
 object AnnotationStore {
     private const val PREFS = "annotations_store"
     private const val KEY_PREFIX = "ann:"
-
     private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-
     fun fileKey(path: String): String {
         val name = File(path).nameWithoutExtension
-        val hash = Integer.toHexString(path.hashCode())
-        return "${name}_$hash"
+        return "${name}_${Integer.toHexString(path.hashCode())}"
     }
-
     fun all(c: Context, path: String): List<Annotation> {
         val json = prefs(c).getString(KEY_PREFIX + fileKey(path), "[]") ?: "[]"
         return try {
             val arr = JSONArray(json)
-            (0 until arr.length()).mapNotNull {
-                try { Annotation.fromJson(arr.getJSONObject(it)) } catch (_: Exception) { null }
-            }
+            (0 until arr.length()).mapNotNull { try { Annotation.fromJson(arr.getJSONObject(it)) } catch (_: Exception) { null } }
         } catch (_: Exception) { emptyList() }
     }
-
     fun save(c: Context, path: String, a: Annotation) {
         val list = all(c, path).toMutableList()
         list.removeAll { it.id == a.id }
         list.add(a.copy(updatedAt = System.currentTimeMillis()))
         write(c, path, list)
     }
-
-    fun remove(c: Context, path: String, id: String) {
-        write(c, path, all(c, path).filterNot { it.id == id })
-    }
-
+    fun remove(c: Context, path: String, id: String) { write(c, path, all(c, path).filterNot { it.id == id }) }
     fun updateNote(c: Context, path: String, id: String, note: String) {
-        write(c, path, all(c, path).map {
-            if (it.id == id) it.copy(note = note, updatedAt = System.currentTimeMillis()) else it
-        })
+        write(c, path, all(c, path).map { if (it.id == id) it.copy(note = note, updatedAt = System.currentTimeMillis()) else it })
     }
-
     private fun write(c: Context, path: String, list: List<Annotation>) {
-        val arr = JSONArray()
-        list.forEach { arr.put(it.toJson()) }
+        val arr = JSONArray(); list.forEach { arr.put(it.toJson()) }
         prefs(c).edit().putString(KEY_PREFIX + fileKey(path), arr.toString()).apply()
     }
 }
