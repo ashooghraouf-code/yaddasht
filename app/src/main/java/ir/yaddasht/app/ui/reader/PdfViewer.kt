@@ -6,19 +6,14 @@ import android.os.ParcelFileDescriptor
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,7 +30,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
@@ -105,17 +99,38 @@ fun PdfViewer(
             }
         }
 
-        HorizontalPager(state = pagerState, modifier = modifier.fillMaxSize(), pageSpacing = 12.dp) { spread ->
-            if (twoPage) {
-                Row(Modifier.fillMaxSize()) {
-                    Box(Modifier.weight(1f)) { PdfPageImage(session, spread * 2, zoom, themeIndex, annotations, onPageTap) }
+        HorizontalPager(
+            state = pagerState,
+            modifier = modifier.fillMaxSize(),
+            pageSpacing = 12.dp,
+            beyondViewportPageCount = 1
+        ) { spread ->
+            val firstIdx = spread * (if (twoPage) 2 else 1)
+            val secondIdx = if (twoPage) spread * 2 + 1 else -1
+
+            androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(1f)) {
+                    PdfPageImage(
+                        session = session,
+                        index = firstIdx,
+                        zoom = zoom,
+                        themeIndex = themeIndex,
+                        pageAnnotations = annotations.filter { it.pageIndex == firstIdx },
+                        onPageTap = { rx, ry -> onPageTap(firstIdx, rx, ry) }
+                    )
+                }
+                if (twoPage && secondIdx < total) {
                     Box(Modifier.weight(1f)) {
-                        val second = spread * 2 + 1
-                        if (second < total) PdfPageImage(session, second, zoom, themeIndex, annotations, onPageTap)
+                        PdfPageImage(
+                            session = session,
+                            index = secondIdx,
+                            zoom = zoom,
+                            themeIndex = themeIndex,
+                            pageAnnotations = annotations.filter { it.pageIndex == secondIdx },
+                            onPageTap = { rx, ry -> onPageTap(secondIdx, rx, ry) }
+                        )
                     }
                 }
-            } else {
-                PdfPageImage(session, spread, zoom, themeIndex, annotations, onPageTap)
             }
         }
     }
@@ -127,8 +142,8 @@ private fun PdfPageImage(
     index: Int,
     zoom: Float,
     themeIndex: Int,
-    allAnnotations: List<Annotation>,
-    onPageTap: (Int, Float, Float) -> Unit
+    pageAnnotations: List<Annotation>,
+    onPageTap: (Float, Float) -> Unit
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -136,82 +151,100 @@ private fun PdfPageImage(
     val screenWidthDp = with(density) { screenWidthPx.toDp() }
     val targetWidth = (screenWidthPx * zoom).toInt().coerceAtLeast(1)
 
-    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var boxSize by remember { mutableStateOf(IntSize.Zero) }
-    val vScroll = rememberScrollState()
-    val hScroll = rememberScrollState()
+    var bitmap by remember(index, targetWidth) { mutableStateOf<Bitmap?>(null) }
+    var imageSize by remember { mutableStateOf(IntSize.Zero) }
 
     LaunchedEffect(index, targetWidth) {
         bitmap = withContext(Dispatchers.Default) { session.renderPage(index, targetWidth) }
     }
 
-    val pageAnnotations = allAnnotations.filter { it.pageIndex == index }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF3A3A3A))
-            .verticalScroll(vScroll),
-        contentAlignment = Alignment.TopCenter
+            .background(Color(0xFF3A3A3A)),
+        contentAlignment = Alignment.Center
     ) {
         bitmap?.let { bmp ->
-            val aspect = bmp.height.toFloat() / bmp.width.toFloat()
-            val w = screenWidthDp * zoom
+            val bmpW = bmp.width
+            val bmpH = bmp.height
+            val aspect = bmpH.toFloat() / bmpW.toFloat()
 
             Box(
-                modifier = (if (zoom > 1f) Modifier.horizontalScroll(hScroll) else Modifier)
-                    .width(w)
-                    .onSizeChanged { boxSize = it }
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pointerInput(index, imageSize) {
+                        detectTapGestures { offset ->
+                            if (imageSize.width > 0 && imageSize.height > 0) {
+                                onPageTap(offset.x / imageSize.width, offset.y / imageSize.height)
+                            }
+                        }
+                    }
             ) {
                 Image(
                     bitmap = bmp.asImageBitmap(),
-                    contentDescription = null,
+                    contentDescription = "صفحه ${index + 1}",
                     contentScale = ContentScale.FillWidth,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .pointerInput(index, boxSize) {
-                            detectTapGestures { offset ->
-                                if (boxSize.width > 0 && boxSize.height > 0) {
-                                    onPageTap(index, offset.x / boxSize.width, offset.y / boxSize.height)
-                                }
-                            }
-                        }
+                        .then(
+                            androidx.compose.ui.layout.onSizeChanged { imageSize = it }.let { Modifier }
+                        )
                 )
 
-                pageAnnotations.forEach { ann ->
-                    val ac = AnnotationPalette.find(ann.colorKey)
-                    when (ann.type) {
-                        AnnotationType.HIGHLIGHT, AnnotationType.UNDERLINE -> {
-                            Box(
-                                Modifier
-                                    .offset(x = w * ann.relX, y = w * ann.relY * aspect)
-                                    .size(
-                                        width = (w * ann.relW).coerceAtLeast(8.dp),
-                                        height = (w * ann.relH * aspect).coerceAtLeast(8.dp)
-                                    )
-                                    .background(ac.colorForTheme(themeIndex))
-                            )
-                        }
-                        AnnotationType.NOTE -> {
-                            Box(
-                                modifier = Modifier
-                                    .offset(x = w * ann.relX - 14.dp, y = w * ann.relY * aspect - 14.dp)
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(ac.color),
-                                contentAlignment = Alignment.Center
-                            ) { Text("📝", fontSize = 14.sp) }
-                        }
-                        AnnotationType.BOOKMARK -> {
-                            Text(
-                                "🔖",
-                                fontSize = 20.sp,
-                                modifier = Modifier.offset(x = w * ann.relX, y = w * ann.relY * aspect)
-                            )
+                // Annotation overlay
+                Box(Modifier.matchParentSize()) {
+                    pageAnnotations.forEach { ann ->
+                        val ac = AnnotationPalette.find(ann.colorKey)
+                        when (ann.type) {
+                            AnnotationType.HIGHLIGHT, AnnotationType.UNDERLINE -> {
+                                Box(
+                                    Modifier
+                                        .align(Alignment.TopStart)
+                                        .offset(
+                                            x = screenWidthDp * ann.relX,
+                                            y = screenWidthDp * ann.relY * aspect
+                                        )
+                                        .size(
+                                            width = (screenWidthDp * ann.relW).coerceAtLeast(8.dp),
+                                            height = (screenWidthDp * ann.relH * aspect).coerceAtLeast(8.dp)
+                                        )
+                                        .background(ac.colorForTheme(themeIndex))
+                                )
+                            }
+                            AnnotationType.NOTE -> {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .offset(
+                                            x = screenWidthDp * ann.relX - 14.dp,
+                                            y = screenWidthDp * ann.relY * aspect - 14.dp
+                                        )
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(ac.color),
+                                    contentAlignment = Alignment.Center
+                                ) { Text("📝", fontSize = 14.sp) }
+                            }
+                            AnnotationType.BOOKMARK -> {
+                                Text(
+                                    "🔖",
+                                    fontSize = 20.sp,
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .offset(
+                                            x = screenWidthDp * ann.relX,
+                                            y = screenWidthDp * ann.relY * aspect
+                                        )
+                                )
+                            }
+                            AnnotationType.UNDERLINE -> Unit
                         }
                     }
                 }
             }
+        } ?: run {
+            // Loading indicator
+            androidx.compose.material3.CircularProgressIndicator(color = Color.White)
         }
     }
 }
