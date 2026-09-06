@@ -7,8 +7,7 @@ import java.util.zip.ZipInputStream
 
 object TextExtractor {
     private const val TAG = "TextExtractor"
-    
-    // ذخیرهٔ آخرین خطا برای نمایش به کاربر
+
     var lastError: String? = null
         private set
 
@@ -23,7 +22,6 @@ object TextExtractor {
                     ""
                 }
                 else -> {
-                    // TXT و سایر فرمت‌های متنی
                     try {
                         File(path).readText(Charsets.UTF_8)
                     } catch (e: Exception) {
@@ -40,9 +38,9 @@ object TextExtractor {
     }
 
     fun fromDocx(input: InputStream): String {
-        val sb = StringBuilder()
+        val paragraphs = mutableListOf<String>()
         var found = false
-        
+
         try {
             ZipInputStream(input).use { z ->
                 var entry = z.nextEntry
@@ -50,25 +48,7 @@ object TextExtractor {
                     if (entry.name == "word/document.xml") {
                         found = true
                         val content = z.readBytes().toString(Charsets.UTF_8)
-                        
-                        // استخراج پاراگراف به پاراگراف
-                        val paraRegex = Regex("<w:p[ >].*?</w:p>", RegexOption.DOT_MATCHES_ALL)
-                        val textRegex = Regex("<w:t[^>]*>([^<]*)</w:t>")
-                        
-                        for (para in paraRegex.findAll(content)) {
-                            val paraContent = para.value
-                            val texts = textRegex.findAll(paraContent).map { it.groupValues[1] }
-                            val paraText = texts.joinToString("")
-                            if (paraText.isNotBlank()) {
-                                sb.append(paraText).append("\n\n")
-                            }
-                        }
-                        
-                        // اگر پاراگراف پیدا نشد، fallback به روش ساده
-                        if (sb.isEmpty()) {
-                            val texts = textRegex.findAll(content).map { it.groupValues[1] }
-                            sb.append(texts.joinToString(" "))
-                        }
+                        parseParagraphs(content, paragraphs)
                         break
                     }
                     entry = z.nextEntry
@@ -76,19 +56,28 @@ object TextExtractor {
             }
         } catch (e: Exception) {
             lastError = "خطا در خواندن DOCX: ${e.message}"
-            Log.e(TAG, "fromDocx error: ${e.message}", e)
             return ""
         }
-        
+
         if (!found) {
-            lastError = "فایل Word معتبر نیست (word/document.xml پیدا نشد)"
+            lastError = "فایل Word معتبر نیست"
             return ""
         }
-        
-        val result = sb.toString().trim()
-        if (result.isEmpty()) {
+        if (paragraphs.isEmpty()) {
             lastError = "فایل Word خالی است"
+            return ""
         }
-        return result
+        return paragraphs.joinToString("\n\n")
+    }
+
+    private fun parseParagraphs(content: String, out: MutableList<String>) {
+        val paraRegex = Regex("<w:p[ >].*?</w:p>", RegexOption.DOT_MATCHES_ALL)
+        val textRegex = Regex("<w:t[^>]*>([^<]*)</w:t>")
+
+        for (para in paraRegex.findAll(content)) {
+            val texts = textRegex.findAll(para.value).map { it.groupValues[1] }
+            val paraText = texts.joinToString("")
+            if (paraText.isNotBlank()) out.add(paraText)
+        }
     }
 }
