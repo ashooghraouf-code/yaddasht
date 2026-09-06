@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
@@ -186,9 +188,7 @@ private fun PdfPageImage(
                     contentScale = ContentScale.FillWidth,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .then(
-                            androidx.compose.ui.layout.onSizeChanged { imageSize = it }.let { Modifier }
-                        )
+                        .onSizeChanged { imageSize = it }
                 )
 
                 // Annotation overlay
@@ -196,7 +196,7 @@ private fun PdfPageImage(
                     pageAnnotations.forEach { ann ->
                         val ac = AnnotationPalette.find(ann.colorKey)
                         when (ann.type) {
-                            AnnotationType.HIGHLIGHT, AnnotationType.UNDERLINE -> {
+                            AnnotationType.HIGHLIGHT -> {
                                 Box(
                                     Modifier
                                         .align(Alignment.TopStart)
@@ -207,6 +207,21 @@ private fun PdfPageImage(
                                         .size(
                                             width = (screenWidthDp * ann.relW).coerceAtLeast(8.dp),
                                             height = (screenWidthDp * ann.relH * aspect).coerceAtLeast(8.dp)
+                                        )
+                                        .background(ac.colorForTheme(themeIndex))
+                                )
+                            }
+                            AnnotationType.UNDERLINE -> {
+                                Box(
+                                    Modifier
+                                        .align(Alignment.TopStart)
+                                        .offset(
+                                            x = screenWidthDp * ann.relX,
+                                            y = screenWidthDp * ann.relY * aspect
+                                        )
+                                        .size(
+                                            width = (screenWidthDp * ann.relW).coerceAtLeast(8.dp),
+                                            height = (screenWidthDp * ann.relH * aspect).coerceAtLeast(2.dp)
                                         )
                                         .background(ac.colorForTheme(themeIndex))
                                 )
@@ -237,14 +252,12 @@ private fun PdfPageImage(
                                         )
                                 )
                             }
-                            AnnotationType.UNDERLINE -> Unit
                         }
                     }
                 }
             }
         } ?: run {
-            // Loading indicator
-            androidx.compose.material3.CircularProgressIndicator(color = Color.White)
+            CircularProgressIndicator(color = Color.White)
         }
     }
 }
