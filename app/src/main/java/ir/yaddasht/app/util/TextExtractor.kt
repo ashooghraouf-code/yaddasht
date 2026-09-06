@@ -32,10 +32,17 @@ object TextExtractor {
             }
         } catch (e: Exception) {
             lastError = "خطای غیرمنتظره: ${e.message}"
-            Log.e(TAG, "extract error: ${e.message}", e)
+            Log.e(TAG, "extract error", e)
             ""
         }
     }
+
+    private fun escapeHtml(s: String): String = s
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("\n", "<br>")
 
     fun fromDocx(input: InputStream): String {
         val paragraphs = mutableListOf<String>()
@@ -67,7 +74,13 @@ object TextExtractor {
             lastError = "فایل Word خالی است"
             return ""
         }
-        return paragraphs.joinToString("\n\n")
+
+        // خروجی HTML برای حفظ ساختار در WebView
+        val sb = StringBuilder()
+        paragraphs.forEach { p ->
+            sb.append("<p>").append(escapeHtml(p)).append("</p>")
+        }
+        return sb.toString()
     }
 
     private fun parseParagraphs(content: String, out: MutableList<String>) {
@@ -77,7 +90,7 @@ object TextExtractor {
         for (para in paraRegex.findAll(content)) {
             val texts = textRegex.findAll(para.value).map { it.groupValues[1] }
             val paraText = texts.joinToString("")
-            if (paraText.isNotBlank()) out.add(paraText)
+            out.add(paraText)
         }
     }
 }
