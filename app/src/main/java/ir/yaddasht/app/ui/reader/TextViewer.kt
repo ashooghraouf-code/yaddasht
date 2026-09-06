@@ -8,12 +8,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import ir.yaddasht.app.util.Annotation
+import ir.yaddasht.app.util.AnnotationPalette
+import org.json.JSONArray
+import org.json.JSONObject
 
 class ReaderBridge {
     var onReady: (() -> Unit)? = null
     var onScroll: ((Int) -> Unit)? = null
     var onSpeechEnd: (() -> Unit)? = null
-    var onHighlightClick: ((String) -> Unit)? = null
+    var onTextSelected: ((String) -> Unit)? = null
+    var onAnnotationClick: ((String) -> Unit)? = null
 
     @JavascriptInterface
     fun onReady() { onReady?.invoke() }
@@ -25,7 +30,10 @@ class ReaderBridge {
     fun onSpeechEnd() { onSpeechEnd?.invoke() }
 
     @JavascriptInterface
-    fun onHighlightClick(id: String) { onHighlightClick?.invoke(id) }
+    fun onTextSelected(data: String) { onTextSelected?.invoke(data) }
+
+    @JavascriptInterface
+    fun onAnnotationClick(id: String, note: String, text: String) { onAnnotationClick?.invoke(id) }
 }
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -57,4 +65,22 @@ fun TextViewer(
             }
         }
     )
+}
+
+fun annotationsToJs(annotations: List<Annotation>, themeIndex: Int): String {
+    val arr = JSONArray()
+    annotations.forEach { ann ->
+        val ac = AnnotationPalette.find(ann.colorKey)
+        arr.put(JSONObject().apply {
+            put("id", ann.id)
+            put("type", ann.type.name)
+            put("startOffset", ann.startOffset)
+            put("endOffset", ann.endOffset)
+            put("color", ac.hex)
+            put("alpha", ac.alpha(themeIndex).toDouble())
+            put("note", ann.note)
+            put("selectedText", ann.selectedText)
+        })
+    }
+    return arr.toString()
 }
