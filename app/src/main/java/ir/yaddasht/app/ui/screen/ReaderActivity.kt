@@ -8,9 +8,6 @@ import android.webkit.WebView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,7 +16,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -134,9 +130,9 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
     val zoomLevels = listOf(1f, 1.3f, 1.6f, 2f)
     var zoomIndex by remember { mutableIntStateOf(0) }
 
-    var showSidebar by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showNoteDialog by remember { mutableStateOf<Annotation?>(null) }
+    var showAnnotationsList by remember { mutableStateOf(false) }
     var annVersion by remember { mutableIntStateOf(0) }
 
     var pendingSelection by remember { mutableStateOf<Triple<String, Int, Int>?>(null) }
@@ -163,8 +159,12 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
         val wv = webView ?: return
         val txt = fullText ?: return
         val annJs = annotationsToJs(annotations, themeIndex)
+        val isHtml = txt.trim().startsWith("<", ignoreCase = true)
+        val escapedText = if (isHtml) txt else "<p>" + txt
+            .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace("\n", "<br>") + "</p>"
         wv.evaluateJavascript(
-            "initReader(${JSONObject.quote(txt)}, $themeIndex, $fontSize, $columns, $scroll, ${JSONObject.quote(annJs)});",
+            "initReader(${JSONObject.quote(escapedText)}, $themeIndex, $fontSize, $columns, $scroll, ${JSONObject.quote(annJs)});",
             null
         )
     }
@@ -184,8 +184,7 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
                     obj.getInt("startOffset"),
                     obj.getInt("endOffset")
                 )
-            } catch (_: Exception) {
-            }
+            } catch (_: Exception) {}
         }
         bridge.onAnnotationClick = { id ->
             AnnotationStore.all(context, path).find { it.id == id }?.let { showNoteDialog = it }
@@ -234,167 +233,174 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
         if (isPdf) ReaderStore.saveProgress(context, path, currentPage)
     }
 
-    Box(Modifier.fillMaxSize().background(themeBg)) {
+    Column(Modifier.fillMaxSize().background(themeBg)) {
 
-        AnimatedVisibility(
-            visible = showSidebar,
-            enter = slideInHorizontally(initialOffsetX = { it }),
-            exit = slideOutHorizontally(targetOffsetX = { it })
+        // Top Bar
+        Row(
+            Modifier.fillMaxWidth().background(themeBg).padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Sidebar(
-                annotations = annotations,
-                themeBg = themeBg,
-                themeFg = themeFg,
-                themeMuted = themeMuted,
-                onAnnotationClick = { ann -> showNoteDialog = ann },
-                onAnnotationDelete = { id ->
-                    AnnotationStore.remove(context, path, id)
-                    annVersion++
-                },
-                onClose = { showSidebar = false }
+            IconButton(onClick = { showAnnotationsList = true }) {
+                Icon(Icons.Filled.Menu, "یادداشت‌ها", tint = themeFg)
+            }
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = themeFg)
+            }
+            Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
+                Text(
+                    File(path).name,
+                    color = themeFg,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    "${annotations.size} یادداشت • ${if (isPdf) "صفحهٔ ${currentPage + 1}" else "قلم $fontSize"}",
+                    color = themeMuted,
+                    fontSize = 11.sp
+                )
+            }
+            if (isPdf && pdfSession != null) {
+                Text(
+                    "${currentPage + 1}/${pdfSession.pageCount}",
+                    color = themeFg,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+            }
+        }
+
+        if (isPdf && pdfSession != null) {
+            LinearProgressIndicator(
+                progress = { (currentPage + 1).toFloat() / pdfSession.pageCount.coerceAtLeast(1) },
+                modifier = Modifier.fillMaxWidth().height(3.dp),
+                color = Color(0xFFFFB74D),
+                trackColor = Color(0xFF3A3A3A)
             )
         }
 
-        Column(Modifier.fillMaxSize()) {
-            Row(
-                Modifier.fillMaxWidth().background(themeBg).padding(horizontal = 4.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { showSidebar = !showSidebar }) {
-                    Icon(Icons.Filled.Menu, "منو", tint = themeFg)
-                }
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = themeFg)
-                }
-                Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
-                    Text(
-                        File(path).name,
-                        color = themeFg,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    val total = annotations.size
-                    Text(
-                        "$total یادداشت • ${if (isPdf) "صفحهٔ ${(currentPage + 1)}" else "قلم $fontSize"}",
-                        color = themeMuted,
-                        fontSize = 11.sp
+        // Content
+        Box(Modifier.weight(1f)) {
+            if (isPdf) {
+                pdfSession?.let { session ->
+                    PdfViewer(
+                        session = session,
+                        initialPage = currentPage,
+                        zoom = zoomLevels[zoomIndex],
+                        twoPage = columns == 2,
+                        themeIndex = themeIndex,
+                        annotations = annotations,
+                        onPageChanged = { currentPage = it },
+                        onPageTap = { page, rx, ry -> pendingPdfTap = Triple(page, rx, ry) }
                     )
                 }
-                if (isPdf && pdfSession != null) {
-                    Text(
-                        "${currentPage + 1}/${pdfSession.pageCount}",
-                        color = themeFg,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(end = 8.dp)
+            } else {
+                if (fullText != null) {
+                    TextViewer(
+                        bridge = bridge,
+                        onPageFinished = { wv ->
+                            webView = wv
+                            if (!webReady) webReady = true
+                            else pushContent(currentScroll)
+                        }
                     )
                 }
             }
+        }
 
-            if (isPdf && pdfSession != null) {
-                LinearProgressIndicator(
-                    progress = { (currentPage + 1).toFloat() / pdfSession.pageCount.coerceAtLeast(1) },
-                    modifier = Modifier.fillMaxWidth().height(3.dp),
-                    color = Color(0xFFFFB74D),
-                    trackColor = Color(0xFF3A3A3A)
-                )
-            }
-
-            Box(Modifier.weight(1f)) {
+        // Bottom Toolbar
+        Row(
+            Modifier.fillMaxWidth().background(themeBg).padding(horizontal = 4.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = {
                 if (isPdf) {
-                    pdfSession?.let { session ->
-                        PdfViewer(
-                            session = session,
-                            initialPage = currentPage,
-                            zoom = zoomLevels[zoomIndex],
-                            twoPage = columns == 2,
-                            themeIndex = themeIndex,
-                            annotations = annotations,
-                            onPageChanged = { currentPage = it },
-                            onPageTap = { page, rx, ry -> pendingPdfTap = Triple(page, rx, ry) }
-                        )
-                    }
+                    Toast.makeText(context, "📍 روی محل دلخواه ضربه بزن", Toast.LENGTH_SHORT).show()
                 } else {
-                    if (fullText != null) {
-                        TextViewer(
-                            bridge = bridge,
-                            onPageFinished = { wv ->
-                                webView = wv
-                                if (!webReady) webReady = true
-                                else pushContent(currentScroll)
-                            }
-                        )
-                    }
-                }
-            }
-
-            BottomToolbar(
-                isPdf = isPdf,
-                speaking = speaking,
-                themeBg = themeBg,
-                themeFg = themeFg,
-                onAddNote = {
-                    if (isPdf) {
-                        Toast.makeText(context, "📍 روی محل دلخواه در صفحه ضربه بزن", Toast.LENGTH_SHORT).show()
-                    } else {
-                        webView?.evaluateJavascript("getSelectionData()") { result ->
-                            if (result != null && result != "null") {
-                                try {
-                                    val raw = result.trim('"').replace("\\\"", "\"").replace("\\\\", "\\")
-                                    val obj = JSONObject(raw)
-                                    pendingSelection = Triple(
-                                        obj.getString("text"),
-                                        obj.getInt("startOffset"),
-                                        obj.getInt("endOffset")
-                                    )
-                                } catch (_: Exception) {
-                                }
-                            } else {
+                    webView?.evaluateJavascript("getSelectionData()") { result ->
+                        if (result != null && result != "null" && result != "\"null\"") {
+                            try {
+                                val raw = result.trim('"').replace("\\\"", "\"").replace("\\\\", "\\")
+                                val obj = JSONObject(raw)
+                                pendingSelection = Triple(
+                                    obj.getString("text"),
+                                    obj.getInt("startOffset"),
+                                    obj.getInt("endOffset")
+                                )
+                            } catch (_: Exception) {
                                 Toast.makeText(context, "اول متنی را انتخاب کن ✋", Toast.LENGTH_SHORT).show()
                             }
+                        } else {
+                            Toast.makeText(context, "اول متنی را انتخاب کن ✋", Toast.LENGTH_SHORT).show()
                         }
                     }
-                },
-                onAddBookmark = {
-                    if (isPdf) {
-                        AnnotationStore.save(
-                            context, path, Annotation(
-                                fileKey = AnnotationStore.fileKey(path),
-                                type = AnnotationType.BOOKMARK,
-                                colorKey = "gold",
-                                pageIndex = currentPage,
-                                relX = 0.02f, relY = 0.02f, relW = 0.06f, relH = 0.06f,
-                                selectedText = "صفحهٔ ${currentPage + 1}"
-                            )
+                }
+            }) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Filled.Brush, "هایلایت", tint = themeFg)
+                    Text("هایلایت", fontSize = 9.sp, color = themeFg)
+                }
+            }
+            IconButton(onClick = {
+                if (isPdf) {
+                    AnnotationStore.save(
+                        context, path, Annotation(
+                            fileKey = AnnotationStore.fileKey(path),
+                            type = AnnotationType.BOOKMARK,
+                            colorKey = "gold",
+                            pageIndex = currentPage,
+                            relX = 0.02f, relY = 0.02f, relW = 0.06f, relH = 0.06f,
+                            selectedText = "صفحهٔ ${currentPage + 1}"
                         )
-                        annVersion++
-                        Toast.makeText(context, "🔖 نشانک صفحهٔ ${currentPage + 1} ثبت شد", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, "برای متن، از انتخاب‌کردن استفاده کن ✋", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                onTts = {
+                    )
+                    annVersion++
+                    Toast.makeText(context, "🔖 نشانک ثبت شد", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "برای متن، از انتخاب استفاده کن", Toast.LENGTH_SHORT).show()
+                }
+            }) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Filled.Bookmark, "نشانک", tint = themeFg)
+                    Text("نشانک", fontSize = 9.sp, color = themeFg)
+                }
+            }
+            if (isPdf) {
+                IconButton(onClick = { zoomIndex = (zoomIndex - 1).coerceAtLeast(0) }) {
+                    Icon(Icons.Filled.Remove, "کوچک", tint = themeFg)
+                }
+                IconButton(onClick = { zoomIndex = (zoomIndex + 1).coerceAtMost(zoomLevels.size - 1) }) {
+                    Icon(Icons.Filled.Add, "بزرگ", tint = themeFg)
+                }
+            } else {
+                IconButton(onClick = {
                     if (!speaking && fullText != null) {
-                        webView?.evaluateJavascript("speak(${JSONObject.quote(fullText!!)}, 1.0);", null)
+                        val plain = fullText!!.replace(Regex("<[^>]+>"), "")
+                        webView?.evaluateJavascript("speak(${JSONObject.quote(plain.take(4000))}, 1.0);", null)
                         speaking = true
                     } else {
                         webView?.evaluateJavascript("stopSpeaking();", null)
                         speaking = false
                     }
-                },
-                onColumns = {
-                    columns = if (columns == 2) 1 else 2
-                    saveSettings()
-                    if (!isPdf) webView?.evaluateJavascript("setColumns($columns);", null)
-                },
-                onZoomOut = { zoomIndex = (zoomIndex - 1).coerceAtLeast(0) },
-                onZoomIn = { zoomIndex = (zoomIndex + 1).coerceAtMost(zoomLevels.size - 1) },
-                onSettings = { showSettings = true }
-            )
+                }) {
+                    Icon(if (speaking) Icons.Filled.Stop else Icons.Filled.PlayArrow, "خواندن", tint = themeFg)
+                }
+            }
+            IconButton(onClick = {
+                columns = if (columns == 2) 1 else 2
+                saveSettings()
+                if (!isPdf) webView?.evaluateJavascript("setColumns($columns);", null)
+            }) {
+                Icon(Icons.Filled.ViewColumn, "دو صفحه", tint = themeFg)
+            }
+            IconButton(onClick = { showSettings = true }) {
+                Icon(Icons.Filled.Settings, "تنظیمات", tint = themeFg)
+            }
         }
     }
 
+    // Dialogs
     pendingSelection?.let { sel ->
         AnnotationPickerDialog(
             selectedText = sel.first,
@@ -422,10 +428,12 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
         val (page, rx, ry) = tap
         PdfAnnotationDialog(
             pageIndex = page,
+            relX = rx,
+            relY = ry,
             onSave = { type, colorKey, note ->
                 val (rw, rh) = when (type) {
-                    AnnotationType.HIGHLIGHT -> 0.45f to 0.04f
-                    AnnotationType.UNDERLINE -> 0.45f to 0.012f
+                    AnnotationType.HIGHLIGHT -> 0.40f to 0.03f
+                    AnnotationType.UNDERLINE -> 0.40f to 0.012f
                     AnnotationType.NOTE -> 0.06f to 0.06f
                     AnnotationType.BOOKMARK -> 0.06f to 0.06f
                 }
@@ -464,6 +472,23 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
         )
     }
 
+    if (showAnnotationsList) {
+        AnnotationsListDialog(
+            annotations = annotations,
+            themeFg = themeFg,
+            themeMuted = themeMuted,
+            onClick = { ann ->
+                showAnnotationsList = false
+                showNoteDialog = ann
+            },
+            onDelete = { id ->
+                AnnotationStore.remove(context, path, id)
+                annVersion++
+            },
+            onDismiss = { showAnnotationsList = false }
+        )
+    }
+
     if (showSettings) {
         ReaderSettingsDialog(
             themeIndex = themeIndex,
@@ -490,94 +515,57 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
 }
 
 @Composable
-private fun Sidebar(
+private fun AnnotationsListDialog(
     annotations: List<Annotation>,
-    themeBg: Color,
     themeFg: Color,
     themeMuted: Color,
-    onAnnotationClick: (Annotation) -> Unit,
-    onAnnotationDelete: (String) -> Unit,
-    onClose: () -> Unit
+    onClick: (Annotation) -> Unit,
+    onDelete: (String) -> Unit,
+    onDismiss: () -> Unit
 ) {
-    Box(
-        Modifier
-            .fillMaxHeight()
-            .width(300.dp)
-            .background(themeBg.copy(alpha = 0.97f))
-            .border(1.dp, themeMuted.copy(alpha = 0.3f))
-    ) {
-        Column(Modifier.fillMaxSize().padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("📑 یادداشت‌ها", fontFamily = LalezarFont, fontSize = 20.sp, color = themeFg, modifier = Modifier.weight(1f))
-                IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "بستن", tint = themeFg) }
-            }
-            HorizontalDivider(color = themeMuted.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 8.dp))
-
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF202020),
+        title = { Text("📑 همهٔ یادداشت‌ها", color = Color.White, fontFamily = LalezarFont, fontSize = 18.sp) },
+        text = {
             if (annotations.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("📝", fontSize = 48.sp)
-                        Spacer(Modifier.height(8.dp))
-                        Text("هنوز یادداشتی نیست", color = themeMuted, fontSize = 13.sp)
-                        Spacer(Modifier.height(4.dp))
-                        Text("متن را انتخاب کن یا روی PDF ضربه بزن", color = themeMuted, fontSize = 11.sp, textAlign = TextAlign.Center)
-                    }
-                }
+                Text("هنوز یادداشتی نیست 📝", color = themeMuted, fontSize = 13.sp)
             } else {
                 LazyColumn {
                     items(annotations.sortedByDescending { it.updatedAt }) { ann ->
-                        AnnotationItem(
-                            ann = ann,
-                            themeFg = themeFg,
-                            themeMuted = themeMuted,
-                            onClick = { onAnnotationClick(ann) },
-                            onDelete = { onAnnotationDelete(ann.id) }
-                        )
+                        val color = AnnotationPalette.find(ann.colorKey)
+                        Card(
+                            onClick = { onClick(ann) },
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = color.color.copy(alpha = 0.15f)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(color.emoji, fontSize = 16.sp)
+                                Spacer(Modifier.width(8.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        ann.selectedText.ifBlank { "صفحهٔ ${ann.pageIndex + 1}" },
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    if (ann.note.isNotBlank()) {
+                                        Text(ann.note, color = themeMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                }
+                                IconButton(onClick = { onDelete(ann.id) }, modifier = Modifier.size(28.dp)) {
+                                    Icon(Icons.Filled.Close, "حذف", tint = Color(0xFFE57373), modifier = Modifier.size(14.dp))
+                                }
+                            }
+                        }
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun AnnotationItem(
-    ann: Annotation,
-    themeFg: Color,
-    themeMuted: Color,
-    onClick: () -> Unit,
-    onDelete: () -> Unit
-) {
-    val color = AnnotationPalette.find(ann.colorKey)
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = color.color.copy(alpha = 0.15f)),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(color.emoji, fontSize = 18.sp)
-                Spacer(Modifier.width(8.dp))
-                Text(color.name, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeFg, modifier = Modifier.weight(1f))
-                Text(ann.type.emoji + " " + ann.type.faName, fontSize = 11.sp, color = themeMuted)
-                Spacer(Modifier.width(4.dp))
-                IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Filled.Close, "حذف", tint = Color(0xFFE57373), modifier = Modifier.size(14.dp))
-                }
-            }
-            if (ann.selectedText.isNotBlank()) {
-                Spacer(Modifier.height(6.dp))
-                Text("«${ann.selectedText}»", fontSize = 13.sp, color = themeFg, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            }
-            if (ann.note.isNotBlank()) {
-                Spacer(Modifier.height(6.dp))
-                Text(ann.note, fontSize = 12.sp, color = themeMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-            Spacer(Modifier.height(4.dp))
-            Text("صفحهٔ ${ann.pageIndex + 1}", fontSize = 10.sp, color = themeMuted)
-        }
-    }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("بستن", color = Color(0xFFFFB74D)) } }
+    )
 }
 
 @Composable
@@ -593,40 +581,7 @@ private fun BottomToolbar(
     onZoomOut: () -> Unit,
     onZoomIn: () -> Unit,
     onSettings: () -> Unit
-) {
-    Row(
-        Modifier.fillMaxWidth().background(themeBg).padding(horizontal = 4.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onAddNote) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Filled.Brush, "هایلایت", tint = themeFg)
-                Text("هایلایت", fontSize = 9.sp, color = themeFg)
-            }
-        }
-        IconButton(onClick = onAddBookmark) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Filled.Bookmark, "نشانک", tint = themeFg)
-                Text("نشانک", fontSize = 9.sp, color = themeFg)
-            }
-        }
-        if (isPdf) {
-            IconButton(onClick = onZoomOut) { Icon(Icons.Filled.Remove, "کوچک‌نمایی", tint = themeFg) }
-            IconButton(onClick = onZoomIn) { Icon(Icons.Filled.Add, "بزرگ‌نمایی", tint = themeFg) }
-        } else {
-            IconButton(onClick = onTts) {
-                Icon(if (speaking) Icons.Filled.Stop else Icons.Filled.PlayArrow, "خواندن", tint = themeFg)
-            }
-        }
-        IconButton(onClick = onColumns) {
-            Icon(Icons.Filled.ViewColumn, "دو صفحه", tint = themeFg)
-        }
-        IconButton(onClick = onSettings) {
-            Icon(Icons.Filled.Settings, "تنظیمات", tint = themeFg)
-        }
-    }
-}
+) {}
 
 @Composable
 private fun ColorRow(selected: String, list: List<AnnotationColor>, onSelect: (String) -> Unit) {
@@ -647,7 +602,7 @@ private fun ColorRow(selected: String, list: List<AnnotationColor>, onSelect: (S
 @Composable
 private fun TypeRow(selected: AnnotationType, onSelect: (AnnotationType) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 6.dp)) {
-        AnnotationType.values().forEach { type ->
+        AnnotationType.entries.forEach { type ->
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
@@ -706,6 +661,8 @@ private fun AnnotationPickerDialog(
 @Composable
 private fun PdfAnnotationDialog(
     pageIndex: Int,
+    relX: Float,
+    relY: Float,
     onSave: (AnnotationType, String, String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -861,7 +818,7 @@ private fun ReaderSettingsDialog(
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("حالت کتاب (دو صفحه‌ای)", color = Color(0xFFB8B8B8), fontSize = 13.sp, modifier = Modifier.weight(1f))
+                    Text("حالت کتاب", color = Color(0xFFB8B8B8), fontSize = 13.sp, modifier = Modifier.weight(1f))
                     TextButton(onClick = { onColumns(if (columns == 2) 1 else 2) }) {
                         Text(if (columns == 2) "✅ فعال" else "❌ غیرفعال", color = Color(0xFFFFB74D))
                     }
