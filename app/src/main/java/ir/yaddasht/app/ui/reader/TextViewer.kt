@@ -19,30 +19,16 @@ class ReaderBridge {
     var onSpeechEnd: (() -> Unit)? = null
     var onTextSelected: ((String) -> Unit)? = null
     var onAnnotationClick: ((String) -> Unit)? = null
-
-    @JavascriptInterface
-    fun onReady() { onReady?.invoke() }
-
-    @JavascriptInterface
-    fun onScroll(y: Int) { onScroll?.invoke(y) }
-
-    @JavascriptInterface
-    fun onSpeechEnd() { onSpeechEnd?.invoke() }
-
-    @JavascriptInterface
-    fun onTextSelected(data: String) { onTextSelected?.invoke(data) }
-
-    @JavascriptInterface
-    fun onAnnotationClick(id: String, note: String, text: String) { onAnnotationClick?.invoke(id) }
+    @JavascriptInterface fun onReady() { onReady?.invoke() }
+    @JavascriptInterface fun onScroll(y: Int) { onScroll?.invoke(y) }
+    @JavascriptInterface fun onSpeechEnd() { onSpeechEnd?.invoke() }
+    @JavascriptInterface fun onTextSelected(d: String) { onTextSelected?.invoke(d) }
+    @JavascriptInterface fun onAnnotationClick(id: String, note: String, text: String) { onAnnotationClick?.invoke(id) }
 }
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun TextViewer(
-    bridge: ReaderBridge,
-    onPageFinished: (WebView) -> Unit,
-    modifier: Modifier = Modifier
-) {
+fun TextViewer(bridge: ReaderBridge, onPageFinished: (WebView) -> Unit, modifier: Modifier = Modifier) {
     AndroidView(
         modifier = modifier.fillMaxSize(),
         factory = { ctx ->
@@ -56,10 +42,7 @@ fun TextViewer(
                 setBackgroundColor(0x00000000)
                 addJavascriptInterface(bridge, "Android")
                 webViewClient = object : WebViewClient() {
-                    override fun onPageFinished(view: WebView?, url: String?) {
-                        super.onPageFinished(view, url)
-                        onPageFinished(this@apply)
-                    }
+                    override fun onPageFinished(view: WebView?, url: String?) { super.onPageFinished(view, url); onPageFinished(this@apply) }
                 }
                 loadUrl("file:///android_asset/reader.html")
             }
@@ -69,17 +52,13 @@ fun TextViewer(
 
 fun annotationsToJs(annotations: List<Annotation>, themeIndex: Int): String {
     val arr = JSONArray()
-    annotations.forEach { ann ->
-        val ac = AnnotationPalette.find(ann.colorKey)
+    annotations.forEach { a ->
+        val ac = AnnotationPalette.find(a.colorKey)
         arr.put(JSONObject().apply {
-            put("id", ann.id)
-            put("type", ann.type.name)
-            put("startOffset", ann.startOffset)
-            put("endOffset", ann.endOffset)
-            put("color", ac.hex)
-            put("alpha", ac.alpha(themeIndex).toDouble())
-            put("note", ann.note)
-            put("selectedText", ann.selectedText)
+            put("id", a.id); put("type", a.type.name)
+            put("startOffset", a.startOffset); put("endOffset", a.endOffset)
+            put("color", ac.hex); put("alpha", ac.alpha(themeIndex).toDouble())
+            put("note", a.note); put("selectedText", a.selectedText)
         })
     }
     return arr.toString()
