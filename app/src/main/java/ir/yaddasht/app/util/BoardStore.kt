@@ -54,6 +54,10 @@ object BoardStore {
         return b
     }
 
+    fun setBackground(c: Context, boardId: Long, bg: Int) {
+        saveBoards(c, boards(c).map { if (it.id == boardId) it.copy(background = bg) else it })
+    }
+
     private fun allItems(c: Context): List<BoardItem> {
         val json = prefs(c).getString(KEY_ITEMS, "[]") ?: "[]"
         return try {
@@ -63,7 +67,7 @@ object BoardStore {
                 BoardItem(
                     o.getLong("noteId"), o.getLong("boardId"),
                     o.optDouble("x", 0.0).toFloat(), o.optDouble("y", 0.0).toFloat(),
-                    o.optDouble("rotation", 0.0).toFloat(), o.optInt("sizeIndex", 0)
+                    o.optDouble("rotation", 0.0).toFloat(), o.optInt("sizeIndex", 1)
                 )
             }
         } catch (_: Exception) { emptyList() }
@@ -90,15 +94,20 @@ object BoardStore {
         val x = 20f + (count % 3) * 40f
         val y = 20f + (count / 3) * 50f
         val rot = listOf(-4f, 3f, -2f, 5f, 0f)[count % 5]
-        list.add(BoardItem(noteId, boardId, x, y, rot, 0))
+        list.add(BoardItem(noteId, boardId, x, y, rot, 1))
         saveItems(c, list)
     }
 
     fun move(c: Context, noteId: Long, boardId: Long, x: Float, y: Float) {
-        val list = allItems(c).map {
+        saveItems(c, allItems(c).map {
             if (it.noteId == noteId && it.boardId == boardId) it.copy(x = x.coerceAtLeast(0f), y = y.coerceAtLeast(0f)) else it
-        }
-        saveItems(c, list)
+        })
+    }
+
+    fun setSize(c: Context, noteId: Long, boardId: Long, sizeIndex: Int) {
+        saveItems(c, allItems(c).map {
+            if (it.noteId == noteId && it.boardId == boardId) it.copy(sizeIndex = sizeIndex.coerceIn(0, 2)) else it
+        })
     }
 
     fun removeItem(c: Context, noteId: Long, boardId: Long) {
