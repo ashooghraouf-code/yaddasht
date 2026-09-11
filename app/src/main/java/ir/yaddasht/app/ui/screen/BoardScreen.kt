@@ -8,7 +8,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +30,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -43,6 +41,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -152,8 +152,11 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                     BoardStore.setBackground(context, currentBoard, (bgIndex + 1) % 4)
                     refresh()
                 }) { Text("🎨", fontSize = 18.sp) }
-                IconButton(onClick = { if (BoardStore.undo(context, currentBoard)) refresh() }, enabled = canUndo) {
-                    Icon(Icons.Filled.Undo, "بازگشت", tint = if (canUndo) Color(0xFFFFE0B2) else Color.Gray)
+                IconButton(
+                    onClick = { if (BoardStore.undo(context, currentBoard)) refresh() },
+                    enabled = canUndo
+                ) {
+                    Icon(Icons.Filled.Undo, "بازگشت", tint = if (canUndo) Color(0xFFFFE0B2) else Color(0xFF777777))
                 }
                 IconButton(onClick = { boardName = ""; showAddBoard = true }) { Icon(Icons.Filled.Add, "تابلو جدید", tint = Color(0xFFFFE0B2)) }
             }
@@ -321,20 +324,35 @@ private fun StickyNote(
 ) {
     val density = LocalDensity.current
     var pos by remember(item.noteId, item.boardId) { mutableStateOf(Offset(item.x, item.y)) }
-    var rotation by remember(item.noteId, item.boardId) { mutableStateOf(item.rotation) }
-    var dragging by remember { mutableStateOf(false) }
-    var transforming by remember { mutableStateOf(false) }
+    var rotation by remember(item.noteId, item.boardId) { mutableFloatStateOf(item.rotation) }
+    var visualZoom by remember { mutableFloatStateOf(1f) }
     var appeared by remember { mutableStateOf(false) }
+    var lastInteraction by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(Unit) {
         delay(stagger * 70L)
         appeared = true
     }
 
-    val dragScale by animateFloatAsState(if (dragging || transforming) 1.07f else 1f, label = "lift")
+    // ذخیره موقعیت و چرخش بعد از 500ms بی‌حرکتی
+    LaunchedEffect(lastInteraction) {
+        if (lastInteraction > 0) {
+            delay(500)
+            onMoved(pos.x, pos.y)
+            onRotated(rotation)
+        }
+    }
+
+    // بازگشت visualZoom به 1 بعد از 400ms
+    LaunchedEffect(lastInteraction) {
+        if (lastInteraction > 0) {
+            delay(400)
+            visualZoom = 1f
+        }
+    }
+
     val entranceScale by animateFloatAsState(if (appeared) 1f else 0.5f, label = "in-scale")
     val entranceAlpha by animateFloatAsState(if (appeared) 1f else 0f, label = "in-alpha")
-    val elev by animateDpAsState(if (dragging || transforming) 22.dp else 7.dp, label = "shadow")
 
     val widthDp = SIZE_WIDTHS[item.sizeIndex.coerceIn(0, 2)].dp
     val body = stickyBody(note.color)
@@ -347,38 +365,22 @@ private fun StickyNote(
             .width(widthDp)
             .graphicsLayer {
                 rotationZ = rotation
-                scaleX = dragScale * entranceScale
-                scaleY = dragScale * entranceScale
+                val scale = entranceScale * visualZoom
+                scaleX = scale
+                scaleY = scale
             }
-            .pointerInput(item.noteId) {
+            .pointerInput(item.noteId, item.boardId) {
                 detectTransformGestures { _, pan, zoom, rot ->
-                    transforming = true
                     pos += pan / density.density
                     rotation += rot
-                    if (zoom != 1f) {
-                        // Zoom می‌تواند برای تغییر سایز استفاده شود
-                    }
-                }
-            }
-            .pointerInput(item.noteId) {
-                detectDragGestures(
-                    onDragStart = { dragging = true },
-                    onDragEnd = {
-                        dragging = false
-                        transforming = false
-                        onMoved(pos.x, pos.y)
-                        onRotated(rotation)
-                    },
-                    onDragCancel = { dragging = false; transforming = false }
-                ) { change, drag ->
-                    change.consume()
-                    pos += drag / density.density
+                    visualZoom = zoom.coerceIn(0.5f, 2.0f)
+                    lastInteraction = System.currentTimeMillis()
                 }
             }
     ) {
         Box(
             Modifier.fillMaxWidth()
-                .shadow(elev, RoundedCornerShape(3.dp))
+                .shadow(7.dp, RoundedCornerShape(3.dp))
                 .clip(RoundedCornerShape(3.dp))
                 .background(Brush.linearGradient(listOf(body, body, stickyEdge(note.color))))
                 .combinedClickable(onClick = onOpen, onLongClick = onSize)
@@ -450,4 +452,4 @@ private fun CurledCorner(modifier: Modifier = Modifier) {
             )
         )
     }
-}
+}ظظ
