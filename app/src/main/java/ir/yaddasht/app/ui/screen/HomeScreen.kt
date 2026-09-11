@@ -244,8 +244,6 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
     var showAddTask by remember { mutableStateOf(false) }
     var editTask by remember { mutableStateOf<Task?>(null) }
     var newTaskOnDate by remember { mutableLongStateOf(0L) }
-
-    // ✅ state برای دیالوگ انتخاب رنگ تم
     var showThemePicker by remember { mutableStateOf(false) }
 
     val (tjy, tjm, tjd) = FaDate.jalali(System.currentTimeMillis())
@@ -277,7 +275,6 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
         list.groupBy { val (a, b, c) = FaDate.jalali(it.second); Triple(a, b, c) }
     }
 
-    // ✅ بدون containerColor ثابت — از MaterialTheme.colorScheme.background پیروی می‌کند
     Scaffold(
         floatingActionButton = {
             when (tab) {
@@ -292,141 +289,55 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
             Column(Modifier.fillMaxSize()) {
                 HomeHeader(count = notes.size, onStats = { showStats = true }, onBackup = { doBackup() }, onRestore = { restoreLauncher.launch(arrayOf("*/*")) }, onThemePicker = { showThemePicker = true })
                 TabRow(selectedTabIndex = tab, containerColor = Color.Transparent, modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)) {
-                    Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("📝 یادداشت‌ها", fontFamily = LalezarFont, fontSize = 14.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
-                    Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("✅ وظایف", fontFamily = LalezarFont, fontSize = 14.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
-                    Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("📅 تقویم", fontFamily = LalezarFont, fontSize = 14.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
+                    Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("📝 یادداشت", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
+                    Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("✅ وظیفه", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
+                    Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("📅 تقویم", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
+                    Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("📌 تابلو", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
                 }
-                if (tab == 0 && !hideMemory && memory != null && query.isBlank()) {
-                    Surface(onClick = { onOpenNote(memory.id) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
-                        shape = RoundedCornerShape(16.dp), color = Saffron.copy(alpha = .14f), border = androidx.compose.foundation.BorderStroke(1.dp, Saffron.copy(alpha = .4f))) {
-                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("⏳", fontSize = 22.sp); Spacer(Modifier.width(10.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text("خاطره‌ای از گذشته", fontFamily = LalezarFont, fontSize = 14.sp, color = Saffron)
-                                Text(memory.title.ifBlank { "بدون عنوان" }, fontSize = 12.sp, color = PaperWhite, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            IconButton(onClick = { hideMemory = true }, modifier = Modifier.size(28.dp)) { Icon(Icons.Filled.Close, null, tint = MutedGreenText, modifier = Modifier.size(16.dp)) }
-                        }
-                    }
-                }
-                if (tab != 2) SearchBox(query, { query = it }, Modifier.padding(horizontal = 20.dp))
-                when (tab) {
-                    0 -> when {
-                        notes.isEmpty() -> EmptyState()
-                        filteredNotes.isEmpty() -> CenterMessage("چیزی پیدا نشد 🔍")
-                        else -> LazyVerticalGrid(columns = GridCells.Adaptive(168.dp), contentPadding = PaddingValues(14.dp, 16.dp, 14.dp, 120.dp), modifier = Modifier.fillMaxSize()) {
-                            if (pinned.isNotEmpty()) {
-                                item(span = { GridItemSpan(maxLineSpan) }) { SectionLabel("📌 سنجاق‌شده") }
-                                items(pinned, key = { "p${it.id}" }) { note -> NoteCard(note, countMap[note.id] ?: 0, { onOpenNote(note.id) }, { togglePin(scope, dao, note) }, { noteToDelete = note }) }
-                            }
-                            if (others.isNotEmpty()) {
-                                if (pinned.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) { SectionLabel("🗒️ یادداشت‌ها") }
-                                items(others, key = { "n${it.id}" }) { note -> NoteCard(note, countMap[note.id] ?: 0, { onOpenNote(note.id) }, { togglePin(scope, dao, note) }, { noteToDelete = note }) }
+
+                // ═══ تب تابلو اعلانات ═══
+                if (tab == 3) {
+                    BoardScreen(
+                        notes = notes,
+                        onOpenNote = { onOpenNote(it) },
+                        onBack = { tab = 0 }
+                    )
+                } else {
+                    if (tab == 0 && !hideMemory && memory != null && query.isBlank()) {
+                        Surface(onClick = { onOpenNote(memory.id) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(16.dp), color = Saffron.copy(alpha = .14f), border = androidx.compose.foundation.BorderStroke(1.dp, Saffron.copy(alpha = .4f))) {
+                            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("⏳", fontSize = 22.sp); Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text("خاطره‌ای از گذشته", fontFamily = LalezarFont, fontSize = 14.sp, color = Saffron)
+                                    Text(memory.title.ifBlank { "بدون عنوان" }, fontSize = 12.sp, color = PaperWhite, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                                IconButton(onClick = { hideMemory = true }, modifier = Modifier.size(28.dp)) { Icon(Icons.Filled.Close, null, tint = MutedGreenText, modifier = Modifier.size(16.dp)) }
                             }
                         }
                     }
-                    1 -> when {
-                        tasks.isEmpty() -> EmptyTasksState()
-                        filteredTasks.isEmpty() -> CenterMessage("وظیفه‌ای پیدا نشد 🔍")
-                        else -> LazyColumn(contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 120.dp), modifier = Modifier.fillMaxSize()) {
-                            filteredTasks.forEach { task ->
-                                item {
-                                    TaskCard(task,
-                                        onClick = { editTask = task },
-                                        onToggle = { scope.launch(Dispatchers.IO) { taskDao.update(task.copy(isCompleted = !task.isCompleted)) } },
-                                        onDelete = { scope.launch(Dispatchers.IO) {
-                                            ReminderScheduler.cancelAll(context, task.id, true)
-                                            taskDao.deleteById(task.id)
-                                        } })
-                                    Spacer(Modifier.height(10.dp))
+                    if (tab != 2) SearchBox(query, { query = it }, Modifier.padding(horizontal = 20.dp))
+                    when (tab) {
+                        0 -> when {
+                            notes.isEmpty() -> EmptyState()
+                            filteredNotes.isEmpty() -> CenterMessage("چیزی پیدا نشد 🔍")
+                            else -> LazyVerticalGrid(columns = GridCells.Adaptive(168.dp), contentPadding = PaddingValues(14.dp, 16.dp, 14.dp, 120.dp), modifier = Modifier.fillMaxSize()) {
+                                if (pinned.isNotEmpty()) {
+                                    item(span = { GridItemSpan(maxLineSpan) }) { SectionLabel("📌 سنجاق‌شده") }
+                                    items(pinned, key = { "p${it.id}" }) { note -> NoteCard(note, countMap[note.id] ?: 0, { onOpenNote(note.id) }, { togglePin(scope, dao, note) }, { noteToDelete = note }) }
+                                }
+                                if (others.isNotEmpty()) {
+                                    if (pinned.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) { SectionLabel("🗒️ یادداشت‌ها") }
+                                    items(others, key = { "n${it.id}" }) { note -> NoteCard(note, countMap[note.id] ?: 0, { onOpenNote(note.id) }, { togglePin(scope, dao, note) }, { noteToDelete = note }) }
                                 }
                             }
                         }
-                    }
-                    else -> {
-                        val holidayDays = remember(calJy, calJm) { computeHolidayDays(calJy, calJm) }
-                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp)) {
-                            Spacer(Modifier.height(8.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = { if (calJm > 1) calJm-- else { calJm = 12; calJy-- } }) { Icon(Icons.Filled.ChevronRight, "قبل", tint = Saffron) }
-                                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("${FaDate.monthName(calJm)} ${calJy.fa()}", fontFamily = LalezarFont, fontSize = 20.sp, color = PaperWhite)
-                                    val infoMillis = jalaliMillis(calJy, calJm, calDay, 12)
-                                    Text("🌙 قمری: " + hijriFullFa(infoMillis), fontSize = 10.sp, color = MutedGreenText)
-                                    Text("🌍 میلادی: " + gregorianFullFa(infoMillis), fontSize = 10.sp, color = MutedGreenText)
-                                }
-                                IconButton(onClick = { if (calJm < 12) calJm++ else { calJm = 1; calJy++ } }) { Icon(Icons.Filled.ChevronLeft, "بعد", tint = Saffron) }
-                            }
-                            Spacer(Modifier.height(6.dp))
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                LegendItem(HOLIDAY_RED, "تعطیل رسمی"); LegendItem(Color(0xFF46A758), "وظیفه دور"); LegendItem(Saffron, "یادآور یادداشت")
-                            }
-                            Spacer(Modifier.height(4.dp))
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                                WEEK_FA.forEach { w -> Text(w, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Saffron, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
-                            }
-                            Spacer(Modifier.height(4.dp))
-                            val cells = List(leadingBlanks(calJy, calJm)) { 0 } + (1..monthLen(calJy, calJm)).toList()
-                            cells.chunked(7).forEach { row ->
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    row.forEach { d ->
-                                        if (d == 0) Box(Modifier.weight(1f))
-                                        else {
-                                            val dayItems = itemsByDay[Triple(calJy, calJm, d)].orEmpty()
-                                            val isToday = calJy == tjy && calJm == tjm && d == tjd
-                                            val isSel = calDay == d
-                                            val isHoliday = holidayDays.contains(d)
-                                            Box(Modifier.weight(1f).height(72.dp).clip(RoundedCornerShape(12.dp))
-                                                .background(if (isSel) DeepGreenSoft else Color.Transparent)
-                                                .border(if (isHoliday) 2.dp else if (isToday) 1.5.dp else 0.dp, if (isHoliday) HOLIDAY_RED else Saffron, RoundedCornerShape(12.dp))
-                                                .combinedClickable(onClick = { calDay = d; newTaskOnDate = jalaliMillis(calJy, calJm, d, 0); showAddTask = true }, onLongClick = { calDay = d; newTaskOnDate = jalaliMillis(calJy, calJm, d, 0); showAddTask = true })
-                                                .padding(3.dp)) {
-                                                Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-                                                    Text(d.fa(), fontSize = 12.sp, color = if (isHoliday) HOLIDAY_RED else if (isToday) Saffron else PaperWhite, fontWeight = if (isToday || isSel || isHoliday) FontWeight.Bold else FontWeight.Normal)
-                                                    val taskItems = dayItems.filter { it.first.startsWith("task:") }
-                                                    val noteItems = dayItems.filter { it.first.startsWith("note:") }
-                                                    taskItems.take(2).forEach { item -> Box(Modifier.fillMaxWidth().height(6.dp).padding(top = 2.dp).clip(RoundedCornerShape(3.dp)).background(taskTint(item.second, item.third))) }
-                                                    noteItems.take((2 - taskItems.size.coerceAtMost(2)).coerceAtLeast(0)).forEach { _ -> Box(Modifier.fillMaxWidth().height(6.dp).padding(top = 2.dp).clip(RoundedCornerShape(3.dp)).background(Saffron)) }
-                                                    if (dayItems.size > 2) Text("+${(dayItems.size - 2).fa()}", fontSize = 8.sp, color = MutedGreenText)
-                                                }
-                                            }
-                                        }
-                                    }
-                                    repeat(7 - row.size) { Box(Modifier.weight(1f)) }
-                                }
-                                Spacer(Modifier.height(3.dp))
-                            }
-                            Spacer(Modifier.height(10.dp))
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Text("📍 ${calDay.fa()} ${FaDate.monthName(calJm)}", fontFamily = LalezarFont, fontSize = 16.sp, color = Saffron, modifier = Modifier.weight(1f))
-                                Surface(onClick = { newTaskOnDate = jalaliMillis(calJy, calJm, calDay, 0); showAddTask = true }, shape = RoundedCornerShape(10.dp), color = Saffron) {
-                                    Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Filled.Add, null, tint = Ink, modifier = Modifier.size(14.dp)); Spacer(Modifier.width(4.dp))
-                                        Text("وظیفه جدید", fontSize = 11.sp, color = Ink, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                            Spacer(Modifier.height(6.dp))
-                            val selItems = itemsByDay[Triple(calJy, calJm, calDay)].orEmpty()
-                            if (selItems.isEmpty()) Text("برای این روز یادآور یا وظیفه‌ای نیست 🌤️", fontSize = 12.sp, color = MutedGreenText)
-                            selItems.forEach { item ->
-                                if (item.first.startsWith("note:")) {
-                                    val id = item.first.removePrefix("note:").toLongOrNull() ?: -1L
-                                    val note = notes.find { it.id == id }
-                                    if (note != null) {
-                                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(DeepGreenSoft)
-                                            .border(1.5.dp, Saffron.copy(alpha = .75f), RoundedCornerShape(18.dp)).clickable { onOpenNote(note.id) }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            Text("📝", fontSize = 18.sp); Spacer(Modifier.width(8.dp))
-                                            Column(Modifier.weight(1f)) {
-                                                Text(note.title.ifBlank { "یادداشت" }, fontFamily = VazirFont, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = PaperWhite)
-                                                Text("⏰ " + fullDateTime(note.reminderAt), fontSize = 11.sp, color = Saffron)
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    val id = item.first.removePrefix("task:").toLongOrNull() ?: -1L
-                                    val task = tasks.find { it.id == id }
-                                    if (task != null) {
+                        1 -> when {
+                            tasks.isEmpty() -> EmptyTasksState()
+                            filteredTasks.isEmpty() -> CenterMessage("وظیفه‌ای پیدا نشد 🔍")
+                            else -> LazyColumn(contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 120.dp), modifier = Modifier.fillMaxSize()) {
+                                filteredTasks.forEach { task ->
+                                    item {
                                         TaskCard(task,
                                             onClick = { editTask = task },
                                             onToggle = { scope.launch(Dispatchers.IO) { taskDao.update(task.copy(isCompleted = !task.isCompleted)) } },
@@ -434,11 +345,108 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                                                 ReminderScheduler.cancelAll(context, task.id, true)
                                                 taskDao.deleteById(task.id)
                                             } })
+                                        Spacer(Modifier.height(10.dp))
                                     }
                                 }
-                                Spacer(Modifier.height(8.dp))
                             }
-                            Spacer(Modifier.height(120.dp))
+                        }
+                        else -> {
+                            val holidayDays = remember(calJy, calJm) { computeHolidayDays(calJy, calJm) }
+                            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp)) {
+                                Spacer(Modifier.height(8.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(onClick = { if (calJm > 1) calJm-- else { calJm = 12; calJy-- } }) { Icon(Icons.Filled.ChevronRight, "قبل", tint = Saffron) }
+                                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("${FaDate.monthName(calJm)} ${calJy.fa()}", fontFamily = LalezarFont, fontSize = 20.sp, color = PaperWhite)
+                                        val infoMillis = jalaliMillis(calJy, calJm, calDay, 12)
+                                        Text("🌙 قمری: " + hijriFullFa(infoMillis), fontSize = 10.sp, color = MutedGreenText)
+                                        Text("🌍 میلادی: " + gregorianFullFa(infoMillis), fontSize = 10.sp, color = MutedGreenText)
+                                    }
+                                    IconButton(onClick = { if (calJm < 12) calJm++ else { calJm = 1; calJy++ } }) { Icon(Icons.Filled.ChevronLeft, "بعد", tint = Saffron) }
+                                }
+                                Spacer(Modifier.height(6.dp))
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                                    LegendItem(HOLIDAY_RED, "تعطیل رسمی"); LegendItem(Color(0xFF46A758), "وظیفه دور"); LegendItem(Saffron, "یادآور یادداشت")
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    WEEK_FA.forEach { w -> Text(w, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Saffron, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                val cells = List(leadingBlanks(calJy, calJm)) { 0 } + (1..monthLen(calJy, calJm)).toList()
+                                cells.chunked(7).forEach { row ->
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        row.forEach { d ->
+                                            if (d == 0) Box(Modifier.weight(1f))
+                                            else {
+                                                val dayItems = itemsByDay[Triple(calJy, calJm, d)].orEmpty()
+                                                val isToday = calJy == tjy && calJm == tjm && d == tjd
+                                                val isSel = calDay == d
+                                                val isHoliday = holidayDays.contains(d)
+                                                Box(Modifier.weight(1f).height(72.dp).clip(RoundedCornerShape(12.dp))
+                                                    .background(if (isSel) DeepGreenSoft else Color.Transparent)
+                                                    .border(if (isHoliday) 2.dp else if (isToday) 1.5.dp else 0.dp, if (isHoliday) HOLIDAY_RED else Saffron, RoundedCornerShape(12.dp))
+                                                    .combinedClickable(onClick = { calDay = d; newTaskOnDate = jalaliMillis(calJy, calJm, d, 0); showAddTask = true }, onLongClick = { calDay = d; newTaskOnDate = jalaliMillis(calJy, calJm, d, 0); showAddTask = true })
+                                                    .padding(3.dp)) {
+                                                    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                                                        Text(d.fa(), fontSize = 12.sp, color = if (isHoliday) HOLIDAY_RED else if (isToday) Saffron else PaperWhite, fontWeight = if (isToday || isSel || isHoliday) FontWeight.Bold else FontWeight.Normal)
+                                                        val taskItems = dayItems.filter { it.first.startsWith("task:") }
+                                                        val noteItems = dayItems.filter { it.first.startsWith("note:") }
+                                                        taskItems.take(2).forEach { item -> Box(Modifier.fillMaxWidth().height(6.dp).padding(top = 2.dp).clip(RoundedCornerShape(3.dp)).background(taskTint(item.second, item.third))) }
+                                                        noteItems.take((2 - taskItems.size.coerceAtMost(2)).coerceAtLeast(0)).forEach { _ -> Box(Modifier.fillMaxWidth().height(6.dp).padding(top = 2.dp).clip(RoundedCornerShape(3.dp)).background(Saffron)) }
+                                                        if (dayItems.size > 2) Text("+${(dayItems.size - 2).fa()}", fontSize = 8.sp, color = MutedGreenText)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        repeat(7 - row.size) { Box(Modifier.weight(1f)) }
+                                    }
+                                    Spacer(Modifier.height(3.dp))
+                                }
+                                Spacer(Modifier.height(10.dp))
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("📍 ${calDay.fa()} ${FaDate.monthName(calJm)}", fontFamily = LalezarFont, fontSize = 16.sp, color = Saffron, modifier = Modifier.weight(1f))
+                                    Surface(onClick = { newTaskOnDate = jalaliMillis(calJy, calJm, calDay, 0); showAddTask = true }, shape = RoundedCornerShape(10.dp), color = Saffron) {
+                                        Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Filled.Add, null, tint = Ink, modifier = Modifier.size(14.dp)); Spacer(Modifier.width(4.dp))
+                                            Text("وظیفه جدید", fontSize = 11.sp, color = Ink, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                                Spacer(Modifier.height(6.dp))
+                                val selItems = itemsByDay[Triple(calJy, calJm, calDay)].orEmpty()
+                                if (selItems.isEmpty()) Text("برای این روز یادآور یا وظیفه‌ای نیست 🌤️", fontSize = 12.sp, color = MutedGreenText)
+                                selItems.forEach { item ->
+                                    if (item.first.startsWith("note:")) {
+                                        val id = item.first.removePrefix("note:").toLongOrNull() ?: -1L
+                                        val note = notes.find { it.id == id }
+                                        if (note != null) {
+                                            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(DeepGreenSoft)
+                                                .border(1.5.dp, Saffron.copy(alpha = .75f), RoundedCornerShape(18.dp)).clickable { onOpenNote(note.id) }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                Text("📝", fontSize = 18.sp); Spacer(Modifier.width(8.dp))
+                                                Column(Modifier.weight(1f)) {
+                                                    Text(note.title.ifBlank { "یادداشت" }, fontFamily = VazirFont, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = PaperWhite)
+                                                    Text("⏰ " + fullDateTime(note.reminderAt), fontSize = 11.sp, color = Saffron)
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        val id = item.first.removePrefix("task:").toLongOrNull() ?: -1L
+                                        val task = tasks.find { it.id == id }
+                                        if (task != null) {
+                                            TaskCard(task,
+                                                onClick = { editTask = task },
+                                                onToggle = { scope.launch(Dispatchers.IO) { taskDao.update(task.copy(isCompleted = !task.isCompleted)) } },
+                                                onDelete = { scope.launch(Dispatchers.IO) {
+                                                    ReminderScheduler.cancelAll(context, task.id, true)
+                                                    taskDao.deleteById(task.id)
+                                                } })
+                                        }
+                                    }
+                                    Spacer(Modifier.height(8.dp))
+                                }
+                                Spacer(Modifier.height(120.dp))
+                            }
                         }
                     }
                 }
@@ -480,7 +488,6 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
             dismissButton = { TextButton(onClick = { noteToDelete = null }) { Text("انصراف") } })
     }
 
-    // ✅ دیالوگ انتخاب رنگ تم اپ
     if (showThemePicker) {
         AlertDialog(
             onDismissRequest = { showThemePicker = false },
@@ -635,7 +642,6 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
     scope.launch(Dispatchers.IO) { dao.update(note.copy(pinned = !note.pinned, updatedAt = System.currentTimeMillis())) }
 }
 
-// ✅ اصلاح‌شده: عنوان افقی می‌ماند + دکمهٔ تغییر رنگ تم
 @Composable private fun HomeHeader(count: Int, onStats: () -> Unit, onBackup: () -> Unit, onRestore: () -> Unit, onThemePicker: () -> Unit) {
     val context = LocalContext.current
     Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)) {
@@ -659,19 +665,14 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis
                 )
-                
             }
             Spacer(Modifier.width(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
-                IconButton(onClick = onThemePicker, modifier = Modifier.size(36.dp)) {
-                    Text("🎨", fontSize = 18.sp)
-                }
+                IconButton(onClick = onThemePicker, modifier = Modifier.size(36.dp)) { Text("🎨", fontSize = 18.sp) }
                 IconButton(onClick = {
                     val intent = android.content.Intent(context, FilePickerActivity::class.java)
                     context.startActivity(intent)
-                }, modifier = Modifier.size(36.dp)) {
-                    Text("📚", fontSize = 18.sp)
-                }
+                }, modifier = Modifier.size(36.dp)) { Text("📚", fontSize = 18.sp) }
                 IconButton(onClick = onBackup, modifier = Modifier.size(36.dp)) { Icon(Icons.Filled.FileUpload, "پشتیبان", tint = MutedGreenText, modifier = Modifier.size(20.dp)) }
                 IconButton(onClick = onRestore, modifier = Modifier.size(36.dp)) { Icon(Icons.Filled.FileDownload, "بازیابی", tint = MutedGreenText, modifier = Modifier.size(20.dp)) }
                 IconButton(onClick = onStats, modifier = Modifier.size(36.dp)) { Icon(Icons.Filled.BarChart, "آمار", tint = MutedGreenText, modifier = Modifier.size(20.dp)) }
