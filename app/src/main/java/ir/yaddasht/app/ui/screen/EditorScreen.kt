@@ -39,7 +39,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -529,10 +528,9 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         }
     }
 
-    // ✅ اصلاح باگ کیبورد: اعلام Insets به Scaffold
     Scaffold(
         containerColor = DeepGreen,
-        contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.ime)
+        contentWindowInsets = WindowInsets.ime
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -550,7 +548,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                 ToolChip("✒️", "تمرکز") { if (!isLocked && !isChecklist) showFocus = true }
                 ToolChip("🤖", "هوش مصنوعی") { showAi = true }
             }
-            // ✅ حذف verticalScroll از بیرون، چون بدنه خودش اسکرول می‌کند
             Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
                 Column(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(22.dp)).background(paperColor(note?.color ?: 0)).padding(16.dp)) {
                     val rem = note?.reminderAt ?: 0
@@ -582,7 +579,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                             placeholder = { Text("اینجا بنویس یا از «دیکته» و «چک‌لیست» استفاده کن", color = InkSoft, fontSize = 15.sp) },
                             textStyle = TextStyle(fontFamily = VazirFont, fontSize = 15.sp, color = Ink, lineHeight = 28.sp, letterSpacing = 0.2.sp, textAlign = TextAlign.Start, textDirection = TextDirection.Rtl),
                             colors = transparentFieldColors(),
-                            // ✅ اسکرول داخلی برای بدنه + پر کردن فضای باقی‌مانده
                             modifier = Modifier.fillMaxWidth().weight(1f))
                     }
                 }
@@ -757,7 +753,7 @@ private fun ChecklistEditor(note: Note, onChange: (Note) -> Unit) {
         if (done == total) { Spacer(Modifier.height(8.dp)); Text("🎉 آفرین! همهٔ کارها انجام شد", color = Color(0xFF2E7D52), fontWeight = FontWeight.Bold, fontSize = 13.sp) }
         Spacer(Modifier.height(10.dp))
     }
-    Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         lines.forEachIndexed { i, line ->
             val checked = line.startsWith("☑ ")
             val text = line.removePrefix("☐ ").removePrefix("☑ ")
