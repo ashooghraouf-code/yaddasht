@@ -32,12 +32,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -498,7 +500,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         }
     }
 
-    // ✅ ویجت خبرنگاری + fallback خواندن مستقیم
     LaunchedEffect(Unit) {
         if (noteId == NEW_NOTE_ID) {
             realId = withContext(Dispatchers.IO) { dao.insert(Note()) }
@@ -518,7 +519,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         }
         ready = true
 
-        // ✅ FALLBACK: اگر تا ۶۰۰ms note نیامد، مستقیم از DB بخوان
         delay(600)
         if (note == null) {
             val n = withContext(Dispatchers.IO) { dao.allNotesSync().firstOrNull { it.id == realId } }
@@ -529,7 +529,11 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         }
     }
 
-    Scaffold(containerColor = DeepGreen) { padding ->
+    // ✅ اصلاح باگ کیبورد: اعلام Insets به Scaffold
+    Scaffold(
+        containerColor = DeepGreen,
+        contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.ime)
+    ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = exit) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = PaperWhite) }
@@ -546,8 +550,9 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                 ToolChip("✒️", "تمرکز") { if (!isLocked && !isChecklist) showFocus = true }
                 ToolChip("🤖", "هوش مصنوعی") { showAi = true }
             }
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(paperColor(note?.color ?: 0)).padding(16.dp)) {
+            // ✅ حذف verticalScroll از بیرون، چون بدنه خودش اسکرول می‌کند
+            Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
+                Column(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(22.dp)).background(paperColor(note?.color ?: 0)).padding(16.dp)) {
                     val rem = note?.reminderAt ?: 0
                     if (rem > System.currentTimeMillis()) {
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Saffron.copy(alpha = .28f)).padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -556,7 +561,6 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                         }
                         Spacer(Modifier.height(10.dp))
                     }
-                    // ✅ onValueChange دفاعی برای عنوان
                     TextField(value = note?.title.orEmpty(), onValueChange = { newTitle ->
                         note = (note ?: Note(id = realId)).copy(title = newTitle)
                     },
@@ -573,12 +577,13 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
                         isLocked -> LockedBox { lockError = ""; pass1 = ""; lockMode = LockMode.Unlock }
                         isChecklist && note != null -> ChecklistEditor(note!!) { note = it }
                         else -> TextField(value = note?.body.orEmpty(), onValueChange = { newBody ->
-                            // ✅ onValueChange دفاعی برای بدنه — هرگز روی null بی‌اثر نمی‌ماند
                             note = (note ?: Note(id = realId)).copy(body = newBody)
                         },
                             placeholder = { Text("اینجا بنویس یا از «دیکته» و «چک‌لیست» استفاده کن", color = InkSoft, fontSize = 15.sp) },
                             textStyle = TextStyle(fontFamily = VazirFont, fontSize = 15.sp, color = Ink, lineHeight = 28.sp, letterSpacing = 0.2.sp, textAlign = TextAlign.Start, textDirection = TextDirection.Rtl),
-                            colors = transparentFieldColors(), modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp))
+                            colors = transparentFieldColors(),
+                            // ✅ اسکرول داخلی برای بدنه + پر کردن فضای باقی‌مانده
+                            modifier = Modifier.fillMaxWidth().weight(1f))
                     }
                 }
                 Spacer(Modifier.height(24.dp))
@@ -752,14 +757,16 @@ private fun ChecklistEditor(note: Note, onChange: (Note) -> Unit) {
         if (done == total) { Spacer(Modifier.height(8.dp)); Text("🎉 آفرین! همهٔ کارها انجام شد", color = Color(0xFF2E7D52), fontWeight = FontWeight.Bold, fontSize = 13.sp) }
         Spacer(Modifier.height(10.dp))
     }
-    lines.forEachIndexed { i, line ->
-        val checked = line.startsWith("☑ ")
-        val text = line.removePrefix("☐ ").removePrefix("☑ ")
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(checked = checked, onCheckedChange = { onChange(note.copy(body = Checklist.toggleLine(note.body, i))) }, colors = CheckboxDefaults.colors(checkedColor = Saffron, checkmarkColor = Ink))
-            TextField(value = text, onValueChange = { v -> val mark = if (checked) "☑ " else "☐ "; val list = lines.toMutableList(); list[i] = mark + v; onChange(note.copy(body = list.joinToString("\n"))) },
-                textStyle = TextStyle(fontFamily = VazirFont, fontSize = 15.sp, color = Ink, lineHeight = 26.sp, letterSpacing = 0.2.sp, textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None, textAlign = TextAlign.Start, textDirection = TextDirection.Rtl),
-                colors = transparentFieldColors(), modifier = Modifier.weight(1f))
+    Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+        lines.forEachIndexed { i, line ->
+            val checked = line.startsWith("☑ ")
+            val text = line.removePrefix("☐ ").removePrefix("☑ ")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = checked, onCheckedChange = { onChange(note.copy(body = Checklist.toggleLine(note.body, i))) }, colors = CheckboxDefaults.colors(checkedColor = Saffron, checkmarkColor = Ink))
+                TextField(value = text, onValueChange = { v -> val mark = if (checked) "☑ " else "☐ "; val list = lines.toMutableList(); list[i] = mark + v; onChange(note.copy(body = list.joinToString("\n"))) },
+                    textStyle = TextStyle(fontFamily = VazirFont, fontSize = 15.sp, color = Ink, lineHeight = 26.sp, letterSpacing = 0.2.sp, textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None, textAlign = TextAlign.Start, textDirection = TextDirection.Rtl),
+                    colors = transparentFieldColors(), modifier = Modifier.weight(1f))
+            }
         }
     }
     TextButton(onClick = { onChange(note.copy(body = note.body.trimEnd('\n') + "\n☐ ")) }) { Text("+ مورد جدید", color = Saffron, fontWeight = FontWeight.Bold) }
