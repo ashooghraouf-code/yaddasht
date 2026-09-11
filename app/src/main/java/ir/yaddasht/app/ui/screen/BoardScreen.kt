@@ -4,7 +4,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -35,12 +35,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
@@ -63,10 +65,15 @@ import ir.yaddasht.app.ui.theme.LalezarFont
 import ir.yaddasht.app.ui.theme.VazirFont
 import ir.yaddasht.app.util.BoardItem
 import ir.yaddasht.app.util.BoardStore
+import kotlinx.coroutines.delay
 import kotlin.random.Random
 
 private fun boardBase(index: Int): Color = listOf(
-    Color(0xFFA1887F), Color(0xFF8D6E63), Color(0xFF37474F), Color(0xFFECEFF1)
+    Color(0xFFA1887F), Color(0xFF6D4C41), Color(0xFF263238), Color(0xFFECEFF1)
+)[index.coerceIn(0, 3)]
+
+private fun boardNameFa(index: Int): String = listOf(
+    "چوب روشن", "چوب تیره", "سیاه مدرن", "کاغذ سفید"
 )[index.coerceIn(0, 3)]
 
 private fun stickyBody(index: Int): Color = listOf(
@@ -81,6 +88,9 @@ private fun pinColor(index: Int): Color = listOf(
     Color(0xFFFDD835), Color(0xFF8E24AA), Color(0xFFFB8C00)
 )[index.coerceIn(0, 5)]
 
+private val SIZE_WIDTHS = listOf(130, 180, 240)
+private val SIZE_LABELS = listOf("کوچک S", "متوسط M", "بزرگ L")
+
 @Composable
 fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -90,8 +100,12 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
     var showAddBoard by remember { mutableStateOf(false) }
     var showAddNote by remember { mutableStateOf(false) }
     var boardName by remember { mutableStateOf("") }
+    var sizeForNote by remember { mutableStateOf<Long?>(null) }
 
-    fun refresh() { items = BoardStore.items(context, currentBoard) }
+    fun refresh() {
+        boards = BoardStore.boards(context)
+        items = BoardStore.items(context, currentBoard)
+    }
     val bgIndex = boards.firstOrNull { it.id == currentBoard }?.background ?: 0
 
     Box(
@@ -131,12 +145,16 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                         )
                     }
                 }
+                IconButton(onClick = {
+                    BoardStore.setBackground(context, currentBoard, (bgIndex + 1) % 4)
+                    refresh()
+                }) { Text("🎨", fontSize = 18.sp) }
                 IconButton(onClick = { boardName = ""; showAddBoard = true }) { Icon(Icons.Filled.Add, "تابلو جدید", tint = Color(0xFFFFE0B2)) }
             }
 
             Box(Modifier.fillMaxSize()) {
                 CorkTexture(bgIndex)
-                Vignette()
+                Vignette(bgIndex)
 
                 if (items.isEmpty()) {
                     Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -150,9 +168,10 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                     val note = notes.firstOrNull { it.id == item.noteId }
                     if (note != null) {
                         StickyNote(
-                            note = note, item = item, variant = idx,
+                            note = note, item = item, variant = idx, stagger = idx,
                             onOpen = { onOpenNote(note.id) },
                             onMoved = { x, y -> BoardStore.move(context, note.id, currentBoard, x, y) },
+                            onSize = { sizeForNote = note.id },
                             onRemove = { BoardStore.removeItem(context, note.id, currentBoard); refresh() }
                         )
                     }
@@ -162,7 +181,7 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                     Modifier.align(Alignment.BottomEnd).padding(18.dp)
                         .size(60.dp).shadow(12.dp, CircleShape).clip(CircleShape)
                         .background(Brush.radialGradient(listOf(Color(0xFFFFD54F), Color(0xFFFB8C00))))
-                        .clickable { showAddNote = true }
+                        .combinedClickable(onClick = { showAddNote = true })
                         .rotate(-4f),
                     contentAlignment = Alignment.Center
                 ) { Icon(Icons.Filled.Add, "افزودن", tint = Color(0xFF3E2723), modifier = Modifier.size(28.dp)) }
@@ -178,7 +197,9 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
             confirmButton = {
                 TextButton(onClick = {
                     val b = BoardStore.addBoard(context, boardName.ifBlank { "تابلو جدید" })
-                    boards = BoardStore.boards(context); currentBoard = b.id; refresh(); showAddBoard = false
+                    currentBoard = b.id
+                    refresh()
+                    showAddBoard = false
                 }) { Text("ساخت") }
             },
             dismissButton = { TextButton(onClick = { showAddBoard = false }) { Text("انصراف") } }
@@ -201,7 +222,7 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(stickyBody(n.color))
                                 .shadow(4.dp, RoundedCornerShape(4.dp))
-                                .clickable { BoardStore.addItem(context, n.id, currentBoard); refresh(); showAddNote = false }
+                                .combinedClickable(onClick = { BoardStore.addItem(context, n.id, currentBoard); refresh(); showAddNote = false })
                                 .padding(12.dp)
                         ) {
                             Text(
@@ -214,6 +235,34 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                 }
             },
             confirmButton = { TextButton(onClick = { showAddNote = false }) { Text("بستن") } }
+        )
+    }
+
+    sizeForNote?.let { noteId ->
+        val current = items.firstOrNull { it.noteId == noteId }?.sizeIndex ?: 1
+        AlertDialog(
+            onDismissRequest = { sizeForNote = null },
+            title = { Text("📐 اندازه یادداشت", fontFamily = LalezarFont, fontSize = 20.sp) },
+            text = {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SIZE_LABELS.forEachIndexed { i, label ->
+                        Surface(
+                            onClick = { BoardStore.setSize(context, noteId, currentBoard, i); refresh(); sizeForNote = null },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (i == current) Color(0xFFFFB74D) else Color(0xFFEFEFEF),
+                            shadowElevation = 3.dp
+                        ) {
+                            Text(
+                                label,
+                                color = if (i == current) Color(0xFF3E2723) else Color(0xFF555555),
+                                fontFamily = VazirFont, fontSize = 14.sp,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { sizeForNote = null }) { Text("بستن") } }
         )
     }
 }
@@ -238,11 +287,12 @@ private fun CorkTexture(bgIndex: Int) {
 }
 
 @Composable
-private fun Vignette() {
+private fun Vignette(bgIndex: Int) {
+    val strength = if (bgIndex == 3) .12f else .30f
     Box(
         Modifier.fillMaxSize().background(
             Brush.radialGradient(
-                colors = listOf(Color.Transparent, Color.Black.copy(alpha = .30f)),
+                colors = listOf(Color.Transparent, Color.Black.copy(alpha = strength)),
                 center = androidx.compose.ui.geometry.Offset.Unspecified,
                 radius = 900f
             )
@@ -255,27 +305,42 @@ private fun StickyNote(
     note: Note,
     item: BoardItem,
     variant: Int,
+    stagger: Int,
     onOpen: () -> Unit,
     onMoved: (Float, Float) -> Unit,
+    onSize: () -> Unit,
     onRemove: () -> Unit
 ) {
     val density = LocalDensity.current
     var pos by remember(item.noteId, item.boardId) { mutableStateOf(Offset(item.x, item.y)) }
     var dragging by remember { mutableStateOf(false) }
+    var appeared by remember { mutableStateOf(false) }
 
-    val scale by animateFloatAsState(if (dragging) 1.07f else 1f, label = "lift")
+    LaunchedEffect(Unit) {
+        delay(stagger * 70L)
+        appeared = true
+    }
+
+    val dragScale by animateFloatAsState(if (dragging) 1.07f else 1f, label = "lift")
+    val entranceScale by animateFloatAsState(if (appeared) 1f else 0.5f, label = "in-scale")
+    val entranceAlpha by animateFloatAsState(if (appeared) 1f else 0f, label = "in-alpha")
     val elev by animateDpAsState(if (dragging) 22.dp else 7.dp, label = "shadow")
     val rot by animateFloatAsState(if (dragging) 0f else item.rotation, label = "rot")
 
-    val widthDp = listOf(150, 190, 230)[item.sizeIndex.coerceIn(0, 2)].dp
+    val widthDp = SIZE_WIDTHS[item.sizeIndex.coerceIn(0, 2)].dp
     val body = stickyBody(note.color)
     val usePin = variant % 2 == 0
 
     Box(
         Modifier
+            .alpha(entranceAlpha)
             .offset { with(density) { IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx()) } }
             .width(widthDp)
-            .graphicsLayer { rotationZ = rot; scaleX = scale; scaleY = scale }
+            .graphicsLayer {
+                rotationZ = rot
+                scaleX = dragScale * entranceScale
+                scaleY = dragScale * entranceScale
+            }
             .pointerInput(item.noteId) {
                 detectDragGestures(
                     onDragStart = { dragging = true },
@@ -292,7 +357,7 @@ private fun StickyNote(
                 .shadow(elev, RoundedCornerShape(3.dp))
                 .clip(RoundedCornerShape(3.dp))
                 .background(Brush.linearGradient(listOf(body, body, stickyEdge(note.color))))
-                .clickable(onClick = onOpen)
+                .combinedClickable(onClick = onOpen, onLongClick = onSize)
                 .padding(top = if (usePin) 20.dp else 14.dp, start = 12.dp, end = 12.dp, bottom = 16.dp)
         ) {
             Column {
@@ -307,7 +372,6 @@ private fun StickyNote(
                     lineHeight = 17.sp
                 )
             }
-            // ✅ اصلاح: align از اینجا به CurledCorner پاس داده می‌شود
             CurledCorner(Modifier.align(Alignment.BottomEnd))
         }
 
@@ -347,7 +411,6 @@ private fun TapeStrip(modifier: Modifier = Modifier) {
     )
 }
 
-// ✅ اصلاح: modifier به‌عنوان پارامتر ورودی
 @Composable
 private fun CurledCorner(modifier: Modifier = Modifier) {
     Canvas(modifier.size(26.dp)) {
