@@ -9,6 +9,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +31,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Redo
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,10 +77,6 @@ private fun boardBase(index: Int): Color = listOf(
     Color(0xFFA1887F), Color(0xFF6D4C41), Color(0xFF263238), Color(0xFFECEFF1)
 )[index.coerceIn(0, 3)]
 
-private fun boardNameFa(index: Int): String = listOf(
-    "چوب روشن", "چوب تیره", "سیاه مدرن", "کاغذ سفید"
-)[index.coerceIn(0, 3)]
-
 private fun stickyBody(index: Int): Color = listOf(
     Color(0xFFFFF59D), Color(0xFFF8BBD0), Color(0xFFB3E5FC),
     Color(0xFFC8E6C9), Color(0xFFFFE0B2), Color(0xFFE1BEE7)
@@ -103,10 +102,12 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
     var showAddNote by remember { mutableStateOf(false) }
     var boardName by remember { mutableStateOf("") }
     var sizeForNote by remember { mutableStateOf<Long?>(null) }
+    var canUndo by remember { mutableStateOf(BoardStore.canUndo(context, currentBoard)) }
 
     fun refresh() {
         boards = BoardStore.boards(context)
         items = BoardStore.items(context, currentBoard)
+        canUndo = BoardStore.canUndo(context, currentBoard)
     }
     val bgIndex = boards.firstOrNull { it.id == currentBoard }?.background ?: 0
 
@@ -151,6 +152,9 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                     BoardStore.setBackground(context, currentBoard, (bgIndex + 1) % 4)
                     refresh()
                 }) { Text("🎨", fontSize = 18.sp) }
+                IconButton(onClick = { if (BoardStore.undo(context, currentBoard)) refresh() }, enabled = canUndo) {
+                    Icon(Icons.Filled.Undo, "بازگشت", tint = if (canUndo) Color(0xFFFFE0B2) else Color.Gray)
+                }
                 IconButton(onClick = { boardName = ""; showAddBoard = true }) { Icon(Icons.Filled.Add, "تابلو جدید", tint = Color(0xFFFFE0B2)) }
             }
 
@@ -172,7 +176,8 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                         StickyNote(
                             note = note, item = item, variant = idx, stagger = idx,
                             onOpen = { onOpenNote(note.id) },
-                            onMoved = { x, y -> BoardStore.move(context, note.id, currentBoard, x, y) },
+                            onMoved = { x, y -> BoardStore.move(context, note.id, currentBoard, x, y); refresh() },
+                            onRotated = { rot -> BoardStore.rotate(context, note.id, currentBoard, rot); refresh() },
                             onSize = { sizeForNote = note.id },
                             onRemove = { BoardStore.removeItem(context, note.id, currentBoard); refresh() }
                         )
@@ -310,12 +315,15 @@ private fun StickyNote(
     stagger: Int,
     onOpen: () -> Unit,
     onMoved: (Float, Float) -> Unit,
+    onRotated: (Float) -> Unit,
     onSize: () -> Unit,
     onRemove: () -> Unit
 ) {
     val density = LocalDensity.current
     var pos by remember(item.noteId, item.boardId) { mutableStateOf(Offset(item.x, item.y)) }
+    var rotation by remember(item.noteId, item.boardId) { mutableStateOf(item.rotation) }
     var dragging by remember { mutableStateOf(false) }
+    var transforming by remember { mutableStateOf(false) }
     var appeared by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -323,11 +331,10 @@ private fun StickyNote(
         appeared = true
     }
 
-    val dragScale by animateFloatAsState(if (dragging) 1.07f else 1f, label = "lift")
+    val dragScale by animateFloatAsState(if (dragging || transforming) 1.07f else 1f, label = "lift")
     val entranceScale by animateFloatAsState(if (appeared) 1f else 0.5f, label = "in-scale")
     val entranceAlpha by animateFloatAsState(if (appeared) 1f else 0f, label = "in-alpha")
-    val elev by animateDpAsState(if (dragging) 22.dp else 7.dp, label = "shadow")
-    val rot by animateFloatAsState(if (dragging) 0f else item.rotation, label = "rot")
+    val elev by animateDpAsState(if (dragging || transforming) 22.dp else 7.dp, label = "shadow")
 
     val widthDp = SIZE_WIDTHS[item.sizeIndex.coerceIn(0, 2)].dp
     val body = stickyBody(note.color)
@@ -339,15 +346,30 @@ private fun StickyNote(
             .offset { with(density) { IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx()) } }
             .width(widthDp)
             .graphicsLayer {
-                rotationZ = rot
+                rotationZ = rotation
                 scaleX = dragScale * entranceScale
                 scaleY = dragScale * entranceScale
             }
             .pointerInput(item.noteId) {
+                detectTransformGestures { _, pan, zoom, rot ->
+                    transforming = true
+                    pos += pan / density.density
+                    rotation += rot
+                    if (zoom != 1f) {
+                        // Zoom می‌تواند برای تغییر سایز استفاده شود
+                    }
+                }
+            }
+            .pointerInput(item.noteId) {
                 detectDragGestures(
                     onDragStart = { dragging = true },
-                    onDragEnd = { dragging = false; onMoved(pos.x, pos.y) },
-                    onDragCancel = { dragging = false }
+                    onDragEnd = {
+                        dragging = false
+                        transforming = false
+                        onMoved(pos.x, pos.y)
+                        onRotated(rotation)
+                    },
+                    onDragCancel = { dragging = false; transforming = false }
                 ) { change, drag ->
                     change.consume()
                     pos += drag / density.density
