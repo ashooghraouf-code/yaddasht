@@ -2,7 +2,6 @@
 
 package ir.yaddasht.app.ui.screen
 
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -109,6 +108,7 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
         items = BoardStore.items(context, currentBoard)
         canUndo = BoardStore.canUndo(context, currentBoard)
     }
+
     val bgIndex = boards.firstOrNull { it.id == currentBoard }?.background ?: 0
 
     Box(
@@ -131,7 +131,9 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = Color(0xFFFFE0B2)) }
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = Color(0xFFFFE0B2))
+                }
                 boards.forEach { b ->
                     val selected = b.id == currentBoard
                     Surface(
@@ -156,9 +158,14 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                     onClick = { if (BoardStore.undo(context, currentBoard)) refresh() },
                     enabled = canUndo
                 ) {
-                    Icon(Icons.Filled.Undo, "بازگشت", tint = if (canUndo) Color(0xFFFFE0B2) else Color(0xFF777777))
+                    Icon(
+                        Icons.Filled.Undo, "بازگشت",
+                        tint = if (canUndo) Color(0xFFFFE0B2) else Color(0xFF777777)
+                    )
                 }
-                IconButton(onClick = { boardName = ""; showAddBoard = true }) { Icon(Icons.Filled.Add, "تابلو جدید", tint = Color(0xFFFFE0B2)) }
+                IconButton(onClick = { boardName = ""; showAddBoard = true }) {
+                    Icon(Icons.Filled.Add, "تابلو جدید", tint = Color(0xFFFFE0B2))
+                }
             }
 
             Box(Modifier.fillMaxSize()) {
@@ -168,8 +175,16 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                 if (items.isEmpty()) {
                     Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("🗒️", fontSize = 64.sp, modifier = Modifier.rotate(-6f))
-                        Text("تابلو خالی است", fontFamily = LalezarFont, fontSize = 22.sp, color = Color.White.copy(alpha = .85f))
-                        Text("با دکمهٔ پایین، اولین یادداشت را بچسبان", fontFamily = VazirFont, fontSize = 13.sp, color = Color.White.copy(alpha = .6f))
+                        Text(
+                            "تابلو خالی است",
+                            fontFamily = LalezarFont, fontSize = 22.sp,
+                            color = Color.White.copy(alpha = .85f)
+                        )
+                        Text(
+                            "با دکمهٔ پایین، اولین یادداشت را بچسبان",
+                            fontFamily = VazirFont, fontSize = 13.sp,
+                            color = Color.White.copy(alpha = .6f)
+                        )
                     }
                 }
 
@@ -177,24 +192,44 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                     val note = notes.firstOrNull { it.id == item.noteId }
                     if (note != null) {
                         StickyNote(
-                            note = note, item = item, variant = idx, stagger = idx,
+                            note = note,
+                            item = item,
+                            variant = idx,
+                            stagger = idx,
                             onOpen = { onOpenNote(note.id) },
-                            onMoved = { x, y -> BoardStore.move(context, note.id, currentBoard, x, y); refresh() },
-                            onRotated = { rot -> BoardStore.rotate(context, note.id, currentBoard, rot); refresh() },
+                            onMoved = { x, y ->
+                                BoardStore.move(context, note.id, currentBoard, x, y)
+                                refresh()
+                            },
+                            onRotated = { rot ->
+                                BoardStore.rotate(context, note.id, currentBoard, rot)
+                                refresh()
+                            },
                             onSize = { sizeForNote = note.id },
-                            onRemove = { BoardStore.removeItem(context, note.id, currentBoard); refresh() }
+                            onRemove = {
+                                BoardStore.removeItem(context, note.id, currentBoard)
+                                refresh()
+                            }
                         )
                     }
                 }
 
                 Box(
                     Modifier.align(Alignment.BottomEnd).padding(18.dp)
-                        .size(60.dp).shadow(12.dp, CircleShape).clip(CircleShape)
-                        .background(Brush.radialGradient(listOf(Color(0xFFFFD54F), Color(0xFFFB8C00))))
+                        .size(60.dp)
+                        .shadow(12.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                listOf(Color(0xFFFFD54F), Color(0xFFFB8C00))
+                            )
+                        )
                         .combinedClickable(onClick = { showAddNote = true })
                         .rotate(-4f),
                     contentAlignment = Alignment.Center
-                ) { Icon(Icons.Filled.Add, "افزودن", tint = Color(0xFF3E2723), modifier = Modifier.size(28.dp)) }
+                ) {
+                    Icon(Icons.Filled.Add, "افزودن", tint = Color(0xFF3E2723), modifier = Modifier.size(28.dp))
+                }
             }
         }
     }
@@ -203,7 +238,13 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
         AlertDialog(
             onDismissRequest = { showAddBoard = false },
             title = { Text("📌 تابلو جدید", fontFamily = LalezarFont, fontSize = 20.sp) },
-            text = { OutlinedTextField(boardName, { boardName = it }, label = { Text("نام تابلو") }, modifier = Modifier.fillMaxWidth()) },
+            text = {
+                OutlinedTextField(
+                    boardName, { boardName = it },
+                    label = { Text("نام تابلو") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     val b = BoardStore.addBoard(context, boardName.ifBlank { "تابلو جدید" })
@@ -223,23 +264,31 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
             onDismissRequest = { showAddNote = false },
             title = { Text("📝 چسباندن یادداشت", fontFamily = LalezarFont, fontSize = 20.sp) },
             text = {
-                if (available.isEmpty()) Text("همهٔ یادداشت‌ها روی این تابلو هستند.")
-                else LazyColumn {
-                    items(available) { n ->
-                        Box(
-                            Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                                .rotate(listOf(-1.5f, 1f, -0.5f, 2f)[n.id.toInt() % 4])
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(stickyBody(n.color))
-                                .shadow(4.dp, RoundedCornerShape(4.dp))
-                                .combinedClickable(onClick = { BoardStore.addItem(context, n.id, currentBoard); refresh(); showAddNote = false })
-                                .padding(12.dp)
-                        ) {
-                            Text(
-                                n.title.ifBlank { n.body.take(30).ifBlank { "بدون عنوان" } },
-                                fontFamily = VazirFont, fontSize = 14.sp, color = Color(0xFF3E2723),
-                                maxLines = 1, overflow = TextOverflow.Ellipsis
-                            )
+                if (available.isEmpty()) {
+                    Text("همهٔ یادداشت‌ها روی این تابلو هستند.")
+                } else {
+                    LazyColumn {
+                        items(available) { n ->
+                            Box(
+                                Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                    .rotate(listOf(-1.5f, 1f, -0.5f, 2f)[n.id.toInt() % 4])
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(stickyBody(n.color))
+                                    .shadow(4.dp, RoundedCornerShape(4.dp))
+                                    .combinedClickable(onClick = {
+                                        BoardStore.addItem(context, n.id, currentBoard)
+                                        refresh()
+                                        showAddNote = false
+                                    })
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    n.title.ifBlank { n.body.take(30).ifBlank { "بدون عنوان" } },
+                                    fontFamily = VazirFont, fontSize = 14.sp,
+                                    color = Color(0xFF3E2723),
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
                 }
@@ -257,7 +306,11 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     SIZE_LABELS.forEachIndexed { i, label ->
                         Surface(
-                            onClick = { BoardStore.setSize(context, noteId, currentBoard, i); refresh(); sizeForNote = null },
+                            onClick = {
+                                BoardStore.setSize(context, noteId, currentBoard, i)
+                                refresh()
+                                sizeForNote = null
+                            },
                             shape = RoundedCornerShape(12.dp),
                             color = if (i == current) Color(0xFFFFB74D) else Color(0xFFEFEFEF),
                             shadowElevation = 3.dp
@@ -289,8 +342,10 @@ private fun CorkTexture(bgIndex: Int) {
             val r = rnd.nextFloat() * 2.6f + 0.6f
             val dark = rnd.nextBoolean()
             drawCircle(
-                color = if (dark) Color(0xFF5D4037).copy(alpha = .16f) else Color(0xFFD7CCC8).copy(alpha = .12f),
-                radius = r, center = Offset(x, y)
+                color = if (dark) Color(0xFF5D4037).copy(alpha = .16f)
+                else Color(0xFFD7CCC8).copy(alpha = .12f),
+                radius = r,
+                center = Offset(x, y)
             )
         }
     }
@@ -334,7 +389,6 @@ private fun StickyNote(
         appeared = true
     }
 
-    // ذخیره موقعیت و چرخش بعد از 500ms بی‌حرکتی
     LaunchedEffect(lastInteraction) {
         if (lastInteraction > 0) {
             delay(500)
@@ -343,7 +397,6 @@ private fun StickyNote(
         }
     }
 
-    // بازگشت visualZoom به 1 بعد از 400ms
     LaunchedEffect(lastInteraction) {
         if (lastInteraction > 0) {
             delay(400)
@@ -351,8 +404,14 @@ private fun StickyNote(
         }
     }
 
-    val entranceScale by animateFloatAsState(if (appeared) 1f else 0.5f, label = "in-scale")
-    val entranceAlpha by animateFloatAsState(if (appeared) 1f else 0f, label = "in-alpha")
+    val entranceScale by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0.5f,
+        label = "in-scale"
+    )
+    val entranceAlpha by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0f,
+        label = "in-alpha"
+    )
 
     val widthDp = SIZE_WIDTHS[item.sizeIndex.coerceIn(0, 2)].dp
     val body = stickyBody(note.color)
@@ -361,7 +420,11 @@ private fun StickyNote(
     Box(
         Modifier
             .alpha(entranceAlpha)
-            .offset { with(density) { IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx()) } }
+            .offset {
+                with(density) {
+                    IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx())
+                }
+            }
             .width(widthDp)
             .graphicsLayer {
                 rotationZ = rotation
@@ -382,48 +445,95 @@ private fun StickyNote(
             Modifier.fillMaxWidth()
                 .shadow(7.dp, RoundedCornerShape(3.dp))
                 .clip(RoundedCornerShape(3.dp))
-                .background(Brush.linearGradient(listOf(body, body, stickyEdge(note.color))))
+                .background(
+                    Brush.linearGradient(
+                        listOf(body, body, stickyEdge(note.color))
+                    )
+                )
                 .combinedClickable(onClick = onOpen, onLongClick = onSize)
-                .padding(top = if (usePin) 20.dp else 14.dp, start = 12.dp, end = 12.dp, bottom = 16.dp)
+                .padding(
+                    top = if (usePin) 20.dp else 14.dp,
+                    start = 12.dp,
+                    end = 12.dp,
+                    bottom = 16.dp
+                )
         ) {
             Column {
                 Text(
                     note.title.ifBlank { "بدون عنوان" },
-                    fontFamily = LalezarFont, fontSize = 15.sp, fontWeight = FontWeight.Bold,
-                    color = Color(0xFF3E2723), maxLines = 1, overflow = TextOverflow.Ellipsis
+                    fontFamily = LalezarFont,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF3E2723),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    note.body, fontFamily = VazirFont, fontSize = 11.sp,
-                    color = Color(0xFF5D4037), maxLines = 5, overflow = TextOverflow.Ellipsis,
+                    note.body,
+                    fontFamily = VazirFont,
+                    fontSize = 11.sp,
+                    color = Color(0xFF5D4037),
+                    maxLines = 5,
+                    overflow = TextOverflow.Ellipsis,
                     lineHeight = 17.sp
                 )
             }
             CurledCorner(Modifier.align(Alignment.BottomEnd))
         }
 
-        if (usePin) Thumbtack(pinColor(note.color), Modifier.align(Alignment.TopCenter).offset(y = (-8).dp))
-        else TapeStrip(Modifier.align(Alignment.TopCenter).offset(y = (-9).dp))
+        if (usePin) {
+            Thumbtack(
+                pinColor(note.color),
+                Modifier.align(Alignment.TopCenter).offset(y = (-8).dp)
+            )
+        } else {
+            TapeStrip(Modifier.align(Alignment.TopCenter).offset(y = (-9).dp))
+        }
 
         IconButton(
             onClick = onRemove,
-            modifier = Modifier.align(Alignment.TopEnd).size(22.dp)
-                .clip(CircleShape).background(Color.Black.copy(alpha = .35f))
-        ) { Icon(Icons.Filled.Close, "حذف", tint = Color.White, modifier = Modifier.size(13.dp)) }
+            modifier = Modifier.align(Alignment.TopEnd)
+                .size(22.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = .35f))
+        ) {
+            Icon(
+                Icons.Filled.Close, "حذف",
+                tint = Color.White,
+                modifier = Modifier.size(13.dp)
+            )
+        }
     }
 }
 
 @Composable
 private fun Thumbtack(color: Color, modifier: Modifier = Modifier) {
     Box(modifier.size(20.dp)) {
-        Box(Modifier.size(20.dp).offset(y = 3.dp).clip(CircleShape).background(Color.Black.copy(alpha = .30f)))
         Box(
-            Modifier.size(20.dp).clip(CircleShape).background(
-                Brush.radialGradient(listOf(color.copy(alpha = .95f), color, color.copy(alpha = .55f)))
-            )
+            Modifier.size(20.dp)
+                .offset(y = 3.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = .30f))
         )
         Box(
-            Modifier.size(6.dp).align(Alignment.TopStart).offset(4.dp, 4.dp)
-                .clip(CircleShape).background(Color.White.copy(alpha = .75f))
+            Modifier.size(20.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        listOf(
+                            color.copy(alpha = .95f),
+                            color,
+                            color.copy(alpha = .55f)
+                        )
+                    )
+                )
+        )
+        Box(
+            Modifier.size(6.dp)
+                .align(Alignment.TopStart)
+                .offset(4.dp, 4.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = .75f))
         )
     }
 }
@@ -431,7 +541,9 @@ private fun Thumbtack(color: Color, modifier: Modifier = Modifier) {
 @Composable
 private fun TapeStrip(modifier: Modifier = Modifier) {
     Box(
-        modifier.width(58.dp).height(18.dp).rotate(-3f)
+        modifier.width(58.dp)
+            .height(18.dp)
+            .rotate(-3f)
             .clip(RoundedCornerShape(2.dp))
             .background(Color.White.copy(alpha = .38f))
     )
@@ -447,9 +559,13 @@ private fun CurledCorner(modifier: Modifier = Modifier) {
             close()
         }
         drawPath(
-            p, Brush.linearGradient(
-                listOf(Color.Black.copy(alpha = .22f), Color.Black.copy(alpha = .05f))
+            p,
+            Brush.linearGradient(
+                listOf(
+                    Color.Black.copy(alpha = .22f),
+                    Color.Black.copy(alpha = .05f)
+                )
             )
         )
     }
-}ظظ
+}
