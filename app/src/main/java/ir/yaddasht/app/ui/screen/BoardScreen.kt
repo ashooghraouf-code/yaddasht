@@ -6,7 +6,10 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
@@ -41,6 +44,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Share
@@ -72,6 +76,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -82,9 +87,11 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import coil.compose.AsyncImage
 import ir.yaddasht.app.data.Note
 import ir.yaddasht.app.ui.theme.LalezarFont
 import ir.yaddasht.app.ui.theme.VazirFont
+import ir.yaddasht.app.util.BoardImage
 import ir.yaddasht.app.util.BoardItem
 import ir.yaddasht.app.util.BoardStore
 import kotlinx.coroutines.delay
@@ -109,6 +116,7 @@ private fun pinColor(index: Int): Color = listOf(
 
 private val SIZE_WIDTHS = listOf(130, 180, 240)
 private val SIZE_LABELS = listOf("کوچک S", "متوسط M", "بزرگ L")
+private val IMAGE_WIDTHS = listOf(120, 180, 240)
 
 @Composable
 fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Unit) {
@@ -118,6 +126,7 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
     var boards by remember { mutableStateOf(BoardStore.boards(context)) }
     var currentBoard by remember { mutableStateOf(boards.firstOrNull()?.id ?: 1L) }
     var items by remember { mutableStateOf(BoardStore.items(context, currentBoard)) }
+    var images by remember { mutableStateOf(BoardStore.images(context, currentBoard)) }
 
     var showAddBoard by remember { mutableStateOf(false) }
     var showAddNote by remember { mutableStateOf(false) }
@@ -129,14 +138,50 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
     var searchQuery by remember { mutableStateOf("") }
 
     var draggingNoteId by remember { mutableStateOf<Long?>(null) }
+    var draggingImageId by remember { mutableStateOf<Long?>(null) }
     var dragY by remember { mutableFloatStateOf(0f) }
     var boardHeightDp by remember { mutableFloatStateOf(0f) }
 
     var capturingForShare by remember { mutableStateOf(false) }
 
+    val pickImageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let { pickedUri ->
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    pickedUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                BoardStore.addImage(context, currentBoard, pickedUri.toString())
+                refresh()
+                Toast.makeText(context, "🖼️ تصویر اضافه شد", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                try {
+                    val inputStream = context.contentResolver.openInputStream(pickedUri)
+                    if (inputStream != null) {
+                        val dir = File(context.filesDir, "board_images")
+                        if (!dir.exists()) dir.mkdirs()
+                        val file = File(dir, "img-${System.currentTimeMillis()}.jpg")
+                        file.outputStream().use { out -> inputStream.copyTo(out) }
+                        inputStream.close()
+                        BoardStore.addImage(context, currentBoard, Uri.fromFile(file).toString())
+                        refresh()
+                        Toast.makeText(context, "🖼️ تصویر اضافه شد", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "خطا: نمی‌توان تصویر را خواند", Toast.LENGTH_LONG).show()
+                    }
+                } catch (e2: Exception) {
+                    Toast.makeText(context, "خطا: ${e2.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
     fun refresh() {
         boards = BoardStore.boards(context)
         items = BoardStore.items(context, currentBoard)
+        images = BoardStore.images(context, currentBoard)
         canUndo = BoardStore.canUndo(context, currentBoard)
     }
 
@@ -151,7 +196,7 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
     }
 
     val trashTopDp = if (boardHeightDp > 1f) boardHeightDp - 150f else Float.MAX_VALUE
-    val isOverTrash = draggingNoteId != null && dragY > trashTopDp
+    val isOverTrash = (draggingNoteId != null || draggingImageId != null) && dragY > trashTopDp
 
     fun captureAndShare() {
         try {
@@ -245,6 +290,9 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                             tint = if (canUndo) Color(0xFFFFE0B2) else Color(0xFF777777)
                         )
                     }
+                    IconButton(onClick = { pickImageLauncher.launch(arrayOf("image/*")) }) {
+                        Icon(Icons.Filled.Image, "تصویر", tint = Color(0xFFFFE0B2))
+                    }
                     IconButton(onClick = { showSearch = !showSearch }) {
                         Icon(
                             if (showSearch) Icons.Filled.SearchOff else Icons.Filled.Search,
@@ -314,7 +362,7 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                 CorkTexture(bgIndex)
                 Vignette(bgIndex)
 
-                if (visibleItems.isEmpty()) {
+                if (visibleItems.isEmpty() && images.isEmpty()) {
                     Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             if (searchQuery.isNotBlank()) "🔍" else "🗒️",
@@ -373,7 +421,38 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                     }
                 }
 
-                if (draggingNoteId != null) {
+                images.forEachIndexed { idx, img ->
+                    BoardImageItem(
+                        image = img,
+                        stagger = visibleItems.size + idx,
+                        isDraggingThis = draggingImageId == img.id,
+                        isOverTrash = isOverTrash && draggingImageId == img.id,
+                        onMoved = { x, y ->
+                            BoardStore.moveImage(context, img.id, currentBoard, x, y)
+                            refresh()
+                        },
+                        onRotated = { rot ->
+                            BoardStore.rotateImage(context, img.id, currentBoard, rot)
+                            refresh()
+                        },
+                        onDragStart = { draggingImageId = img.id },
+                        onDragUpdate = { y -> dragY = y },
+                        onDragEnd = { y, canceled ->
+                            if (!canceled && y > trashTopDp) {
+                                BoardStore.removeImage(context, img.id, currentBoard)
+                                refresh()
+                                Toast.makeText(context, "🗑️ تصویر حذف شد", Toast.LENGTH_SHORT).show()
+                            }
+                            draggingImageId = null
+                        },
+                        onRemove = {
+                            BoardStore.removeImage(context, img.id, currentBoard)
+                            refresh()
+                        }
+                    )
+                }
+
+                if (draggingNoteId != null || draggingImageId != null) {
                     TrashBin(
                         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
                         highlighted = isOverTrash
@@ -493,6 +572,152 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
             },
             confirmButton = { TextButton(onClick = { sizeForNote = null }) { Text("بستن") } }
         )
+    }
+}
+
+@Composable
+private fun BoardImageItem(
+    image: BoardImage,
+    stagger: Int,
+    isDraggingThis: Boolean,
+    isOverTrash: Boolean,
+    onMoved: (Float, Float) -> Unit,
+    onRotated: (Float) -> Unit,
+    onDragStart: () -> Unit,
+    onDragUpdate: (Float) -> Unit,
+    onDragEnd: (Float, Boolean) -> Unit,
+    onRemove: () -> Unit
+) {
+    val density = LocalDensity.current
+    var pos by remember(image.id, image.boardId) { mutableStateOf(Offset(image.x, image.y)) }
+    var rotation by remember(image.id, image.boardId) { mutableFloatStateOf(image.rotation) }
+    var visualZoom by remember { mutableFloatStateOf(1f) }
+    var appeared by remember { mutableStateOf(false) }
+    var lastInteraction by remember { mutableLongStateOf(0L) }
+    var gestureActive by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(stagger * 70L)
+        appeared = true
+    }
+
+    LaunchedEffect(lastInteraction) {
+        if (lastInteraction > 0 && !gestureActive) {
+            delay(500)
+            onMoved(pos.x, pos.y)
+            onRotated(rotation)
+        }
+    }
+
+    LaunchedEffect(lastInteraction) {
+        if (lastInteraction > 0) {
+            delay(400)
+            visualZoom = 1f
+        }
+    }
+
+    val entranceScale by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0.5f,
+        label = "in-scale"
+    )
+    val entranceAlpha by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0f,
+        label = "in-alpha"
+    )
+
+    val trashScale by animateFloatAsState(
+        targetValue = if (isOverTrash) 0.4f else 1f,
+        label = "trash-scale"
+    )
+    val trashAlpha by animateFloatAsState(
+        targetValue = if (isOverTrash) 0.3f else 1f,
+        label = "trash-alpha"
+    )
+
+    val widthDp = IMAGE_WIDTHS[image.sizeIndex.coerceIn(0, 2)].dp
+
+    Box(
+        Modifier
+            .alpha(entranceAlpha * trashAlpha)
+            .offset {
+                with(density) {
+                    IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx())
+                }
+            }
+            .width(widthDp)
+            .graphicsLayer {
+                rotationZ = rotation
+                val scale = entranceScale * visualZoom * trashScale
+                scaleX = scale
+                scaleY = scale
+            }
+            .pointerInput(image.id, image.boardId) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    var moved = false
+                    var canceled = false
+                    do {
+                        val event = awaitPointerEvent()
+                        canceled = event.changes.any { it.isConsumed }
+                        if (!canceled) {
+                            val zoomChange = event.calculateZoom()
+                            val rotationChange = event.calculateRotation()
+                            val panChange = event.calculatePan()
+                            val active = panChange != Offset.Zero || rotationChange != 0f || zoomChange != 1f
+                            if (active) {
+                                if (!moved && (zoomChange != 1f || rotationChange != 0f || panChange.getDistance() > 8f)) {
+                                    moved = true
+                                    gestureActive = true
+                                    onDragStart()
+                                }
+                                if (moved) {
+                                    pos += panChange / density.density
+                                    rotation += rotationChange
+                                    visualZoom = (visualZoom * zoomChange).coerceIn(0.5f, 2.0f)
+                                    onDragUpdate(pos.y)
+                                    lastInteraction = System.currentTimeMillis()
+                                }
+                                event.changes.forEach { it.consume() }
+                            }
+                        }
+                    } while (!canceled && event.changes.any { it.pressed })
+                    if (moved) {
+                        gestureActive = false
+                        onDragEnd(pos.y, canceled)
+                    }
+                }
+            }
+    ) {
+        Box(
+            Modifier.fillMaxWidth()
+                .shadow(7.dp, RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color.White)
+                .padding(4.dp)
+        ) {
+            AsyncImage(
+                model = Uri.parse(image.uri),
+                contentDescription = "تصویر",
+                contentScale = ContentScale.FillWidth,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        if (!isDraggingThis) {
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.align(Alignment.TopEnd)
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = .55f))
+            ) {
+                Icon(
+                    Icons.Filled.Close, "حذف",
+                    tint = Color.White,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
     }
 }
 
