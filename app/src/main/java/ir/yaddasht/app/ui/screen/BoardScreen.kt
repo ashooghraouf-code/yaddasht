@@ -667,7 +667,7 @@ private fun StickyNote(
                                     onDragUpdate(pos.y)
                                     lastInteraction = System.currentTimeMillis()
                                 }
-                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                                event.changes.forEach { it.consume() }
                             }
                         }
                     } while (!canceled && event.changes.any { it.pressed })
