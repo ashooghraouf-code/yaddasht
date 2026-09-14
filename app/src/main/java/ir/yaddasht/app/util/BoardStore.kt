@@ -30,10 +30,10 @@ object BoardStore {
     private const val KEY_BOARDS = "boards"
     private const val KEY_ITEMS = "items"
     private const val KEY_IMAGES = "images"
-    private const val KEY_UNDO_PREFIX = "undo:"
 
     private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+    // ═══ Boards ═══
     fun boards(c: Context): List<Board> {
         val json = prefs(c).getString(KEY_BOARDS, "") ?: ""
         if (json.isBlank()) {
@@ -47,13 +47,19 @@ object BoardStore {
                 val o = arr.getJSONObject(it)
                 Board(o.getLong("id"), o.getString("name"), o.optInt("background", 0))
             }
-        } catch (_: Exception) { listOf(Board(1L, "اصلی", 0)) }
+        } catch (_: Exception) {
+            listOf(Board(1L, "اصلی", 0))
+        }
     }
 
     fun saveBoards(c: Context, list: List<Board>) {
         val arr = JSONArray()
         list.forEach { b ->
-            arr.put(JSONObject().apply { put("id", b.id); put("name", b.name); put("background", b.background) })
+            arr.put(JSONObject().apply {
+                put("id", b.id)
+                put("name", b.name)
+                put("background", b.background)
+            })
         }
         prefs(c).edit().putString(KEY_BOARDS, arr.toString()).apply()
     }
@@ -70,6 +76,7 @@ object BoardStore {
         saveBoards(c, boards(c).map { if (it.id == boardId) it.copy(background = bg) else it })
     }
 
+    // ═══ Items ═══
     private fun allItems(c: Context): List<BoardItem> {
         val json = prefs(c).getString(KEY_ITEMS, "[]") ?: "[]"
         return try {
@@ -77,21 +84,29 @@ object BoardStore {
             (0 until arr.length()).map {
                 val o = arr.getJSONObject(it)
                 BoardItem(
-                    o.getLong("noteId"), o.getLong("boardId"),
-                    o.optDouble("x", 0.0).toFloat(), o.optDouble("y", 0.0).toFloat(),
-                    o.optDouble("rotation", 0.0).toFloat(), o.optInt("sizeIndex", 1)
+                    o.getLong("noteId"),
+                    o.getLong("boardId"),
+                    o.optDouble("x", 0.0).toFloat(),
+                    o.optDouble("y", 0.0).toFloat(),
+                    o.optDouble("rotation", 0.0).toFloat(),
+                    o.optInt("sizeIndex", 1)
                 )
             }
-        } catch (_: Exception) { emptyList() }
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 
     private fun saveItems(c: Context, list: List<BoardItem>) {
         val arr = JSONArray()
         list.forEach { i ->
             arr.put(JSONObject().apply {
-                put("noteId", i.noteId); put("boardId", i.boardId)
-                put("x", i.x.toDouble()); put("y", i.y.toDouble())
-                put("rotation", i.rotation.toDouble()); put("sizeIndex", i.sizeIndex)
+                put("noteId", i.noteId)
+                put("boardId", i.boardId)
+                put("x", i.x.toDouble())
+                put("y", i.y.toDouble())
+                put("rotation", i.rotation.toDouble())
+                put("sizeIndex", i.sizeIndex)
             })
         }
         prefs(c).edit().putString(KEY_ITEMS, arr.toString()).apply()
@@ -112,19 +127,24 @@ object BoardStore {
 
     fun move(c: Context, noteId: Long, boardId: Long, x: Float, y: Float) {
         saveItems(c, allItems(c).map {
-            if (it.noteId == noteId && it.boardId == boardId) it.copy(x = x.coerceAtLeast(0f), y = y.coerceAtLeast(0f)) else it
+            if (it.noteId == noteId && it.boardId == boardId)
+                it.copy(x = x.coerceAtLeast(0f), y = y.coerceAtLeast(0f))
+            else it
         })
     }
 
     fun rotate(c: Context, noteId: Long, boardId: Long, rotation: Float) {
         saveItems(c, allItems(c).map {
-            if (it.noteId == noteId && it.boardId == boardId) it.copy(rotation = rotation) else it
+            if (it.noteId == noteId && it.boardId == boardId) it.copy(rotation = rotation)
+            else it
         })
     }
 
     fun setSize(c: Context, noteId: Long, boardId: Long, sizeIndex: Int) {
         saveItems(c, allItems(c).map {
-            if (it.noteId == noteId && it.boardId == boardId) it.copy(sizeIndex = sizeIndex.coerceIn(0, 2)) else it
+            if (it.noteId == noteId && it.boardId == boardId)
+                it.copy(sizeIndex = sizeIndex.coerceIn(0, 2))
+            else it
         })
     }
 
@@ -132,7 +152,7 @@ object BoardStore {
         saveItems(c, allItems(c).filterNot { it.noteId == noteId && it.boardId == boardId })
     }
 
-    // ═══ تصویرها ═══
+    // ═══ Images ═══
     private fun allImages(c: Context): List<BoardImage> {
         val json = prefs(c).getString(KEY_IMAGES, "[]") ?: "[]"
         return try {
@@ -140,22 +160,31 @@ object BoardStore {
             (0 until arr.length()).map {
                 val o = arr.getJSONObject(it)
                 BoardImage(
-                    o.getLong("id"), o.getLong("boardId"),
+                    o.getLong("id"),
+                    o.getLong("boardId"),
                     o.getString("uri"),
-                    o.optDouble("x", 0.0).toFloat(), o.optDouble("y", 0.0).toFloat(),
-                    o.optDouble("rotation", 0.0).toFloat(), o.optInt("sizeIndex", 1)
+                    o.optDouble("x", 0.0).toFloat(),
+                    o.optDouble("y", 0.0).toFloat(),
+                    o.optDouble("rotation", 0.0).toFloat(),
+                    o.optInt("sizeIndex", 1)
                 )
             }
-        } catch (_: Exception) { emptyList() }
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 
     private fun saveImages(c: Context, list: List<BoardImage>) {
         val arr = JSONArray()
         list.forEach { i ->
             arr.put(JSONObject().apply {
-                put("id", i.id); put("boardId", i.boardId); put("uri", i.uri)
-                put("x", i.x.toDouble()); put("y", i.y.toDouble())
-                put("rotation", i.rotation.toDouble()); put("sizeIndex", i.sizeIndex)
+                put("id", i.id)
+                put("boardId", i.boardId)
+                put("uri", i.uri)
+                put("x", i.x.toDouble())
+                put("y", i.y.toDouble())
+                put("rotation", i.rotation.toDouble())
+                put("sizeIndex", i.sizeIndex)
             })
         }
         prefs(c).edit().putString(KEY_IMAGES, arr.toString()).apply()
@@ -176,13 +205,16 @@ object BoardStore {
 
     fun moveImage(c: Context, imageId: Long, boardId: Long, x: Float, y: Float) {
         saveImages(c, allImages(c).map {
-            if (it.id == imageId && it.boardId == boardId) it.copy(x = x.coerceAtLeast(0f), y = y.coerceAtLeast(0f)) else it
+            if (it.id == imageId && it.boardId == boardId)
+                it.copy(x = x.coerceAtLeast(0f), y = y.coerceAtLeast(0f))
+            else it
         })
     }
 
     fun rotateImage(c: Context, imageId: Long, boardId: Long, rotation: Float) {
         saveImages(c, allImages(c).map {
-            if (it.id == imageId && it.boardId == boardId) it.copy(rotation = rotation) else it
+            if (it.id == imageId && it.boardId == boardId) it.copy(rotation = rotation)
+            else it
         })
     }
 
@@ -190,5 +222,17 @@ object BoardStore {
         saveImages(c, allImages(c).filterNot { it.id == imageId && it.boardId == boardId })
     }
 
-    // ═══ Undo Stack ═══
-    fun canUndo(c: Context, boardId
+    // ═══ Undo ═══
+    fun canUndo(c: Context, boardId: Long): Boolean {
+        val json = prefs(c).getString("undo:$boardId", "[]") ?: "[]"
+        return try {
+            JSONArray(json).length() > 0
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun undo(c: Context, boardId: Long): Boolean {
+        return false
+    }
+}
