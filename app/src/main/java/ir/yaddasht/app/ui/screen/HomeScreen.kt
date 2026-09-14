@@ -246,12 +246,18 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
     var newTaskOnDate by remember { mutableLongStateOf(0L) }
     var showThemePicker by remember { mutableStateOf(false) }
 
+    // ═══ ✅ حالت فول‌اسکرین تابلو ═══
+    var boardFullscreen by rememberSaveable { mutableStateOf(false) }
+
     val (tjy, tjm, tjd) = FaDate.jalali(System.currentTimeMillis())
     var calJy by remember { mutableIntStateOf(tjy) }
     var calJm by remember { mutableIntStateOf(tjm) }
     var calDay by remember { mutableIntStateOf(tjd) }
 
-    LaunchedEffect(tab) { if (tab == 2) { val (jy, jm, jd) = FaDate.jalali(System.currentTimeMillis()); calJy = jy; calJm = jm; calDay = jd } }
+    LaunchedEffect(tab) {
+        if (tab == 2) { val (jy, jm, jd) = FaDate.jalali(System.currentTimeMillis()); calJy = jy; calJm = jm; calDay = jd }
+        if (tab == 3) boardFullscreen = true
+    }
 
     val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch(Dispatchers.IO) {
@@ -284,25 +290,55 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                 }
             }
         }) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        Box(
+            Modifier.fillMaxSize().then(
+                if (tab == 3 && boardFullscreen) Modifier else Modifier.padding(padding)
+            )
+        ) {
             PaperDots()
             Column(Modifier.fillMaxSize()) {
-                HomeHeader(count = notes.size, onStats = { showStats = true }, onBackup = { doBackup() }, onRestore = { restoreLauncher.launch(arrayOf("*/*")) }, onThemePicker = { showThemePicker = true })
-                TabRow(selectedTabIndex = tab, containerColor = Color.Transparent, modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)) {
-                    Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("📝 یادداشت", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
-                    Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("✅ وظیفه", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
-                    Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("📅 تقویم", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
-                    Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("📌 تابلو", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
-                }
 
-                // ═══ تب تابلو اعلانات ═══
+                // ═══ ✅ تب تابلو ═══
                 if (tab == 3) {
-                    BoardScreen(
-                        notes = notes,
-                        onOpenNote = { onOpenNote(it) },
-                        onBack = { tab = 0 }
-                    )
+                    if (boardFullscreen) {
+                        // فول‌اسکرین: فقط تابلو (دکمهٔ ✕ خودِ تابلو برمی‌گرداند)
+                        BoardScreen(
+                            notes = notes,
+                            onOpenNote = { onOpenNote(it) },
+                            onBack = { boardFullscreen = false }
+                        )
+                    } else {
+                        // حالت عادی: هدر + تب‌ها + تابلو + دکمهٔ ⛶
+                        HomeHeader(count = notes.size, onStats = { showStats = true }, onBackup = { doBackup() }, onRestore = { restoreLauncher.launch(arrayOf("*/*")) }, onThemePicker = { showThemePicker = true })
+                        TabRow(selectedTabIndex = tab, containerColor = Color.Transparent, modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)) {
+                            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("📝 یادداشت", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
+                            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("✅ وظیفه", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
+                            Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("📅 تقویم", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
+                            Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("📌 تابلو", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
+                        }
+                        Box(Modifier.weight(1f)) {
+                            BoardScreen(
+                                notes = notes,
+                                onOpenNote = { onOpenNote(it) },
+                                onBack = { tab = 0 }
+                            )
+                            IconButton(
+                                onClick = { boardFullscreen = true },
+                                modifier = Modifier.align(Alignment.TopEnd).padding(10.dp).size(38.dp)
+                                    .clip(CircleShape).background(Color.Black.copy(alpha = .5f))
+                            ) { Text("⛶", fontSize = 18.sp, color = Color.White) }
+                        }
+                    }
                 } else {
+                    // ═══ سایر تب‌ها ═══
+                    HomeHeader(count = notes.size, onStats = { showStats = true }, onBackup = { doBackup() }, onRestore = { restoreLauncher.launch(arrayOf("*/*")) }, onThemePicker = { showThemePicker = true })
+                    TabRow(selectedTabIndex = tab, containerColor = Color.Transparent, modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)) {
+                        Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("📝 یادداشت", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
+                        Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("✅ وظیفه", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
+                        Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("📅 تقویم", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
+                        Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("📌 تابلو", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
+                    }
+
                     if (tab == 0 && !hideMemory && memory != null && query.isBlank()) {
                         Surface(onClick = { onOpenNote(memory.id) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
                             shape = RoundedCornerShape(16.dp), color = Saffron.copy(alpha = .14f), border = androidx.compose.foundation.BorderStroke(1.dp, Saffron.copy(alpha = .4f))) {
