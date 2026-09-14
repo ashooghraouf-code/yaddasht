@@ -6,7 +6,6 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Picture
 import android.widget.Toast
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -14,7 +13,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateRotation
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,7 +25,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -53,7 +55,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,14 +69,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -88,7 +88,6 @@ import ir.yaddasht.app.util.BoardItem
 import ir.yaddasht.app.util.BoardStore
 import kotlinx.coroutines.delay
 import java.io.File
-import kotlin.math.abs
 import kotlin.random.Random
 
 private fun boardBase(index: Int): Color = listOf(
@@ -125,18 +124,14 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
     var sizeForNote by remember { mutableStateOf<Long?>(null) }
     var canUndo by remember { mutableStateOf(BoardStore.canUndo(context, currentBoard)) }
 
-    // ═══ فاز ۳: Search ═══
     var showSearch by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
-    // ═══ فاز ۳: Drag to Trash ═══
     var draggingNoteId by remember { mutableStateOf<Long?>(null) }
-    var dragPositionY by remember { mutableFloatStateOf(0f) }
-    var screenMetrics by remember { mutableStateOf(context.resources.displayMetrics) }
+    var dragY by remember { mutableFloatStateOf(0f) }
+    var boardHeightDp by remember { mutableFloatStateOf(0f) }
 
-    // ═══ فاز ۳: Share ═══
     var capturingForShare by remember { mutableStateOf(false) }
-    var shareVersion by remember { mutableIntStateOf(0) }
 
     fun refresh() {
         boards = BoardStore.boards(context)
@@ -146,7 +141,6 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
 
     val bgIndex = boards.firstOrNull { it.id == currentBoard }?.background ?: 0
 
-    // فیلتر یادداشت‌ها با جستجو
     val visibleItems = remember(items, searchQuery, notes) {
         if (searchQuery.isBlank()) items
         else items.filter { item ->
@@ -155,11 +149,9 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
         }
     }
 
-    // ناحیهٔ سطل زباله (پایین صفحه، وسط، ارتفاع ۱۲۰dp)
-    val trashZoneTopPx = screenMetrics.heightPixels - (140 * density.density)
-    val isOverTrash = draggingNoteId != null && dragPositionY > trashZoneTopPx
+    val trashTopDp = if (boardHeightDp > 1f) boardHeightDp - 150f else Float.MAX_VALUE
+    val isOverTrash = draggingNoteId != null && dragY > trashTopDp
 
-    // گرفتن screenshot برای اشتراک‌گذاری
     fun captureAndShare() {
         try {
             val activity = context as? Activity
@@ -175,16 +167,10 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
             val dir = File(context.cacheDir, "board_shares")
             if (!dir.exists()) dir.mkdirs()
             val file = File(dir, "board-${System.currentTimeMillis()}.png")
-            file.outputStream().use { out ->
-                bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
-            }
+            file.outputStream().use { out -> bmp.compress(Bitmap.CompressFormat.PNG, 100, out) }
             bmp.recycle()
 
-            val uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                file
-            )
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "image/png"
                 putExtra(Intent.EXTRA_STREAM, uri)
@@ -197,7 +183,6 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
         }
     }
 
-    // وقتی capturingForShare فعال شد، بعد از یک frame، screenshot بگیر
     LaunchedEffect(capturingForShare) {
         if (capturingForShare) {
             delay(120)
@@ -218,7 +203,6 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                 .clip(RoundedCornerShape(18.dp))
                 .background(boardBase(bgIndex))
         ) {
-            // ═══ Top Bar — هنگام screenshot مخفی می‌شود ═══
             if (!capturingForShare) {
                 Row(
                     Modifier.fillMaxWidth()
@@ -234,11 +218,7 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                     boards.forEach { b ->
                         val selected = b.id == currentBoard
                         Surface(
-                            onClick = {
-                                currentBoard = b.id
-                                refresh()
-                                searchQuery = ""
-                            },
+                            onClick = { currentBoard = b.id; refresh(); searchQuery = "" },
                             shape = RoundedCornerShape(10.dp),
                             color = if (selected) Color(0xFFFFB74D) else Color.White.copy(alpha = .12f),
                             shadowElevation = if (selected) 6.dp else 0.dp
@@ -267,8 +247,7 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                     IconButton(onClick = { showSearch = !showSearch }) {
                         Icon(
                             if (showSearch) Icons.Filled.SearchOff else Icons.Filled.Search,
-                            "جستجو",
-                            tint = Color(0xFFFFE0B2)
+                            "جستجو", tint = Color(0xFFFFE0B2)
                         )
                     }
                     IconButton(onClick = { capturingForShare = true }) {
@@ -279,7 +258,6 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                     }
                 }
 
-                // ═══ Search Bar ═══
                 if (showSearch) {
                     Row(
                         Modifier.fillMaxWidth()
@@ -328,8 +306,10 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                 }
             }
 
-            // ═══ Board Area ═══
-            Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier.fillMaxSize()
+                    .onSizeChanged { s -> boardHeightDp = with(density) { s.height.toDp().value } }
+            ) {
                 CorkTexture(bgIndex)
                 Vignette(bgIndex)
 
@@ -341,8 +321,7 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                             modifier = Modifier.rotate(if (searchQuery.isNotBlank()) 0f else -6f)
                         )
                         Text(
-                            if (searchQuery.isNotBlank()) "یادداشتی یافت نشد"
-                            else "تابلو خالی است",
+                            if (searchQuery.isNotBlank()) "یادداشتی یافت نشد" else "تابلو خالی است",
                             fontFamily = LalezarFont, fontSize = 22.sp,
                             color = Color.White.copy(alpha = .85f)
                         )
@@ -375,14 +354,10 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                                 refresh()
                             },
                             onSize = { sizeForNote = note.id },
-                            onDragStart = {
-                                draggingNoteId = note.id
-                            },
-                            onDragUpdate = { y ->
-                                dragPositionY = y
-                            },
-                            onDragEnd = { finalY ->
-                                if (finalY > trashZoneTopPx) {
+                            onDragStart = { draggingNoteId = note.id },
+                            onDragUpdate = { y -> dragY = y },
+                            onDragEnd = { y, canceled ->
+                                if (!canceled && y > trashTopDp) {
                                     BoardStore.removeItem(context, note.id, currentBoard)
                                     refresh()
                                     Toast.makeText(context, "🗑️ یادداشت حذف شد", Toast.LENGTH_SHORT).show()
@@ -397,7 +372,6 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                     }
                 }
 
-                // ═══ Trash Bin — فقط هنگام drag ═══
                 if (draggingNoteId != null) {
                     TrashBin(
                         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
@@ -405,7 +379,6 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                     )
                 }
 
-                // ═══ FAB ═══
                 if (!capturingForShare) {
                     Box(
                         Modifier.align(Alignment.BottomEnd).padding(18.dp)
@@ -413,9 +386,7 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                             .shadow(12.dp, CircleShape)
                             .clip(CircleShape)
                             .background(
-                                Brush.radialGradient(
-                                    listOf(Color(0xFFFFD54F), Color(0xFFFB8C00))
-                                )
+                                Brush.radialGradient(listOf(Color(0xFFFFD54F), Color(0xFFFB8C00)))
                             )
                             .combinedClickable(onClick = { showAddNote = true })
                             .rotate(-4f),
@@ -524,18 +495,12 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
     }
 }
 
-// ═══════════════════════════════════════════
-//  Trash Bin component
-// ═══════════════════════════════════════════
 @Composable
 private fun TrashBin(modifier: Modifier = Modifier, highlighted: Boolean) {
     val size by animateDpAsState(if (highlighted) 80.dp else 64.dp, label = "trash-size")
     val bg by animateFloatAsState(if (highlighted) 0.95f else 0.55f, label = "trash-bg")
 
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
                 .size(size)
@@ -545,8 +510,7 @@ private fun TrashBin(modifier: Modifier = Modifier, highlighted: Boolean) {
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                Icons.Filled.Delete,
-                "حذف",
+                Icons.Filled.Delete, "حذف",
                 tint = Color.White,
                 modifier = Modifier.size(size * 0.5f)
             )
@@ -554,8 +518,7 @@ private fun TrashBin(modifier: Modifier = Modifier, highlighted: Boolean) {
         Text(
             if (highlighted) "رها کن تا حذف شود!" else "بکش اینجا",
             color = if (highlighted) Color(0xFFFFCDD2) else Color.White.copy(alpha = .7f),
-            fontFamily = LalezarFont,
-            fontSize = 12.sp,
+            fontFamily = LalezarFont, fontSize = 12.sp,
             modifier = Modifier.padding(top = 4.dp)
         )
     }
@@ -610,7 +573,7 @@ private fun StickyNote(
     onSize: () -> Unit,
     onDragStart: () -> Unit,
     onDragUpdate: (Float) -> Unit,
-    onDragEnd: (Float) -> Unit,
+    onDragEnd: (Float, Boolean) -> Unit,
     onRemove: () -> Unit
 ) {
     val density = LocalDensity.current
@@ -650,7 +613,6 @@ private fun StickyNote(
         label = "in-alpha"
     )
 
-    // کوچک شدن یادداشت وقتی به سطل نزدیک است
     val trashScale by animateFloatAsState(
         targetValue = if (isOverTrash) 0.4f else 1f,
         label = "trash-scale"
@@ -680,26 +642,40 @@ private fun StickyNote(
                 scaleY = scale
             }
             .pointerInput(item.noteId, item.boardId) {
-                detectTransformGestures(
-                    onGestureStart = {
-                        gestureActive = true
-                        onDragStart()
-                    },
-                    onGesture = { _, pan, zoom, rot ->
-                        pos += pan / density.density
-                        rotation += rot
-                        visualZoom = zoom.coerceIn(0.5f, 2.0f)
-                        // گزارش موقعیت Y به parent
-                        val absoluteY = (pos.y) * density.density + (item.y * density.density)
-                        onDragUpdate(absoluteY + (size.height / 2f))
-                        lastInteraction = System.currentTimeMillis()
-                    },
-                    onGestureEnd = {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    var moved = false
+                    var canceled = false
+                    do {
+                        val event = awaitPointerEvent()
+                        canceled = event.changes.any { it.isConsumed }
+                        if (!canceled) {
+                            val zoomChange = event.calculateZoom()
+                            val rotationChange = event.calculateRotation()
+                            val panChange = event.calculatePan()
+                            val active = panChange != Offset.Zero || rotationChange != 0f || zoomChange != 1f
+                            if (active) {
+                                if (!moved && (zoomChange != 1f || rotationChange != 0f || panChange.getDistance() > 8f)) {
+                                    moved = true
+                                    gestureActive = true
+                                    onDragStart()
+                                }
+                                if (moved) {
+                                    pos += panChange / density.density
+                                    rotation += rotationChange
+                                    visualZoom = (visualZoom * zoomChange).coerceIn(0.5f, 2.0f)
+                                    onDragUpdate(pos.y)
+                                    lastInteraction = System.currentTimeMillis()
+                                }
+                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                            }
+                        }
+                    } while (!canceled && event.changes.any { it.pressed })
+                    if (moved) {
                         gestureActive = false
-                        val absoluteY = (pos.y) * density.density + (item.y * density.density)
-                        onDragEnd(absoluteY + (size.height / 2f))
+                        onDragEnd(pos.y, canceled)
                     }
-                )
+                }
             }
     ) {
         Box(
@@ -707,9 +683,7 @@ private fun StickyNote(
                 .shadow(7.dp, RoundedCornerShape(3.dp))
                 .clip(RoundedCornerShape(3.dp))
                 .background(
-                    Brush.linearGradient(
-                        listOf(body, body, stickyEdge(note.color))
-                    )
+                    Brush.linearGradient(listOf(body, body, stickyEdge(note.color)))
                 )
                 .combinedClickable(onClick = onOpen, onLongClick = onSize)
                 .padding(
