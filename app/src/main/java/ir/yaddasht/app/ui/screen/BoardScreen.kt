@@ -144,6 +144,15 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
 
     var capturingForShare by remember { mutableStateOf(false) }
 
+    // ═══ ✅ refresh اول تعریف می‌شود ═══
+    fun refresh() {
+        boards = BoardStore.boards(context)
+        items = BoardStore.items(context, currentBoard)
+        images = BoardStore.images(context, currentBoard)
+        canUndo = BoardStore.canUndo(context, currentBoard)
+    }
+
+    // ═══ ✅ سپس pickImageLauncher ═══
     val pickImageLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -176,13 +185,6 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                 }
             }
         }
-    }
-
-    fun refresh() {
-        boards = BoardStore.boards(context)
-        items = BoardStore.items(context, currentBoard)
-        images = BoardStore.images(context, currentBoard)
-        canUndo = BoardStore.canUndo(context, currentBoard)
     }
 
     val bgIndex = boards.firstOrNull { it.id == currentBoard }?.background ?: 0
