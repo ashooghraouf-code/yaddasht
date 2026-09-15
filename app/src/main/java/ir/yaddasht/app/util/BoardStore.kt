@@ -4,7 +4,7 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
-data class Board(val id: Long, val name: String, val background: Int)
+data class Board(val id: Long, val name: String, val background: Int, val sizeIndex: Int = 1)
 
 data class BoardItem(
     val noteId: Long,
@@ -36,7 +36,7 @@ object BoardStore {
     fun boards(c: Context): List<Board> {
         val json = prefs(c).getString(KEY_BOARDS, "") ?: ""
         if (json.isBlank()) {
-            val default = listOf(Board(1L, "اصلی", 0))
+            val default = listOf(Board(1L, "اصلی", 0, 1))
             saveBoards(c, default)
             return default
         }
@@ -44,10 +44,15 @@ object BoardStore {
             val arr = JSONArray(json)
             (0 until arr.length()).map {
                 val o = arr.getJSONObject(it)
-                Board(o.getLong("id"), o.getString("name"), o.optInt("background", 0))
+                Board(
+                    o.getLong("id"),
+                    o.getString("name"),
+                    o.optInt("background", 0),
+                    o.optInt("sizeIndex", 1)
+                )
             }
         } catch (_: Exception) {
-            listOf(Board(1L, "اصلی", 0))
+            listOf(Board(1L, "اصلی", 0, 1))
         }
     }
 
@@ -58,14 +63,15 @@ object BoardStore {
                 put("id", b.id)
                 put("name", b.name)
                 put("background", b.background)
+                put("sizeIndex", b.sizeIndex)
             })
         }
         prefs(c).edit().putString(KEY_BOARDS, arr.toString()).apply()
     }
 
-    fun addBoard(c: Context, name: String, background: Int = 0): Board {
+    fun addBoard(c: Context, name: String, background: Int = 0, sizeIndex: Int = 1): Board {
         val list = boards(c).toMutableList()
-        val b = Board(System.currentTimeMillis(), name, background)
+        val b = Board(System.currentTimeMillis(), name, background, sizeIndex)
         list.add(b)
         saveBoards(c, list)
         return b
@@ -73,6 +79,10 @@ object BoardStore {
 
     fun setBackground(c: Context, boardId: Long, bg: Int) {
         saveBoards(c, boards(c).map { if (it.id == boardId) it.copy(background = bg) else it })
+    }
+
+    fun setBoardSize(c: Context, boardId: Long, sizeIndex: Int) {
+        saveBoards(c, boards(c).map { if (it.id == boardId) it.copy(sizeIndex = sizeIndex.coerceIn(0, 3)) else it })
     }
 
     private fun allItems(c: Context): List<BoardItem> {
