@@ -10,6 +10,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
+import android.os.Build
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
@@ -265,7 +266,8 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
         }
     }
 
-    val trashTopDp = if (boardAreaHeightDp > 1f) boardAreaHeightDp - 150f else Float.MAX_VALUE
+    // ✅ سطح حساس سطل زباله کاهش یافت: ۱۵۰dp → ۷۰dp
+    val trashTopDp = if (boardAreaHeightDp > 1f) boardAreaHeightDp - 70f else Float.MAX_VALUE
     val isOverTrash = (draggingNoteId != null || draggingImageId != null) && dragY > trashTopDp
 
     fun exportToPdf() {
@@ -304,6 +306,13 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     isAntiAlias = true
                     typeface = bodyType
                 }
+
+                // ✅ محاسبهٔ lineSpacing برای انطباق دقیق با صفحه (lineHeight = 17sp)
+                val targetLineHeight = 17f * spPx
+                val fm = bodyPaint.fontMetrics
+                val naturalLineHeight = fm.descent - fm.ascent + fm.leading
+                val extraLineSpacing = (targetLineHeight - naturalLineHeight).coerceAtLeast(0f)
+
                 val bgPaint = Paint().apply { isAntiAlias = true }
                 val framePaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.WHITE }
 
@@ -322,11 +331,16 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                         .setMaxLines(1)
                         .setEllipsize(TextUtils.TruncateAt.END)
                         .build()
-                    val bodyLayout = StaticLayout.Builder.obtain(note.body, 0, note.body.length, bodyPaint, innerW)
+
+                    val bodyBuilder = StaticLayout.Builder.obtain(note.body, 0, note.body.length, bodyPaint, innerW)
                         .setAlignment(Layout.Alignment.ALIGN_NORMAL)
                         .setMaxLines(5)
                         .setEllipsize(TextUtils.TruncateAt.END)
-                        .build()
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        bodyBuilder.setLineSpacing(extraLineSpacing, 1f)
+                    }
+                    val bodyLayout = bodyBuilder.build()
+
                     val hPx = topPadPx + titleLayout.height + bodyLayout.height + bottomPadPx
 
                     val cx = item.x.coerceIn(0f, clampX) * d + wPx / 2f
