@@ -232,6 +232,10 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
     val boardWidthDp = if (isPhoneSize) with(density) { boardPxW.toDp().value } else BOARD_SIZES_DP[boardSizeIndex].first
     val boardHeightDpActual = if (isPhoneSize) with(density) { boardPxH.toDp().value } else BOARD_SIZES_DP[boardSizeIndex].second
 
+    // ✅ محدودهِ مجاز مختصات (خودترمیمی دادهٔ خراب)
+    val clampX = (if (boardWidthDp > 60f) boardWidthDp - 60f else 300f).coerceAtLeast(0f)
+    val clampY = (if (boardHeightDpActual > 60f) boardHeightDpActual - 60f else 400f).coerceAtLeast(0f)
+
     val visibleItems = remember(items, searchQuery, notes) {
         if (searchQuery.isBlank()) items
         else items.filter { item ->
@@ -255,7 +259,7 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                 val file = File(dir, "board-${System.currentTimeMillis()}.pdf")
 
                 val pdfDocument = PdfDocument()
-                val pageInfo = PdfDocument.PageInfo.Builder(pxW, pxH, 1).create()
+                val pageInfo = PdfDocument.PageInfo.Builder(pxW.coerceAtLeast(1), pxH.coerceAtLeast(1), 1).create()
                 val page = pdfDocument.startPage(pageInfo)
                 val canvas = page.canvas
 
@@ -280,7 +284,7 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     val noteHeight = 200f * density.density
 
                     canvas.save()
-                    canvas.translate(item.x * density.density, item.y * density.density)
+                    canvas.translate(item.x.coerceIn(0f, clampX) * density.density, item.y.coerceIn(0f, clampY) * density.density)
                     canvas.rotate(item.rotation)
                     canvas.scale(item.scale, item.scale)
 
@@ -290,7 +294,7 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
 
                     var yPos = 40f
                     val titleText = note.title.ifBlank { "بدون عنوان" }
-                    val titleLayout = StaticLayout.Builder.obtain(titleText, 0, titleText.length, titlePaint, noteWidth.toInt() - 24)
+                    val titleLayout = StaticLayout.Builder.obtain(titleText, 0, titleText.length, titlePaint, (noteWidth - 24f).coerceAtLeast(1f).toInt())
                         .setAlignment(Layout.Alignment.ALIGN_NORMAL).build()
                     canvas.save()
                     canvas.translate(12f, yPos)
@@ -299,7 +303,7 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     yPos += titleLayout.height.toFloat() + 10f
 
                     val bodyText = note.body
-                    val bodyLayout = StaticLayout.Builder.obtain(bodyText, 0, bodyText.length, textPaint, noteWidth.toInt() - 24)
+                    val bodyLayout = StaticLayout.Builder.obtain(bodyText, 0, bodyText.length, textPaint, (noteWidth - 24f).coerceAtLeast(1f).toInt())
                         .setAlignment(Layout.Alignment.ALIGN_NORMAL).build()
                     canvas.save()
                     canvas.translate(12f, yPos)
@@ -312,7 +316,7 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     val bitmap = loadBitmapFromUri(context, img.uri)
                     if (bitmap != null) {
                         canvas.save()
-                        canvas.translate(img.x * density.density, img.y * density.density)
+                        canvas.translate(img.x.coerceIn(0f, clampX) * density.density, img.y.coerceIn(0f, clampY) * density.density)
                         canvas.rotate(img.rotation)
                         canvas.scale(img.scale, img.scale)
                         val imgWidth = BASE_IMAGE_WIDTH * density.density
@@ -350,111 +354,92 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().background(boardBase(bgIndex))) {
             if (!isExporting) {
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        Modifier.fillMaxWidth()
-                            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .28f))
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 8.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = androidx.compose.ui.graphics.Color(0xFFFFE0B2))
-                        }
+                Row(
+                    Modifier.fillMaxWidth()
+                        .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .28f))
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 8.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = androidx.compose.ui.graphics.Color(0xFFFFE0B2))
+                    }
 
-                        boards.forEach { b ->
-                            val selected = b.id == currentBoard
-                            Surface(
-                                onClick = { currentBoard = b.id; refresh(); searchQuery = "" },
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (selected) androidx.compose.ui.graphics.Color(0xFFFFB74D) else androidx.compose.ui.graphics.Color.White.copy(alpha = .12f),
-                                shadowElevation = if (selected) 6.dp else 0.dp
-                            ) {
-                                Text(
-                                    b.name,
-                                    color = if (selected) androidx.compose.ui.graphics.Color(0xFF3E2723) else androidx.compose.ui.graphics.Color(0xFFFFE0B2),
-                                    fontFamily = LalezarFont, fontSize = 15.sp,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                )
-                            }
-                        }
-
-                        Surface(shape = RoundedCornerShape(8.dp), color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.12f)) {
+                    boards.forEach { b ->
+                        val selected = b.id == currentBoard
+                        Surface(
+                            onClick = { currentBoard = b.id; refresh(); searchQuery = "" },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (selected) androidx.compose.ui.graphics.Color(0xFFFFB74D) else androidx.compose.ui.graphics.Color.White.copy(alpha = .12f),
+                            shadowElevation = if (selected) 6.dp else 0.dp
+                        ) {
                             Text(
-                                "📝${items.size} 🖼${images.size}",
-                                fontSize = 11.sp,
-                                color = androidx.compose.ui.graphics.Color(0xFFFFE0B2),
-                                fontFamily = VazirFont,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                b.name,
+                                color = if (selected) androidx.compose.ui.graphics.Color(0xFF3E2723) else androidx.compose.ui.graphics.Color(0xFFFFE0B2),
+                                fontFamily = LalezarFont, fontSize = 15.sp,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                             )
-                        }
-
-                        Surface(
-                            onClick = { pickImageLauncher.launch(arrayOf("image/*")) },
-                            shape = RoundedCornerShape(12.dp),
-                            color = androidx.compose.ui.graphics.Color(0xFFFB8C00).copy(alpha = 0.2f),
-                            border = BorderStroke(1.dp, androidx.compose.ui.graphics.Color(0xFFFB8C00).copy(alpha = 0.4f))
-                        ) {
-                            Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Filled.Image, "افزودن تصویر", tint = androidx.compose.ui.graphics.Color(0xFFFFE0B2), modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("عکس", color = androidx.compose.ui.graphics.Color(0xFFFFE0B2), fontSize = 12.sp, fontFamily = VazirFont)
-                            }
-                        }
-
-                        Surface(
-                            onClick = { showSearch = !showSearch },
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (showSearch) androidx.compose.ui.graphics.Color(0xFFFFB74D).copy(alpha = 0.3f) else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.1f)
-                        ) {
-                            Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(if (showSearch) Icons.Filled.SearchOff else Icons.Filled.Search, "جستجو", tint = androidx.compose.ui.graphics.Color(0xFFFFE0B2), modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("جستجو", color = androidx.compose.ui.graphics.Color(0xFFFFE0B2), fontSize = 12.sp, fontFamily = VazirFont)
-                            }
-                        }
-
-                        Surface(
-                            onClick = { exportToPdf() },
-                            shape = RoundedCornerShape(12.dp),
-                            color = androidx.compose.ui.graphics.Color(0xFFE53935).copy(alpha = 0.2f),
-                            border = BorderStroke(1.dp, androidx.compose.ui.graphics.Color(0xFFE53935).copy(alpha = 0.4f))
-                        ) {
-                            Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Filled.PictureAsPdf, "خروجی PDF", tint = androidx.compose.ui.graphics.Color(0xFFFFCDD2), modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("PDF", color = androidx.compose.ui.graphics.Color(0xFFFFCDD2), fontSize = 12.sp, fontFamily = VazirFont)
-                            }
-                        }
-
-                        IconButton(onClick = { BoardStore.setBackground(context, currentBoard, (bgIndex + 1) % 4); refresh() }) {
-                            Icon(Icons.Filled.Palette, "تغییر پس‌زمینه", tint = androidx.compose.ui.graphics.Color(0xFFFFE0B2))
-                        }
-                        Surface(onClick = { BoardStore.setBoardSize(context, currentBoard, (boardSizeIndex + 1) % 4); refresh() }, shape = RoundedCornerShape(8.dp), color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.1f)) {
-                            Text(BOARD_SIZE_LABELS[boardSizeIndex], fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFFFFE0B2), fontFamily = VazirFont, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
-                        }
-                        IconButton(onClick = { boardName = ""; showAddBoard = true }) {
-                            Icon(Icons.Filled.Add, "تابلو جدید", tint = androidx.compose.ui.graphics.Color(0xFFFFE0B2))
                         }
                     }
 
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .fillMaxHeight()
-                            .width(40.dp)
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(
-                                        androidx.compose.ui.graphics.Color.Transparent,
-                                        androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f)
-                                    ),
-                                    startX = 40f,
-                                    endX = 0f
-                                )
-                            )
-                    )
+                    Surface(shape = RoundedCornerShape(8.dp), color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.12f)) {
+                        Text(
+                            "📝${items.size} 🖼${images.size}",
+                            fontSize = 11.sp,
+                            color = androidx.compose.ui.graphics.Color(0xFFFFE0B2),
+                            fontFamily = VazirFont,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    Surface(
+                        onClick = { pickImageLauncher.launch(arrayOf("image/*")) },
+                        shape = RoundedCornerShape(12.dp),
+                        color = androidx.compose.ui.graphics.Color(0xFFFB8C00).copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, androidx.compose.ui.graphics.Color(0xFFFB8C00).copy(alpha = 0.4f))
+                    ) {
+                        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.Image, "افزودن تصویر", tint = androidx.compose.ui.graphics.Color(0xFFFFE0B2), modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("عکس", color = androidx.compose.ui.graphics.Color(0xFFFFE0B2), fontSize = 12.sp, fontFamily = VazirFont)
+                        }
+                    }
+
+                    Surface(
+                        onClick = { showSearch = !showSearch },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (showSearch) androidx.compose.ui.graphics.Color(0xFFFFB74D).copy(alpha = 0.3f) else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.1f)
+                    ) {
+                        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(if (showSearch) Icons.Filled.SearchOff else Icons.Filled.Search, "جستجو", tint = androidx.compose.ui.graphics.Color(0xFFFFE0B2), modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("جستجو", color = androidx.compose.ui.graphics.Color(0xFFFFE0B2), fontSize = 12.sp, fontFamily = VazirFont)
+                        }
+                    }
+
+                    Surface(
+                        onClick = { exportToPdf() },
+                        shape = RoundedCornerShape(12.dp),
+                        color = androidx.compose.ui.graphics.Color(0xFFE53935).copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, androidx.compose.ui.graphics.Color(0xFFE53935).copy(alpha = 0.4f))
+                    ) {
+                        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.PictureAsPdf, "خروجی PDF", tint = androidx.compose.ui.graphics.Color(0xFFFFCDD2), modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("PDF", color = androidx.compose.ui.graphics.Color(0xFFFFCDD2), fontSize = 12.sp, fontFamily = VazirFont)
+                        }
+                    }
+
+                    IconButton(onClick = { BoardStore.setBackground(context, currentBoard, (bgIndex + 1) % 4); refresh() }) {
+                        Icon(Icons.Filled.Palette, "تغییر پس‌زمینه", tint = androidx.compose.ui.graphics.Color(0xFFFFE0B2))
+                    }
+                    Surface(onClick = { BoardStore.setBoardSize(context, currentBoard, (boardSizeIndex + 1) % 4); refresh() }, shape = RoundedCornerShape(8.dp), color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.1f)) {
+                        Text(BOARD_SIZE_LABELS[boardSizeIndex], fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFFFFE0B2), fontFamily = VazirFont, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                    }
+                    IconButton(onClick = { boardName = ""; showAddBoard = true }) {
+                        Icon(Icons.Filled.Add, "تابلو جدید", tint = androidx.compose.ui.graphics.Color(0xFFFFE0B2))
+                    }
                 }
 
                 if (showSearch) {
@@ -509,6 +494,14 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                             CorkTexture(bgIndex)
                             Vignette(bgIndex)
 
+                            // ✅ نشان عیب‌یابی: همیشه قابل مشاهده
+                            Text(
+                                "آیتم:${items.size} عکس:${images.size} بوم:${boardPxW}x${boardPxH} حالت:$boardSizeIndex",
+                                fontSize = 9.sp,
+                                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.55f),
+                                modifier = Modifier.absoluteOffset(4.dp, 4.dp)
+                            )
+
                             if (visibleItems.isEmpty() && images.isEmpty() && !isExporting) {
                                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                                     Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -527,6 +520,8 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                                         item = item,
                                         variant = idx,
                                         stagger = idx,
+                                        clampX = clampX,
+                                        clampY = clampY,
                                         isDraggingThis = draggingNoteId == note.id,
                                         isOverTrash = isOverTrash && draggingNoteId == note.id,
                                         onOpen = { onOpenNote(note.id) },
@@ -547,6 +542,8 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                                 BoardImageItem(
                                     image = img,
                                     stagger = visibleItems.size + idx,
+                                    clampX = clampX,
+                                    clampY = clampY,
                                     isDraggingThis = draggingImageId == img.id,
                                     isOverTrash = isOverTrash && draggingImageId == img.id,
                                     onMoved = { x, y -> BoardStore.moveImage(context, img.id, currentBoard, x, y); refresh() },
@@ -756,6 +753,8 @@ private fun loadBitmapFromUri(context: Context, uriString: String): Bitmap? {
 private fun BoardImageItem(
     image: BoardImage,
     stagger: Int,
+    clampX: Float,
+    clampY: Float,
     isDraggingThis: Boolean,
     isOverTrash: Boolean,
     onMoved: (Float, Float) -> Unit,
@@ -766,7 +765,9 @@ private fun BoardImageItem(
     onDragEnd: (Float, Boolean) -> Unit
 ) {
     val density = LocalDensity.current
-    var pos by remember(image.id, image.boardId) { mutableStateOf(Offset(image.x.coerceAtLeast(0f), image.y.coerceAtLeast(0f))) }
+    var pos by remember(image.id, image.boardId) {
+        mutableStateOf(Offset(image.x.coerceIn(0f, clampX), image.y.coerceIn(0f, clampY)))
+    }
     var rotation by remember(image.id, image.boardId) { mutableFloatStateOf(image.rotation) }
     var scale by remember(image.id, image.boardId) { mutableFloatStateOf(image.scale) }
     var visualZoom by remember { mutableFloatStateOf(1f) }
@@ -794,7 +795,6 @@ private fun BoardImageItem(
 
     val widthDp = (BASE_IMAGE_WIDTH * scale).dp
 
-    // ✅ استفاده از absoluteOffset که همیشه از چپ-بالا حساب می‌کند
     Box(
         Modifier
             .alpha(trashAlpha)
@@ -826,7 +826,10 @@ private fun BoardImageItem(
                                     onDragStart()
                                 }
                                 if (moved) {
-                                    pos += panChange / density.density
+                                    pos = Offset(
+                                        (pos.x + panChange.x / density.density).coerceIn(0f, clampX),
+                                        (pos.y + panChange.y / density.density).coerceIn(0f, clampY)
+                                    )
                                     rotation += rotationChange
                                     scale = (scale * zoomChange).coerceIn(0.3f, 3.0f)
                                     visualZoom = zoomChange.coerceIn(0.5f, 2.0f)
@@ -920,6 +923,8 @@ private fun StickyNote(
     item: BoardItem,
     variant: Int,
     stagger: Int,
+    clampX: Float,
+    clampY: Float,
     isDraggingThis: Boolean,
     isOverTrash: Boolean,
     onOpen: () -> Unit,
@@ -931,7 +936,9 @@ private fun StickyNote(
     onDragEnd: (Float, Boolean) -> Unit
 ) {
     val density = LocalDensity.current
-    var pos by remember(item.noteId, item.boardId) { mutableStateOf(Offset(item.x.coerceAtLeast(0f), item.y.coerceAtLeast(0f))) }
+    var pos by remember(item.noteId, item.boardId) {
+        mutableStateOf(Offset(item.x.coerceIn(0f, clampX), item.y.coerceIn(0f, clampY)))
+    }
     var rotation by remember(item.noteId, item.boardId) { mutableFloatStateOf(item.rotation) }
     var scale by remember(item.noteId, item.boardId) { mutableFloatStateOf(item.scale) }
     var visualZoom by remember { mutableFloatStateOf(1f) }
@@ -961,7 +968,6 @@ private fun StickyNote(
     val body = stickyBody(note.color)
     val usePin = variant % 2 == 0
 
-    // ✅ استفاده از absoluteOffset که همیشه از چپ-بالا حساب می‌کند
     Box(
         Modifier
             .alpha(trashAlpha)
@@ -993,7 +999,10 @@ private fun StickyNote(
                                     onDragStart()
                                 }
                                 if (moved) {
-                                    pos += panChange / density.density
+                                    pos = Offset(
+                                        (pos.x + panChange.x / density.density).coerceIn(0f, clampX),
+                                        (pos.y + panChange.y / density.density).coerceIn(0f, clampY)
+                                    )
                                     rotation += rotationChange
                                     scale = (scale * zoomChange).coerceIn(0.3f, 3.0f)
                                     visualZoom = zoomChange.coerceIn(0.5f, 2.0f)
