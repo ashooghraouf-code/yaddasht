@@ -33,11 +33,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -379,7 +379,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                             }
                         }
 
-                        // ✅ شمارندهٔ آیتم‌های روی تابلو
                         Surface(shape = RoundedCornerShape(8.dp), color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.12f)) {
                             Text(
                                 "📝${items.size} 🖼${images.size}",
@@ -492,7 +491,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
             }
 
             Box(Modifier.fillMaxSize().onSizeChanged { s -> boardAreaHeightDp = with(density) { s.height.toDp().value } }) {
-                // ✅ بوم تابلو با جهت چپ‌به‌راست تا مختصات از گوشهٔ چپ-بالا محاسبه شود
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                     val scrollStateV = rememberScrollState()
                     val scrollStateH = rememberScrollState()
@@ -797,9 +795,8 @@ private fun BoardImageItem(
 
     Box(
         Modifier
-            .align(Alignment.TopLeft)
             .alpha(trashAlpha)
-            .offset { with(density) { IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx()) } }
+            .absoluteOffset { with(density) { IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx()) } }
             .width(widthDp)
             .graphicsLayer {
                 rotationZ = rotation
@@ -964,9 +961,8 @@ private fun StickyNote(
 
     Box(
         Modifier
-            .align(Alignment.TopLeft)
             .alpha(trashAlpha)
-            .offset { with(density) { IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx()) } }
+            .absoluteOffset { with(density) { IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx()) } }
             .width(widthDp)
             .graphicsLayer {
                 rotationZ = rotation
