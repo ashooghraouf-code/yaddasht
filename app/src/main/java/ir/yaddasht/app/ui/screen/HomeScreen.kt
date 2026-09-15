@@ -245,8 +245,6 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
     var editTask by remember { mutableStateOf<Task?>(null) }
     var newTaskOnDate by remember { mutableLongStateOf(0L) }
     var showThemePicker by remember { mutableStateOf(false) }
-
-    // ═══ ✅ حالت فول‌اسکرین تابلو ═══
     var boardFullscreen by rememberSaveable { mutableStateOf(false) }
 
     val (tjy, tjm, tjd) = FaDate.jalali(System.currentTimeMillis())
@@ -290,26 +288,18 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                 }
             }
         }) { padding ->
-        Box(
-            Modifier.fillMaxSize().then(
-                if (tab == 3 && boardFullscreen) Modifier else Modifier.padding(padding)
-            )
-        ) {
+        Box(Modifier.fillMaxSize().padding(padding)) {
             PaperDots()
             Column(Modifier.fillMaxSize()) {
-
-                // ═══ ✅ تب تابلو ═══
                 if (tab == 3) {
                     if (boardFullscreen) {
-                        // فول‌اسکرین: فقط تابلو (دکمهٔ ✕ خودِ تابلو برمی‌گرداند)
                         BoardScreen(
                             notes = notes,
-                            noteDao = dao, // ✅ اصلاح شد
+                            noteDao = dao,
                             onOpenNote = { onOpenNote(it) },
                             onBack = { boardFullscreen = false }
                         )
                     } else {
-                        // حالت عادی: هدر + تب‌ها + تابلو + دکمهٔ ⛶
                         HomeHeader(count = notes.size, onStats = { showStats = true }, onBackup = { doBackup() }, onRestore = { restoreLauncher.launch(arrayOf("*/*")) }, onThemePicker = { showThemePicker = true })
                         TabRow(selectedTabIndex = tab, containerColor = Color.Transparent, modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)) {
                             Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("📝 یادداشت", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
@@ -320,19 +310,13 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                         Box(Modifier.weight(1f)) {
                             BoardScreen(
                                 notes = notes,
-                                noteDao = dao, // ✅ اصلاح شد
+                                noteDao = dao,
                                 onOpenNote = { onOpenNote(it) },
                                 onBack = { tab = 0 }
                             )
-                            IconButton(
-                                onClick = { boardFullscreen = true },
-                                modifier = Modifier.align(Alignment.TopEnd).padding(10.dp).size(38.dp)
-                                    .clip(CircleShape).background(Color.Black.copy(alpha = .5f))
-                            ) { Text("⛶", fontSize = 18.sp, color = Color.White) }
                         }
                     }
                 } else {
-                    // ═══ سایر تب‌ها ═══
                     HomeHeader(count = notes.size, onStats = { showStats = true }, onBackup = { doBackup() }, onRestore = { restoreLauncher.launch(arrayOf("*/*")) }, onThemePicker = { showThemePicker = true })
                     TabRow(selectedTabIndex = tab, containerColor = Color.Transparent, modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)) {
                         Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("📝 یادداشت", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
