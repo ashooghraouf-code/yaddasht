@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -793,6 +794,7 @@ private fun BoardImageItem(
 
     val widthDp = (BASE_IMAGE_WIDTH * scale).dp
 
+    // ✅ استفاده از absoluteOffset که همیشه از چپ-بالا حساب می‌کند
     Box(
         Modifier
             .alpha(trashAlpha)
@@ -959,6 +961,7 @@ private fun StickyNote(
     val body = stickyBody(note.color)
     val usePin = variant % 2 == 0
 
+    // ✅ استفاده از absoluteOffset که همیشه از چپ-بالا حساب می‌کند
     Box(
         Modifier
             .alpha(trashAlpha)
