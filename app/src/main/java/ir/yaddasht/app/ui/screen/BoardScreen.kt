@@ -88,6 +88,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
@@ -173,7 +174,6 @@ private val BOARD_SIZES_DP = listOf(
 private val BASE_NOTE_WIDTH = 150f
 private val BASE_IMAGE_WIDTH = 150f
 
-// ✅ فونت واقعی اپ برای PDF (بدون ریسک کامپایل)
 private fun safeTypeface(context: Context, name: String, bold: Boolean): Typeface {
     val id = context.resources.getIdentifier(name, "font", context.packageName)
     return if (id != 0) {
@@ -303,9 +303,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     textSize = 11f * spPx
                     isAntiAlias = true
                     typeface = bodyType
-                    // ✅ ارتفاع خط دقیقاً مثل صفحه: 17sp
-                    val lh = 17f * spPx
-                    setLineSpacing(lh - fontSpacing, 0f)
                 }
                 val bgPaint = Paint().apply { isAntiAlias = true }
                 val framePaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.WHITE }
@@ -606,7 +603,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                         }
                     }
 
-                    // ═══ 🗺️ مینی‌مپ: موقعیت شما روی کاغذ ═══
                     if (!isPhoneSize && boardPxW > 0 && boardPxH > 0 && vpW > 0 && vpH > 0) {
                         MiniMap(
                             paperW = boardPxW.toFloat(),
@@ -840,12 +836,12 @@ private fun MiniMap(
         drawRect(
             androidx.compose.ui.graphics.Color.White.copy(alpha = 0.22f),
             topLeft = Offset(vx, vy),
-            size = androidx.compose.ui.size(vw, vh)
+            size = Size(vw, vh)
         )
         drawRect(
             androidx.compose.ui.graphics.Color.White,
             topLeft = Offset(vx, vy),
-            size = androidx.compose.ui.size(vw, vh),
+            size = Size(vw, vh),
             style = androidx.compose.ui.graphics.drawscope.Stroke(1.5f)
         )
         finger?.let { f ->
