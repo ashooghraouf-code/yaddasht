@@ -12,6 +12,7 @@ import android.net.Uri
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import android.text.TextUtils
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -232,7 +233,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
     val boardWidthDp = if (isPhoneSize) with(density) { boardPxW.toDp().value } else BOARD_SIZES_DP[boardSizeIndex].first
     val boardHeightDpActual = if (isPhoneSize) with(density) { boardPxH.toDp().value } else BOARD_SIZES_DP[boardSizeIndex].second
 
-    // ✅ محدودهِ مجاز مختصات (خودترمیمی دادهٔ خراب)
     val clampX = (if (boardWidthDp > 60f) boardWidthDp - 60f else 300f).coerceAtLeast(0f)
     val clampY = (if (boardHeightDpActual > 60f) boardHeightDpActual - 60f else 400f).coerceAtLeast(0f)
 
@@ -252,79 +252,104 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
         isExporting = true
         scope.launch(Dispatchers.IO) {
             try {
-                val pxW = if (boardPxW > 0) boardPxW else (boardWidthDp * density.density).toInt()
-                val pxH = if (boardPxH > 0) boardPxH else (boardHeightDpActual * density.density).toInt()
+                val d = density.density
+                val pxW = (if (boardPxW > 0) boardPxW else boardWidthDp * d).toInt().coerceAtLeast(1)
+                val pxH = (if (boardPxH > 0) boardPxH else boardHeightDpActual * d).toInt().coerceAtLeast(1)
                 val dir = File(context.cacheDir, "board_exports")
                 if (!dir.exists()) dir.mkdirs()
                 val file = File(dir, "board-${System.currentTimeMillis()}.pdf")
 
                 val pdfDocument = PdfDocument()
-                val pageInfo = PdfDocument.PageInfo.Builder(pxW.coerceAtLeast(1), pxH.coerceAtLeast(1), 1).create()
+                val pageInfo = PdfDocument.PageInfo.Builder(pxW, pxH, 1).create()
                 val page = pdfDocument.startPage(pageInfo)
                 val canvas = page.canvas
 
                 canvas.drawColor(boardBase(bgIndex).toArgb())
 
                 val textPaint = TextPaint().apply {
-                    color = androidx.compose.ui.graphics.Color(0xFF3E2723).toArgb()
-                    textSize = 11f * density.density
+                    color = androidx.compose.ui.graphics.Color(0xFF5D4037).toArgb()
+                    textSize = 11f * d * 1.45f
                     isAntiAlias = true
                 }
                 val titlePaint = TextPaint().apply {
                     color = androidx.compose.ui.graphics.Color(0xFF3E2723).toArgb()
-                    textSize = 15f * density.density
+                    textSize = 15f * d * 1.45f
                     isAntiAlias = true
                     typeface = android.graphics.Typeface.DEFAULT_BOLD
                 }
                 val bgPaint = Paint().apply { isAntiAlias = true }
+                val framePaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.WHITE }
 
+                // ═══ یادداشت‌ها: چرخش حول مرکز + بدون مقیاس دوبرابر + ارتفاع واقعی ═══
                 items.forEach { item ->
                     val note = notes.firstOrNull { it.id == item.noteId } ?: return@forEach
-                    val noteWidth = (BASE_NOTE_WIDTH * item.scale) * density.density
-                    val noteHeight = 200f * density.density
+                    val scale = item.scale.coerceIn(0.3f, 3.0f)
+                    val wPx = BASE_NOTE_WIDTH * scale * d
+                    val padPx = 12f * d
+                    val topPadPx = 14f * d
+                    val bottomPadPx = 16f * d
+                    val innerW = (wPx - 2f * padPx).toInt().coerceAtLeast(1)
+
+                    val titleText = note.title.ifBlank { "بدون عنوان" }
+                    val titleLayout = StaticLayout.Builder.obtain(titleText, 0, titleText.length, titlePaint, innerW)
+                        .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                        .setMaxLines(1)
+                        .setEllipsize(TextUtils.TruncateAt.END)
+                        .build()
+                    val bodyLayout = StaticLayout.Builder.obtain(note.body, 0, note.body.length, textPaint, innerW)
+                        .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                        .setMaxLines(5)
+                        .setEllipsize(TextUtils.TruncateAt.END)
+                        .build()
+                    val hPx = topPadPx + titleLayout.height + bodyLayout.height + bottomPadPx
+
+                    val cx = item.x.coerceIn(0f, clampX) * d + wPx / 2f
+                    val cy = item.y.coerceIn(0f, clampY) * d + hPx / 2f
 
                     canvas.save()
-                    canvas.translate(item.x.coerceIn(0f, clampX) * density.density, item.y.coerceIn(0f, clampY) * density.density)
+                    canvas.translate(cx, cy)
                     canvas.rotate(item.rotation)
-                    canvas.scale(item.scale, item.scale)
+                    canvas.translate(-wPx / 2f, -hPx / 2f)
 
                     bgPaint.color = stickyBody(note.color).toArgb()
-                    val rect = android.graphics.RectF(0f, 0f, noteWidth, noteHeight)
-                    canvas.drawRoundRect(rect, 9f, 9f, bgPaint)
+                    canvas.drawRoundRect(android.graphics.RectF(0f, 0f, wPx, hPx), 3f * d, 3f * d, bgPaint)
 
-                    var yPos = 40f
-                    val titleText = note.title.ifBlank { "بدون عنوان" }
-                    val titleLayout = StaticLayout.Builder.obtain(titleText, 0, titleText.length, titlePaint, (noteWidth - 24f).coerceAtLeast(1f).toInt())
-                        .setAlignment(Layout.Alignment.ALIGN_NORMAL).build()
                     canvas.save()
-                    canvas.translate(12f, yPos)
+                    canvas.translate(padPx, topPadPx)
                     titleLayout.draw(canvas)
                     canvas.restore()
-                    yPos += titleLayout.height.toFloat() + 10f
 
-                    val bodyText = note.body
-                    val bodyLayout = StaticLayout.Builder.obtain(bodyText, 0, bodyText.length, textPaint, (noteWidth - 24f).coerceAtLeast(1f).toInt())
-                        .setAlignment(Layout.Alignment.ALIGN_NORMAL).build()
                     canvas.save()
-                    canvas.translate(12f, yPos)
+                    canvas.translate(padPx, topPadPx + titleLayout.height)
                     bodyLayout.draw(canvas)
                     canvas.restore()
+
                     canvas.restore()
                 }
 
+                // ═══ تصاویر: چرخش حول مرکز + قاب سفید ═══
                 images.forEach { img ->
-                    val bitmap = loadBitmapFromUri(context, img.uri)
-                    if (bitmap != null) {
-                        canvas.save()
-                        canvas.translate(img.x.coerceIn(0f, clampX) * density.density, img.y.coerceIn(0f, clampY) * density.density)
-                        canvas.rotate(img.rotation)
-                        canvas.scale(img.scale, img.scale)
-                        val imgWidth = BASE_IMAGE_WIDTH * density.density
-                        val imgHeight = imgWidth * bitmap.height / bitmap.width.toFloat()
-                        canvas.drawBitmap(bitmap, null, android.graphics.RectF(0f, 0f, imgWidth, imgHeight), null)
-                        canvas.restore()
-                        bitmap.recycle()
-                    }
+                    val bitmap = loadBitmapFromUri(context, img.uri) ?: return@forEach
+                    val scale = img.scale.coerceIn(0.3f, 3.0f)
+                    val wPx = BASE_IMAGE_WIDTH * scale * d
+                    val hPx = wPx * bitmap.height / bitmap.width.toFloat()
+                    val frame = 4f * d
+                    val totalW = wPx + 2f * frame
+                    val totalH = hPx + 2f * frame
+
+                    val cx = img.x.coerceIn(0f, clampX) * d + totalW / 2f
+                    val cy = img.y.coerceIn(0f, clampY) * d + totalH / 2f
+
+                    canvas.save()
+                    canvas.translate(cx, cy)
+                    canvas.rotate(img.rotation)
+                    canvas.translate(-totalW / 2f, -totalH / 2f)
+
+                    canvas.drawRoundRect(android.graphics.RectF(0f, 0f, totalW, totalH), 6f * d, 6f * d, framePaint)
+                    canvas.drawBitmap(bitmap, null, android.graphics.RectF(frame, frame, frame + wPx, frame + hPx), null)
+
+                    canvas.restore()
+                    bitmap.recycle()
                 }
 
                 pdfDocument.finishPage(page)
@@ -493,14 +518,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                         ) {
                             CorkTexture(bgIndex)
                             Vignette(bgIndex)
-
-                            // ✅ نشان عیب‌یابی: همیشه قابل مشاهده
-                            Text(
-                                "آیتم:${items.size} عکس:${images.size} بوم:${boardPxW}x${boardPxH} حالت:$boardSizeIndex",
-                                fontSize = 9.sp,
-                                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.55f),
-                                modifier = Modifier.absoluteOffset(4.dp, 4.dp)
-                            )
 
                             if (visibleItems.isEmpty() && images.isEmpty() && !isExporting) {
                                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
