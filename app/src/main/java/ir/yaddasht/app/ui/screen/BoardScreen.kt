@@ -132,7 +132,6 @@ private fun stickyBody(index: Int): androidx.compose.ui.graphics.Color = listOf(
 
 private fun stickyEdge(index: Int): androidx.compose.ui.graphics.Color = stickyBody(index).copy(alpha = .55f)
 
-// ✅ بازگردانی تابع pinColor که باعث خطای کامپایل شده بود
 private fun pinColor(index: Int): androidx.compose.ui.graphics.Color = listOf(
     androidx.compose.ui.graphics.Color(0xFFE53935),
     androidx.compose.ui.graphics.Color(0xFF1E88E5),
@@ -188,30 +187,25 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
         canUndo = BoardStore.canUndo(context, currentBoard)
     }
 
+    // ✅ کد ساده‌شده افزودن عکس - بدون takePersistableUriPermission
     val pickImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        uri?.let { pickedUri ->
-            try {
-                context.contentResolver.takePersistableUriPermission(pickedUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                BoardStore.addImage(context, currentBoard, pickedUri.toString())
+        if (uri == null) return@rememberLauncherForActivityResult
+        try {
+            val inputStream = context.contentResolver.openInputStream(uri)
+            if (inputStream != null) {
+                val dir = File(context.filesDir, "board_images")
+                if (!dir.exists()) dir.mkdirs()
+                val file = File(dir, "img-${System.currentTimeMillis()}.jpg")
+                file.outputStream().use { out -> inputStream.copyTo(out) }
+                inputStream.close()
+                BoardStore.addImage(context, currentBoard, Uri.fromFile(file).toString())
                 refresh()
                 Toast.makeText(context, "🖼️ تصویر اضافه شد", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                try {
-                    val inputStream = context.contentResolver.openInputStream(pickedUri)
-                    if (inputStream != null) {
-                        val dir = File(context.filesDir, "board_images")
-                        if (!dir.exists()) dir.mkdirs()
-                        val file = File(dir, "img-${System.currentTimeMillis()}.jpg")
-                        file.outputStream().use { out -> inputStream.copyTo(out) }
-                        inputStream.close()
-                        BoardStore.addImage(context, currentBoard, Uri.fromFile(file).toString())
-                        refresh()
-                        Toast.makeText(context, "🖼️ تصویر اضافه شد", Toast.LENGTH_SHORT).show()
-                    }
-                } catch (e2: Exception) {
-                    Toast.makeText(context, "خطا: ${e2.message}", Toast.LENGTH_LONG).show()
-                }
+            } else {
+                Toast.makeText(context, "خطا: نمی‌توان تصویر را خواند", Toast.LENGTH_LONG).show()
             }
+        } catch (e: Exception) {
+            Toast.makeText(context, "خطا: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -516,21 +510,22 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                 if ((draggingNoteId != null || draggingImageId != null) && !isExporting) {
                     TrashBin(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp), highlighted = isOverTrash)
                 }
+            }
+        }
 
-                if (!isExporting) {
-                    Box(
-                        Modifier.align(Alignment.BottomEnd).padding(18.dp)
-                            .size(60.dp)
-                            .shadow(12.dp, CircleShape)
-                            .clip(CircleShape)
-                            .background(Brush.radialGradient(listOf(androidx.compose.ui.graphics.Color(0xFFFFD54F), androidx.compose.ui.graphics.Color(0xFFFB8C00))))
-                            .combinedClickable(onClick = { showAddNote = true })
-                            .rotate(-4f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Filled.Add, "افزودن", tint = androidx.compose.ui.graphics.Color(0xFF3E2723), modifier = Modifier.size(28.dp))
-                    }
-                }
+        // ✅ دکمه "+" به باکس اصلی منتقل شد - همیشه دیده می‌شود
+        if (!isExporting) {
+            Box(
+                Modifier.align(Alignment.BottomEnd).padding(18.dp)
+                    .size(60.dp)
+                    .shadow(12.dp, CircleShape)
+                    .clip(CircleShape)
+                    .background(Brush.radialGradient(listOf(androidx.compose.ui.graphics.Color(0xFFFFD54F), androidx.compose.ui.graphics.Color(0xFFFB8C00))))
+                    .combinedClickable(onClick = { showAddNote = true })
+                    .rotate(-4f),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.Add, "افزودن", tint = androidx.compose.ui.graphics.Color(0xFF3E2723), modifier = Modifier.size(28.dp))
             }
         }
 
@@ -650,7 +645,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
         )
     }
     
-    // ✅ بازگشت به منطق ساده و صحیح: فقط نمایش یادداشت‌های موجود برای انتخاب
     if (showAddNote) { 
         val onBoard = items.map { it.noteId }.toSet()
         val available = notes.filter { it.id !in onBoard }
@@ -660,7 +654,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
             title = { Text("📝 چسباندن یادداشت", fontFamily = LalezarFont, fontSize = 20.sp) },
             text = { 
                 if (notes.isEmpty()) {
-                    // ✅ پیام ساده و راهنما بدون تغییر مسیر اجباری
                     Text("هنوز یادداشتی نساخته‌اید. لطفاً ابتدا از تب «یادداشت‌ها» یک یادداشت ایجاد کنید.", textAlign = TextAlign.Center)
                 } else if (available.isEmpty()) {
                     Text("همهٔ یادداشت‌ها در حال حاضر روی این تابلو هستند.")
@@ -678,6 +671,7 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                                         BoardStore.addItem(context, n.id, currentBoard)
                                         refresh()
                                         showAddNote = false
+                                        Toast.makeText(context, "یادداشت چسبانده شد", Toast.LENGTH_SHORT).show()
                                     })
                                     .padding(12.dp)
                             ) {
