@@ -92,6 +92,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -131,7 +132,7 @@ private fun stickyBody(index: Int): androidx.compose.ui.graphics.Color = listOf(
 
 private fun stickyEdge(index: Int): androidx.compose.ui.graphics.Color = stickyBody(index).copy(alpha = .55f)
 
-// ✅ این تابع در نسخه قبل جا افتاده بود و اکنون اضافه شد
+// ✅ بازگردانی تابع pinColor که باعث خطای کامپایل شده بود
 private fun pinColor(index: Int): androidx.compose.ui.graphics.Color = listOf(
     androidx.compose.ui.graphics.Color(0xFFE53935),
     androidx.compose.ui.graphics.Color(0xFF1E88E5),
@@ -649,15 +650,20 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
         )
     }
     
+    // ✅ بازگشت به منطق ساده و صحیح: فقط نمایش یادداشت‌های موجود برای انتخاب
     if (showAddNote) { 
         val onBoard = items.map { it.noteId }.toSet()
         val available = notes.filter { it.id !in onBoard }
+        
         AlertDialog(
             onDismissRequest = { showAddNote = false },
             title = { Text("📝 چسباندن یادداشت", fontFamily = LalezarFont, fontSize = 20.sp) },
             text = { 
-                if (available.isEmpty()) {
-                    Text("همهٔ یادداشت‌ها روی این تابلو هستند.")
+                if (notes.isEmpty()) {
+                    // ✅ پیام ساده و راهنما بدون تغییر مسیر اجباری
+                    Text("هنوز یادداشتی نساخته‌اید. لطفاً ابتدا از تب «یادداشت‌ها» یک یادداشت ایجاد کنید.", textAlign = TextAlign.Center)
+                } else if (available.isEmpty()) {
+                    Text("همهٔ یادداشت‌ها در حال حاضر روی این تابلو هستند.")
                 } else {
                     LazyColumn {
                         items(available) { n ->
