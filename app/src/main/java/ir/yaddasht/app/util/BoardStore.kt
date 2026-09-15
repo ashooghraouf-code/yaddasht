@@ -12,7 +12,7 @@ data class BoardItem(
     val x: Float,
     val y: Float,
     val rotation: Float,
-    val sizeIndex: Int
+    val scale: Float
 )
 
 data class BoardImage(
@@ -22,7 +22,7 @@ data class BoardImage(
     val x: Float,
     val y: Float,
     val rotation: Float,
-    val sizeIndex: Int
+    val scale: Float
 )
 
 object BoardStore {
@@ -87,7 +87,7 @@ object BoardStore {
                     o.optDouble("x", 0.0).toFloat(),
                     o.optDouble("y", 0.0).toFloat(),
                     o.optDouble("rotation", 0.0).toFloat(),
-                    o.optInt("sizeIndex", 1)
+                    o.optDouble("scale", 1.0).toFloat()
                 )
             }
         } catch (_: Exception) {
@@ -104,7 +104,7 @@ object BoardStore {
                 put("x", i.x.toDouble())
                 put("y", i.y.toDouble())
                 put("rotation", i.rotation.toDouble())
-                put("sizeIndex", i.sizeIndex)
+                put("scale", i.scale.toDouble())
             })
         }
         prefs(c).edit().putString(KEY_ITEMS, arr.toString()).apply()
@@ -119,7 +119,7 @@ object BoardStore {
         val x = 20f + (count % 3) * 40f
         val y = 20f + (count / 3) * 50f
         val rot = listOf(-4f, 3f, -2f, 5f, 0f)[count % 5]
-        list.add(BoardItem(noteId, boardId, x, y, rot, 1))
+        list.add(BoardItem(noteId, boardId, x, y, rot, 1.0f))
         saveItems(c, list)
     }
 
@@ -138,10 +138,10 @@ object BoardStore {
         })
     }
 
-    fun setSize(c: Context, noteId: Long, boardId: Long, sizeIndex: Int) {
+    fun setScale(c: Context, noteId: Long, boardId: Long, scale: Float) {
         saveItems(c, allItems(c).map {
             if (it.noteId == noteId && it.boardId == boardId)
-                it.copy(sizeIndex = sizeIndex.coerceIn(0, 2))
+                it.copy(scale = scale.coerceIn(0.3f, 3.0f))
             else it
         })
     }
@@ -163,7 +163,7 @@ object BoardStore {
                     o.optDouble("x", 0.0).toFloat(),
                     o.optDouble("y", 0.0).toFloat(),
                     o.optDouble("rotation", 0.0).toFloat(),
-                    o.optInt("sizeIndex", 1)
+                    o.optDouble("scale", 1.0).toFloat()
                 )
             }
         } catch (_: Exception) {
@@ -181,7 +181,7 @@ object BoardStore {
                 put("x", i.x.toDouble())
                 put("y", i.y.toDouble())
                 put("rotation", i.rotation.toDouble())
-                put("sizeIndex", i.sizeIndex)
+                put("scale", i.scale.toDouble())
             })
         }
         prefs(c).edit().putString(KEY_IMAGES, arr.toString()).apply()
@@ -194,7 +194,7 @@ object BoardStore {
         val count = list.count { it.boardId == boardId }
         val x = 30f + (count % 3) * 30f
         val y = 30f + (count / 3) * 40f
-        val img = BoardImage(System.currentTimeMillis(), boardId, uri, x, y, 0f, 1)
+        val img = BoardImage(System.currentTimeMillis(), boardId, uri, x, y, 0f, 1.0f)
         list.add(img)
         saveImages(c, list)
         return img
@@ -211,6 +211,14 @@ object BoardStore {
     fun rotateImage(c: Context, imageId: Long, boardId: Long, rotation: Float) {
         saveImages(c, allImages(c).map {
             if (it.id == imageId && it.boardId == boardId) it.copy(rotation = rotation)
+            else it
+        })
+    }
+
+    fun setImageScale(c: Context, imageId: Long, boardId: Long, scale: Float) {
+        saveImages(c, allImages(c).map {
+            if (it.id == imageId && it.boardId == boardId)
+                it.copy(scale = scale.coerceIn(0.3f, 3.0f))
             else it
         })
     }
