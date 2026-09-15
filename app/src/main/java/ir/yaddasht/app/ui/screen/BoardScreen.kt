@@ -41,6 +41,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -90,12 +91,15 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import ir.yaddasht.app.data.Note
+import ir.yaddasht.app.data.NoteDao
 import ir.yaddasht.app.ui.theme.LalezarFont
 import ir.yaddasht.app.ui.theme.VazirFont
 import ir.yaddasht.app.util.BoardImage
 import ir.yaddasht.app.util.BoardItem
 import ir.yaddasht.app.util.BoardStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.random.Random
 
@@ -115,11 +119,20 @@ private fun pinColor(index: Int): Color = listOf(
     Color(0xFFFDD835), Color(0xFF8E24AA), Color(0xFFFB8C00)
 )[index.coerceIn(0, 5)]
 
+// ✅ سایزهای تابلو: 0=صفحه گوشی، 1=A4 عمودی، 2=A3 عمودی، 3=A2 عمودی
+private val BOARD_SIZE_LABELS = listOf("📱 صفحه گوشی", "📄 A4", "📐 A3", "🗺️ A2")
+private val BOARD_SIZES_DP = listOf(
+    Pair(400f, 700f),   // صفحه گوشی
+    Pair(595f, 842f),   // A4
+    Pair(842f, 1191f),  // A3
+    Pair(1191f, 1684f)  // A2
+)
+
 private val BASE_NOTE_WIDTH = 150f
 private val BASE_IMAGE_WIDTH = 150f
 
 @Composable
-fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Unit) {
+fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val density = LocalDensity.current
 
@@ -142,6 +155,10 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
     var boardHeightDp by remember { mutableFloatStateOf(0f) }
 
     var capturingForShare by remember { mutableStateOf(false) }
+
+    // ✅ برای حذف دوگانه
+    var noteToDelete by remember { mutableStateOf<Note?>(null) }
+    var imageToDelete by remember { mutableStateOf<BoardImage?>(null) }
 
     val refresh: () -> Unit = {
         boards = BoardStore.boards(context)
@@ -184,7 +201,10 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
         }
     }
 
-    val bgIndex = boards.firstOrNull { it.id == currentBoard }?.background ?: 0
+    val currentBoardData = boards.firstOrNull { it.id == currentBoard }
+    val bgIndex = currentBoardData?.background ?: 0
+    val boardSizeIndex = currentBoardData?.sizeIndex ?: 1
+    val (boardWidthDp, boardHeightDpActual) = BOARD_SIZES_DP[boardSizeIndex.coerceIn(0, 3)]
 
     val visibleItems = remember(items, searchQuery, notes) {
         if (searchQuery.isBlank()) items
@@ -220,7 +240,7 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                         val intent = Intent(Intent.ACTION_SEND).apply {
                             type = "image/png"
                             putExtra(Intent.EXTRA_STREAM, uri)
-                            putExtra(Intent.EXTRA_SUBJECT, "تابلوی ${boards.firstOrNull { it.id == currentBoard }?.name ?: ""}")
+                            putExtra(Intent.EXTRA_SUBJECT, "تابلوی ${currentBoardData?.name ?: ""}")
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
                         context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری تابلو"))
@@ -241,7 +261,7 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "image/png"
                     putExtra(Intent.EXTRA_STREAM, uri)
-                    putExtra(Intent.EXTRA_SUBJECT, "تابلوی ${boards.firstOrNull { it.id == currentBoard }?.name ?: ""}")
+                    putExtra(Intent.EXTRA_SUBJECT, "تابلوی ${currentBoardData?.name ?: ""}")
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
                 context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری تابلو"))
@@ -293,6 +313,11 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                         BoardStore.setBackground(context, currentBoard, (bgIndex + 1) % 4)
                         refresh()
                     }) { Text("🎨", fontSize = 18.sp) }
+                    IconButton(onClick = {
+                        val next = (boardSizeIndex + 1) % 4
+                        BoardStore.setBoardSize(context, currentBoard, next)
+                        refresh()
+                    }) { Text(BOARD_SIZE_LABELS[boardSizeIndex], fontSize = 12.sp, color = Color(0xFFFFE0B2)) }
                     IconButton(
                         onClick = { if (BoardStore.undo(context, currentBoard)) refresh() },
                         enabled = canUndo
@@ -371,104 +396,109 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                 Modifier.fillMaxSize()
                     .onSizeChanged { s -> boardHeightDp = with(density) { s.height.toDp().value } }
             ) {
-                CorkTexture(bgIndex)
-                Vignette(bgIndex)
+                // ✅ Scroll برای تابلوهای بزرگ
+                val scrollStateV = rememberScrollState()
+                val scrollStateH = rememberScrollState()
+                
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollStateV)
+                        .horizontalScroll(scrollStateH)
+                ) {
+                    Box(
+                        Modifier
+                            .width(boardWidthDp.dp)
+                            .height(boardHeightDpActual.dp)
+                    ) {
+                        CorkTexture(bgIndex, boardWidthDp, boardHeightDpActual)
+                        Vignette(bgIndex, boardWidthDp, boardHeightDpActual)
 
-                if (visibleItems.isEmpty() && images.isEmpty()) {
-                    Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            if (searchQuery.isNotBlank()) "🔍" else "🗒️",
-                            fontSize = 64.sp,
-                            modifier = Modifier.rotate(if (searchQuery.isNotBlank()) 0f else -6f)
-                        )
-                        Text(
-                            if (searchQuery.isNotBlank()) "یادداشتی یافت نشد" else "تابلو خالی است",
-                            fontFamily = LalezarFont, fontSize = 22.sp,
-                            color = Color.White.copy(alpha = .85f)
-                        )
-                        Text(
-                            if (searchQuery.isNotBlank()) "عبارت دیگری امتحان کن"
-                            else "با دکمهٔ پایین، اولین یادداشت را بچسبان",
-                            fontFamily = VazirFont, fontSize = 13.sp,
-                            color = Color.White.copy(alpha = .6f)
-                        )
-                    }
-                }
-
-                visibleItems.forEachIndexed { idx, item ->
-                    val note = notes.firstOrNull { it.id == item.noteId }
-                    if (note != null) {
-                        StickyNote(
-                            note = note,
-                            item = item,
-                            variant = idx,
-                            stagger = idx,
-                            isDraggingThis = draggingNoteId == note.id,
-                            isOverTrash = isOverTrash && draggingNoteId == note.id,
-                            onOpen = { onOpenNote(note.id) },
-                            onMoved = { x, y ->
-                                BoardStore.move(context, note.id, currentBoard, x, y)
-                                refresh()
-                            },
-                            onRotated = { rot ->
-                                BoardStore.rotate(context, note.id, currentBoard, rot)
-                                refresh()
-                            },
-                            onScaleChanged = { scale ->
-                                BoardStore.setScale(context, note.id, currentBoard, scale)
-                                refresh()
-                            },
-                            onDragStart = { draggingNoteId = note.id },
-                            onDragUpdate = { y -> dragY = y },
-                            onDragEnd = { y, canceled ->
-                                if (!canceled && y > trashTopDp) {
-                                    BoardStore.removeItem(context, note.id, currentBoard)
-                                    refresh()
-                                    Toast.makeText(context, "🗑️ یادداشت حذف شد", Toast.LENGTH_SHORT).show()
-                                }
-                                draggingNoteId = null
-                            },
-                            onRemove = {
-                                BoardStore.removeItem(context, note.id, currentBoard)
-                                refresh()
+                        if (visibleItems.isEmpty() && images.isEmpty()) {
+                            Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    if (searchQuery.isNotBlank()) "🔍" else "🗒️",
+                                    fontSize = 64.sp,
+                                    modifier = Modifier.rotate(if (searchQuery.isNotBlank()) 0f else -6f)
+                                )
+                                Text(
+                                    if (searchQuery.isNotBlank()) "یادداشتی یافت نشد" else "تابلو خالی است",
+                                    fontFamily = LalezarFont, fontSize = 22.sp,
+                                    color = Color.White.copy(alpha = .85f)
+                                )
+                                Text(
+                                    if (searchQuery.isNotBlank()) "عبارت دیگری امتحان کن"
+                                    else "با دکمهٔ پایین، اولین یادداشت را بچسبان",
+                                    fontFamily = VazirFont, fontSize = 13.sp,
+                                    color = Color.White.copy(alpha = .6f)
+                                )
                             }
-                        )
-                    }
-                }
-
-                images.forEachIndexed { idx, img ->
-                    BoardImageItem(
-                        image = img,
-                        stagger = visibleItems.size + idx,
-                        isDraggingThis = draggingImageId == img.id,
-                        isOverTrash = isOverTrash && draggingImageId == img.id,
-                        onMoved = { x, y ->
-                            BoardStore.moveImage(context, img.id, currentBoard, x, y)
-                            refresh()
-                        },
-                        onRotated = { rot ->
-                            BoardStore.rotateImage(context, img.id, currentBoard, rot)
-                            refresh()
-                        },
-                        onScaleChanged = { scale ->
-                            BoardStore.setImageScale(context, img.id, currentBoard, scale)
-                            refresh()
-                        },
-                        onDragStart = { draggingImageId = img.id },
-                        onDragUpdate = { y -> dragY = y },
-                        onDragEnd = { y, canceled ->
-                            if (!canceled && y > trashTopDp) {
-                                BoardStore.removeImage(context, img.id, currentBoard)
-                                refresh()
-                                Toast.makeText(context, "🗑️ تصویر حذف شد", Toast.LENGTH_SHORT).show()
-                            }
-                            draggingImageId = null
-                        },
-                        onRemove = {
-                            BoardStore.removeImage(context, img.id, currentBoard)
-                            refresh()
                         }
-                    )
+
+                        visibleItems.forEachIndexed { idx, item ->
+                            val note = notes.firstOrNull { it.id == item.noteId }
+                            if (note != null) {
+                                StickyNote(
+                                    note = note,
+                                    item = item,
+                                    variant = idx,
+                                    stagger = idx,
+                                    isDraggingThis = draggingNoteId == note.id,
+                                    isOverTrash = isOverTrash && draggingNoteId == note.id,
+                                    onOpen = { onOpenNote(note.id) },
+                                    onMoved = { x, y ->
+                                        BoardStore.move(context, note.id, currentBoard, x, y)
+                                        refresh()
+                                    },
+                                    onRotated = { rot ->
+                                        BoardStore.rotate(context, note.id, currentBoard, rot)
+                                        refresh()
+                                    },
+                                    onScaleChanged = { scale ->
+                                        BoardStore.setScale(context, note.id, currentBoard, scale)
+                                        refresh()
+                                    },
+                                    onDragStart = { draggingNoteId = note.id },
+                                    onDragUpdate = { y -> dragY = y },
+                                    onDragEnd = { y, canceled ->
+                                        if (!canceled && y > trashTopDp) {
+                                            noteToDelete = note
+                                        }
+                                        draggingNoteId = null
+                                    }
+                                )
+                            }
+                        }
+
+                        images.forEachIndexed { idx, img ->
+                            BoardImageItem(
+                                image = img,
+                                stagger = visibleItems.size + idx,
+                                isDraggingThis = draggingImageId == img.id,
+                                isOverTrash = isOverTrash && draggingImageId == img.id,
+                                onMoved = { x, y ->
+                                    BoardStore.moveImage(context, img.id, currentBoard, x, y)
+                                    refresh()
+                                },
+                                onRotated = { rot ->
+                                    BoardStore.rotateImage(context, img.id, currentBoard, rot)
+                                    refresh()
+                                },
+                                onScaleChanged = { scale ->
+                                    BoardStore.setImageScale(context, img.id, currentBoard, scale)
+                                    refresh()
+                                },
+                                onDragStart = { draggingImageId = img.id },
+                                onDragUpdate = { y -> dragY = y },
+                                onDragEnd = { y, canceled ->
+                                    if (!canceled && y > trashTopDp) {
+                                        imageToDelete = img
+                                    }
+                                    draggingImageId = null
+                                }
+                            )
+                        }
+                    }
                 }
 
                 if (draggingNoteId != null || draggingImageId != null) {
@@ -516,6 +546,74 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                 )
             }
         }
+    }
+
+    // ✅ دیالوگ حذف دوگانه برای یادداشت
+    noteToDelete?.let { note ->
+        AlertDialog(
+            onDismissRequest = { noteToDelete = null },
+            title = { Text("🗑️ حذف یادداشت", fontFamily = LalezarFont, fontSize = 20.sp) },
+            text = {
+                Column {
+                    Text("«${note.title.ifBlank { "بدون عنوان" }}»")
+                    Text(
+                        "می‌خواهی از تابلو حذف شود یا کلاً از دفترچه؟",
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    BoardStore.removeItem(context, note.id, currentBoard)
+                    refresh()
+                    noteToDelete = null
+                    Toast.makeText(context, "از تابلو حذف شد", Toast.LENGTH_SHORT).show()
+                }) {
+                    Text("فقط از تابلو", color = Color(0xFFFB8C00), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { noteToDelete = null }) {
+                        Text("انصراف")
+                    }
+                    TextButton(onClick = {
+                        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                            noteDao.deleteById(note.id)
+                            BoardStore.removeItem(context, note.id, currentBoard)
+                            withContext(Dispatchers.Main) {
+                                refresh()
+                                noteToDelete = null
+                                Toast.makeText(context, "کلاً حذف شد", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }) {
+                        Text("حذف کامل", color = Color.Red, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        )
+    }
+
+    // ✅ دیالوگ حذف برای تصویر
+    imageToDelete?.let { img ->
+        AlertDialog(
+            onDismissRequest = { imageToDelete = null },
+            title = { Text("🗑️ حذف تصویر", fontFamily = LalezarFont, fontSize = 20.sp) },
+            text = { Text("این تصویر از تابلو حذف شود؟") },
+            confirmButton = {
+                TextButton(onClick = {
+                    BoardStore.removeImage(context, img.id, currentBoard)
+                    refresh()
+                    imageToDelete = null
+                    Toast.makeText(context, "تصویر حذف شد", Toast.LENGTH_SHORT).show()
+                }) {
+                    Text("حذف", color = Color.Red, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = { TextButton(onClick = { imageToDelete = null }) { Text("انصراف") } }
+        )
     }
 
     if (showAddBoard) {
@@ -593,8 +691,7 @@ private fun BoardImageItem(
     onScaleChanged: (Float) -> Unit,
     onDragStart: () -> Unit,
     onDragUpdate: (Float) -> Unit,
-    onDragEnd: (Float, Boolean) -> Unit,
-    onRemove: () -> Unit
+    onDragEnd: (Float, Boolean) -> Unit
 ) {
     val density = LocalDensity.current
     var pos by remember(image.id, image.boardId) { mutableStateOf(Offset(image.x, image.y)) }
@@ -713,22 +810,6 @@ private fun BoardImageItem(
                 modifier = Modifier.fillMaxWidth()
             )
         }
-
-        if (!isDraggingThis) {
-            IconButton(
-                onClick = onRemove,
-                modifier = Modifier.align(Alignment.TopEnd)
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = .55f))
-            ) {
-                Icon(
-                    Icons.Filled.Close, "حذف",
-                    tint = Color.White,
-                    modifier = Modifier.size(14.dp)
-                )
-            }
-        }
     }
 }
 
@@ -762,9 +843,9 @@ private fun TrashBin(modifier: Modifier = Modifier, highlighted: Boolean) {
 }
 
 @Composable
-private fun CorkTexture(bgIndex: Int) {
+private fun CorkTexture(bgIndex: Int, widthDp: Float, heightDp: Float) {
     val base = boardBase(bgIndex)
-    Canvas(Modifier.fillMaxSize()) {
+    Canvas(Modifier.width(widthDp.dp).height(heightDp.dp)) {
         drawRect(base)
         val rnd = Random(1337)
         repeat(450) {
@@ -783,10 +864,10 @@ private fun CorkTexture(bgIndex: Int) {
 }
 
 @Composable
-private fun Vignette(bgIndex: Int) {
+private fun Vignette(bgIndex: Int, widthDp: Float, heightDp: Float) {
     val strength = if (bgIndex == 3) .12f else .30f
     Box(
-        Modifier.fillMaxSize().background(
+        Modifier.width(widthDp.dp).height(heightDp.dp).background(
             Brush.radialGradient(
                 colors = listOf(Color.Transparent, Color.Black.copy(alpha = strength)),
                 center = androidx.compose.ui.geometry.Offset.Unspecified,
@@ -810,8 +891,7 @@ private fun StickyNote(
     onScaleChanged: (Float) -> Unit,
     onDragStart: () -> Unit,
     onDragUpdate: (Float) -> Unit,
-    onDragEnd: (Float, Boolean) -> Unit,
-    onRemove: () -> Unit
+    onDragEnd: (Float, Boolean) -> Unit
 ) {
     val density = LocalDensity.current
     var pos by remember(item.noteId, item.boardId) { mutableStateOf(Offset(item.x, item.y)) }
@@ -963,22 +1043,6 @@ private fun StickyNote(
             )
         } else {
             TapeStrip(Modifier.align(Alignment.TopCenter).offset(y = (-9).dp))
-        }
-
-        if (!isDraggingThis) {
-            IconButton(
-                onClick = onRemove,
-                modifier = Modifier.align(Alignment.TopEnd)
-                    .size(22.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = .35f))
-            ) {
-                Icon(
-                    Icons.Filled.Close, "حذف",
-                    tint = Color.White,
-                    modifier = Modifier.size(13.dp)
-                )
-            }
         }
     }
 }
