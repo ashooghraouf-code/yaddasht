@@ -304,6 +304,7 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                         // فول‌اسکرین: فقط تابلو (دکمهٔ ✕ خودِ تابلو برمی‌گرداند)
                         BoardScreen(
                             notes = notes,
+                            noteDao = dao, // ✅ اصلاح شد
                             onOpenNote = { onOpenNote(it) },
                             onBack = { boardFullscreen = false }
                         )
@@ -319,6 +320,7 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                         Box(Modifier.weight(1f)) {
                             BoardScreen(
                                 notes = notes,
+                                noteDao = dao, // ✅ اصلاح شد
                                 onOpenNote = { onOpenNote(it) },
                                 onBack = { tab = 0 }
                             )
