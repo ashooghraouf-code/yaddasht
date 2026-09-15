@@ -131,6 +131,16 @@ private fun stickyBody(index: Int): androidx.compose.ui.graphics.Color = listOf(
 
 private fun stickyEdge(index: Int): androidx.compose.ui.graphics.Color = stickyBody(index).copy(alpha = .55f)
 
+// ✅ این تابع در نسخه قبل جا افتاده بود و اکنون اضافه شد
+private fun pinColor(index: Int): androidx.compose.ui.graphics.Color = listOf(
+    androidx.compose.ui.graphics.Color(0xFFE53935),
+    androidx.compose.ui.graphics.Color(0xFF1E88E5),
+    androidx.compose.ui.graphics.Color(0xFF43A047),
+    androidx.compose.ui.graphics.Color(0xFFFDD835),
+    androidx.compose.ui.graphics.Color(0xFF8E24AA),
+    androidx.compose.ui.graphics.Color(0xFFFB8C00)
+)[index.coerceIn(0, 5)]
+
 private val BOARD_SIZE_LABELS = listOf("📱 گوشی", "📄 A4", "📐 A3", "🗺️ A2")
 private val BOARD_SIZES_DP = listOf(
     Pair(400f, 700f),
