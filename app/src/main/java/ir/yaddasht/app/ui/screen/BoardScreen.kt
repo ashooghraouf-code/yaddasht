@@ -49,6 +49,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -57,7 +58,6 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
-import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -67,9 +67,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -90,11 +92,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
@@ -141,9 +145,21 @@ private fun pinColor(index: Int): androidx.compose.ui.graphics.Color = listOf(
     androidx.compose.ui.graphics.Color(0xFFFB8C00)
 )[index.coerceIn(0, 5)]
 
+private fun corkDotA(index: Int): androidx.compose.ui.graphics.Color = when (index) {
+    2 -> androidx.compose.ui.graphics.Color.White.copy(alpha = 0.07f)
+    3 -> androidx.compose.ui.graphics.Color(0xFF8D6E63).copy(alpha = 0.12f)
+    else -> androidx.compose.ui.graphics.Color(0xFF5D4037).copy(alpha = 0.30f)
+}
+
+private fun corkDotB(index: Int): androidx.compose.ui.graphics.Color = when (index) {
+    2 -> androidx.compose.ui.graphics.Color.White.copy(alpha = 0.03f)
+    3 -> androidx.compose.ui.graphics.Color(0xFFD7CCC8).copy(alpha = 0.30f)
+    else -> androidx.compose.ui.graphics.Color(0xFFD7CCC8).copy(alpha = 0.24f)
+}
+
 private val BOARD_SIZE_LABELS = listOf("📱 گوشی", "📄 A4", "📐 A3", "🗺️ A2")
 private val BOARD_SIZES_DP = listOf(
-    Pair(400f, 700f),
+    Pair(0f, 0f),
     Pair(595f, 842f),
     Pair(842f, 1191f),
     Pair(1191f, 1684f)
@@ -166,7 +182,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
     var showAddBoard by remember { mutableStateOf(false) }
     var showAddNote by remember { mutableStateOf(false) }
     var boardName by remember { mutableStateOf("") }
-    var canUndo by remember { mutableStateOf(BoardStore.canUndo(context, currentBoard)) }
     var isExporting by remember { mutableStateOf(false) }
 
     var showSearch by remember { mutableStateOf(false) }
@@ -175,7 +190,9 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
     var draggingNoteId by remember { mutableStateOf<Long?>(null) }
     var draggingImageId by remember { mutableStateOf<Long?>(null) }
     var dragY by remember { mutableFloatStateOf(0f) }
-    var boardHeightDp by remember { mutableFloatStateOf(0f) }
+    var boardAreaHeightDp by remember { mutableFloatStateOf(0f) }
+    var boardPxW by remember { mutableIntStateOf(0) }
+    var boardPxH by remember { mutableIntStateOf(0) }
 
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
     var imageToDelete by remember { mutableStateOf<BoardImage?>(null) }
@@ -184,10 +201,8 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
         boards = BoardStore.boards(context)
         items = BoardStore.items(context, currentBoard)
         images = BoardStore.images(context, currentBoard)
-        canUndo = BoardStore.canUndo(context, currentBoard)
     }
 
-    // ✅ کد ساده‌شده افزودن عکس - بدون takePersistableUriPermission
     val pickImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         try {
@@ -211,8 +226,10 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
 
     val currentBoardData = boards.firstOrNull { it.id == currentBoard }
     val bgIndex = currentBoardData?.background ?: 0
-    val boardSizeIndex = currentBoardData?.sizeIndex ?: 1
-    val (boardWidthDp, boardHeightDpActual) = BOARD_SIZES_DP[boardSizeIndex.coerceIn(0, 3)]
+    val boardSizeIndex = currentBoardData?.sizeIndex ?: 0
+    val isPhoneSize = boardSizeIndex == 0
+    val boardWidthDp = if (isPhoneSize) with(density) { boardPxW.toDp().value } else BOARD_SIZES_DP[boardSizeIndex].first
+    val boardHeightDpActual = if (isPhoneSize) with(density) { boardPxH.toDp().value } else BOARD_SIZES_DP[boardSizeIndex].second
 
     val visibleItems = remember(items, searchQuery, notes) {
         if (searchQuery.isBlank()) items
@@ -222,7 +239,7 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
         }
     }
 
-    val trashTopDp = if (boardHeightDp > 1f) boardHeightDp - 150f else Float.MAX_VALUE
+    val trashTopDp = if (boardAreaHeightDp > 1f) boardAreaHeightDp - 150f else Float.MAX_VALUE
     val isOverTrash = (draggingNoteId != null || draggingImageId != null) && dragY > trashTopDp
 
     fun exportToPdf() {
@@ -230,12 +247,14 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
         isExporting = true
         scope.launch(Dispatchers.IO) {
             try {
+                val pxW = if (boardPxW > 0) boardPxW else (boardWidthDp * density.density).toInt()
+                val pxH = if (boardPxH > 0) boardPxH else (boardHeightDpActual * density.density).toInt()
                 val dir = File(context.cacheDir, "board_exports")
                 if (!dir.exists()) dir.mkdirs()
                 val file = File(dir, "board-${System.currentTimeMillis()}.pdf")
-                
+
                 val pdfDocument = PdfDocument()
-                val pageInfo = PdfDocument.PageInfo.Builder(boardWidthDp.toInt(), boardHeightDpActual.toInt(), 1).create()
+                val pageInfo = PdfDocument.PageInfo.Builder(pxW, pxH, 1).create()
                 val page = pdfDocument.startPage(pageInfo)
                 val canvas = page.canvas
 
@@ -243,12 +262,12 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
 
                 val textPaint = TextPaint().apply {
                     color = androidx.compose.ui.graphics.Color(0xFF3E2723).toArgb()
-                    textSize = 11f * (context.resources.displayMetrics.density)
+                    textSize = 11f * density.density
                     isAntiAlias = true
                 }
                 val titlePaint = TextPaint().apply {
                     color = androidx.compose.ui.graphics.Color(0xFF3E2723).toArgb()
-                    textSize = 15f * (context.resources.displayMetrics.density)
+                    textSize = 15f * density.density
                     isAntiAlias = true
                     typeface = android.graphics.Typeface.DEFAULT_BOLD
                 }
@@ -256,11 +275,11 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
 
                 items.forEach { item ->
                     val note = notes.firstOrNull { it.id == item.noteId } ?: return@forEach
-                    val noteWidth = (BASE_NOTE_WIDTH * item.scale) * context.resources.displayMetrics.density
-                    val noteHeight = 200f * context.resources.displayMetrics.density
+                    val noteWidth = (BASE_NOTE_WIDTH * item.scale) * density.density
+                    val noteHeight = 200f * density.density
 
                     canvas.save()
-                    canvas.translate(item.x * context.resources.displayMetrics.density, item.y * context.resources.displayMetrics.density)
+                    canvas.translate(item.x * density.density, item.y * density.density)
                     canvas.rotate(item.rotation)
                     canvas.scale(item.scale, item.scale)
 
@@ -269,7 +288,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     canvas.drawRoundRect(rect, 9f, 9f, bgPaint)
 
                     var yPos = 40f
-                    
                     val titleText = note.title.ifBlank { "بدون عنوان" }
                     val titleLayout = StaticLayout.Builder.obtain(titleText, 0, titleText.length, titlePaint, noteWidth.toInt() - 24)
                         .setAlignment(Layout.Alignment.ALIGN_NORMAL).build()
@@ -286,7 +304,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     canvas.translate(12f, yPos)
                     bodyLayout.draw(canvas)
                     canvas.restore()
-
                     canvas.restore()
                 }
 
@@ -294,11 +311,11 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     val bitmap = loadBitmapFromUri(context, img.uri)
                     if (bitmap != null) {
                         canvas.save()
-                        canvas.translate(img.x * context.resources.displayMetrics.density, img.y * context.resources.displayMetrics.density)
+                        canvas.translate(img.x * density.density, img.y * density.density)
                         canvas.rotate(img.rotation)
                         canvas.scale(img.scale, img.scale)
-                        val imgWidth = (BASE_IMAGE_WIDTH * context.resources.displayMetrics.density)
-                        val imgHeight = (imgWidth * bitmap.height / bitmap.width.toFloat())
+                        val imgWidth = BASE_IMAGE_WIDTH * density.density
+                        val imgHeight = imgWidth * bitmap.height / bitmap.width.toFloat()
                         canvas.drawBitmap(bitmap, null, android.graphics.RectF(0f, 0f, imgWidth, imgHeight), null)
                         canvas.restore()
                         bitmap.recycle()
@@ -337,10 +354,42 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                         Modifier.fillMaxWidth()
                             .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .28f))
                             .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            .padding(horizontal = 8.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "بازگشت", tint = androidx.compose.ui.graphics.Color(0xFFFFE0B2))
+                        }
+
+                        boards.forEach { b ->
+                            val selected = b.id == currentBoard
+                            Surface(
+                                onClick = { currentBoard = b.id; refresh(); searchQuery = "" },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (selected) androidx.compose.ui.graphics.Color(0xFFFFB74D) else androidx.compose.ui.graphics.Color.White.copy(alpha = .12f),
+                                shadowElevation = if (selected) 6.dp else 0.dp
+                            ) {
+                                Text(
+                                    b.name,
+                                    color = if (selected) androidx.compose.ui.graphics.Color(0xFF3E2723) else androidx.compose.ui.graphics.Color(0xFFFFE0B2),
+                                    fontFamily = LalezarFont, fontSize = 15.sp,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                )
+                            }
+                        }
+
+                        // ✅ شمارندهٔ آیتم‌های روی تابلو
+                        Surface(shape = RoundedCornerShape(8.dp), color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.12f)) {
+                            Text(
+                                "📝${items.size} 🖼${images.size}",
+                                fontSize = 11.sp,
+                                color = androidx.compose.ui.graphics.Color(0xFFFFE0B2),
+                                fontFamily = VazirFont,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+
                         Surface(
                             onClick = { pickImageLauncher.launch(arrayOf("image/*")) },
                             shape = RoundedCornerShape(12.dp),
@@ -379,16 +428,11 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                             }
                         }
 
-                        Spacer(modifier = Modifier.width(1.dp).height(28.dp).background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.2f)))
-
                         IconButton(onClick = { BoardStore.setBackground(context, currentBoard, (bgIndex + 1) % 4); refresh() }) {
                             Icon(Icons.Filled.Palette, "تغییر پس‌زمینه", tint = androidx.compose.ui.graphics.Color(0xFFFFE0B2))
                         }
                         Surface(onClick = { BoardStore.setBoardSize(context, currentBoard, (boardSizeIndex + 1) % 4); refresh() }, shape = RoundedCornerShape(8.dp), color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.1f)) {
                             Text(BOARD_SIZE_LABELS[boardSizeIndex], fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFFFFE0B2), fontFamily = VazirFont, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
-                        }
-                        IconButton(onClick = { if (BoardStore.undo(context, currentBoard)) refresh() }, enabled = canUndo) {
-                            Icon(Icons.Filled.Undo, "بازگشت", tint = if (canUndo) androidx.compose.ui.graphics.Color(0xFFFFE0B2) else androidx.compose.ui.graphics.Color(0xFF777777))
                         }
                         IconButton(onClick = { boardName = ""; showAddBoard = true }) {
                             Icon(Icons.Filled.Add, "تابلو جدید", tint = androidx.compose.ui.graphics.Color(0xFFFFE0B2))
@@ -399,14 +443,14 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()
-                            .width(50.dp)
+                            .width(40.dp)
                             .background(
                                 Brush.horizontalGradient(
                                     colors = listOf(
                                         androidx.compose.ui.graphics.Color.Transparent,
                                         androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f)
                                     ),
-                                    startX = 50f,
+                                    startX = 40f,
                                     endX = 0f
                                 )
                             )
@@ -447,62 +491,76 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                 }
             }
 
-            Box(Modifier.fillMaxSize().onSizeChanged { s -> boardHeightDp = with(density) { s.height.toDp().value } }) {
-                val scrollStateV = rememberScrollState()
-                val scrollStateH = rememberScrollState()
-                
-                Box(Modifier.fillMaxSize().verticalScroll(scrollStateV).horizontalScroll(scrollStateH)) {
-                    Box(Modifier.width(boardWidthDp.dp).height(boardHeightDpActual.dp)) {
-                        CorkTexture(bgIndex, boardWidthDp, boardHeightDpActual)
-                        Vignette(bgIndex, boardWidthDp, boardHeightDpActual)
+            Box(Modifier.fillMaxSize().onSizeChanged { s -> boardAreaHeightDp = with(density) { s.height.toDp().value } }) {
+                // ✅ بوم تابلو با جهت چپ‌به‌راست تا مختصات از گوشهٔ چپ-بالا محاسبه شود
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                    val scrollStateV = rememberScrollState()
+                    val scrollStateH = rememberScrollState()
 
-                        if (visibleItems.isEmpty() && images.isEmpty() && !isExporting) {
-                            Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(if (searchQuery.isNotBlank()) "🔍" else "🗒️", fontSize = 64.sp, modifier = Modifier.rotate(if (searchQuery.isNotBlank()) 0f else -6f))
-                                Text(if (searchQuery.isNotBlank()) "یادداشتی یافت نشد" else "تابلو خالی است", fontFamily = LalezarFont, fontSize = 22.sp, color = androidx.compose.ui.graphics.Color.White.copy(alpha = .85f))
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .then(if (!isPhoneSize) Modifier.verticalScroll(scrollStateV).horizontalScroll(scrollStateH) else Modifier)
+                    ) {
+                        Box(
+                            Modifier
+                                .then(if (isPhoneSize) Modifier.fillMaxSize() else Modifier.width(boardWidthDp.dp).height(boardHeightDpActual.dp))
+                                .onSizeChanged { s -> boardPxW = s.width; boardPxH = s.height }
+                        ) {
+                            CorkTexture(bgIndex)
+                            Vignette(bgIndex)
+
+                            if (visibleItems.isEmpty() && images.isEmpty() && !isExporting) {
+                                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                                    Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(if (searchQuery.isNotBlank()) "🔍" else "🗒️", fontSize = 64.sp, modifier = Modifier.rotate(if (searchQuery.isNotBlank()) 0f else -6f))
+                                        Text(if (searchQuery.isNotBlank()) "یادداشتی یافت نشد" else "تابلو خالی است", fontFamily = LalezarFont, fontSize = 22.sp, color = androidx.compose.ui.graphics.Color.White.copy(alpha = .85f))
+                                        Text("با دکمهٔ + یادداشت بچسبانید یا با دکمهٔ «عکس» تصویر اضافه کنید", fontFamily = VazirFont, fontSize = 13.sp, color = androidx.compose.ui.graphics.Color.White.copy(alpha = .6f), textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
+                                    }
+                                }
                             }
-                        }
 
-                        visibleItems.forEachIndexed { idx, item ->
-                            val note = notes.firstOrNull { it.id == item.noteId }
-                            if (note != null) {
-                                StickyNote(
-                                    note = note,
-                                    item = item,
-                                    variant = idx,
-                                    stagger = idx,
-                                    isDraggingThis = draggingNoteId == note.id,
-                                    isOverTrash = isOverTrash && draggingNoteId == note.id,
-                                    onOpen = { onOpenNote(note.id) },
-                                    onMoved = { x, y -> BoardStore.move(context, note.id, currentBoard, x, y); refresh() },
-                                    onRotated = { rot -> BoardStore.rotate(context, note.id, currentBoard, rot); refresh() },
-                                    onScaleChanged = { scale -> BoardStore.setScale(context, note.id, currentBoard, scale); refresh() },
-                                    onDragStart = { draggingNoteId = note.id },
+                            visibleItems.forEachIndexed { idx, item ->
+                                val note = notes.firstOrNull { it.id == item.noteId }
+                                if (note != null) {
+                                    StickyNote(
+                                        note = note,
+                                        item = item,
+                                        variant = idx,
+                                        stagger = idx,
+                                        isDraggingThis = draggingNoteId == note.id,
+                                        isOverTrash = isOverTrash && draggingNoteId == note.id,
+                                        onOpen = { onOpenNote(note.id) },
+                                        onMoved = { x, y -> BoardStore.move(context, note.id, currentBoard, x, y); refresh() },
+                                        onRotated = { rot -> BoardStore.rotate(context, note.id, currentBoard, rot); refresh() },
+                                        onScaleChanged = { scale -> BoardStore.setScale(context, note.id, currentBoard, scale); refresh() },
+                                        onDragStart = { draggingNoteId = note.id },
+                                        onDragUpdate = { y -> dragY = y },
+                                        onDragEnd = { y, canceled ->
+                                            if (!canceled && y > trashTopDp) noteToDelete = note
+                                            draggingNoteId = null
+                                        }
+                                    )
+                                }
+                            }
+
+                            images.forEachIndexed { idx, img ->
+                                BoardImageItem(
+                                    image = img,
+                                    stagger = visibleItems.size + idx,
+                                    isDraggingThis = draggingImageId == img.id,
+                                    isOverTrash = isOverTrash && draggingImageId == img.id,
+                                    onMoved = { x, y -> BoardStore.moveImage(context, img.id, currentBoard, x, y); refresh() },
+                                    onRotated = { rot -> BoardStore.rotateImage(context, img.id, currentBoard, rot); refresh() },
+                                    onScaleChanged = { scale -> BoardStore.setImageScale(context, img.id, currentBoard, scale); refresh() },
+                                    onDragStart = { draggingImageId = img.id },
                                     onDragUpdate = { y -> dragY = y },
                                     onDragEnd = { y, canceled ->
-                                        if (!canceled && y > trashTopDp) noteToDelete = note
-                                        draggingNoteId = null
+                                        if (!canceled && y > trashTopDp) imageToDelete = img
+                                        draggingImageId = null
                                     }
                                 )
                             }
-                        }
-
-                        images.forEachIndexed { idx, img ->
-                            BoardImageItem(
-                                image = img,
-                                stagger = visibleItems.size + idx,
-                                isDraggingThis = draggingImageId == img.id,
-                                isOverTrash = isOverTrash && draggingImageId == img.id,
-                                onMoved = { x, y -> BoardStore.moveImage(context, img.id, currentBoard, x, y); refresh() },
-                                onRotated = { rot -> BoardStore.rotateImage(context, img.id, currentBoard, rot); refresh() },
-                                onScaleChanged = { scale -> BoardStore.setImageScale(context, img.id, currentBoard, scale); refresh() },
-                                onDragStart = { draggingImageId = img.id },
-                                onDragUpdate = { y -> dragY = y },
-                                onDragEnd = { y, canceled ->
-                                    if (!canceled && y > trashTopDp) imageToDelete = img
-                                    draggingImageId = null
-                                }
-                            )
                         }
                     }
                 }
@@ -513,7 +571,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
             }
         }
 
-        // ✅ دکمه "+" به باکس اصلی منتقل شد - همیشه دیده می‌شود
         if (!isExporting) {
             Box(
                 Modifier.align(Alignment.BottomEnd).padding(18.dp)
@@ -529,21 +586,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
             }
         }
 
-        if (!isExporting) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(12.dp)
-                    .size(40.dp)
-                    .shadow(6.dp, CircleShape)
-                    .clip(CircleShape)
-                    .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f))
-            ) {
-                Icon(Icons.Filled.Close, "بازگشت", tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(22.dp))
-            }
-        }
-        
         if (isExporting) {
             Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f)), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -644,15 +686,15 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
             }
         )
     }
-    
-    if (showAddNote) { 
+
+    if (showAddNote) {
         val onBoard = items.map { it.noteId }.toSet()
         val available = notes.filter { it.id !in onBoard }
-        
+
         AlertDialog(
             onDismissRequest = { showAddNote = false },
             title = { Text("📝 چسباندن یادداشت", fontFamily = LalezarFont, fontSize = 20.sp) },
-            text = { 
+            text = {
                 if (notes.isEmpty()) {
                     Text("هنوز یادداشتی نساخته‌اید. لطفاً ابتدا از تب «یادداشت‌ها» یک یادداشت ایجاد کنید.", textAlign = TextAlign.Center)
                 } else if (available.isEmpty()) {
@@ -725,19 +767,13 @@ private fun BoardImageItem(
     onDragEnd: (Float, Boolean) -> Unit
 ) {
     val density = LocalDensity.current
-    var pos by remember(image.id, image.boardId) { mutableStateOf(Offset(image.x, image.y)) }
+    var pos by remember(image.id, image.boardId) { mutableStateOf(Offset(image.x.coerceAtLeast(0f), image.y.coerceAtLeast(0f))) }
     var rotation by remember(image.id, image.boardId) { mutableFloatStateOf(image.rotation) }
     var scale by remember(image.id, image.boardId) { mutableFloatStateOf(image.scale) }
     var visualZoom by remember { mutableFloatStateOf(1f) }
-    var appeared by remember { mutableStateOf(false) }
     var lastInteraction by remember { mutableLongStateOf(0L) }
     var gestureActive by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        delay(stagger * 70L)
-        appeared = true
-    }
-    
     LaunchedEffect(lastInteraction) {
         if (lastInteraction > 0 && !gestureActive) {
             delay(500)
@@ -746,7 +782,7 @@ private fun BoardImageItem(
             onScaleChanged(scale)
         }
     }
-    
+
     LaunchedEffect(lastInteraction) {
         if (lastInteraction > 0) {
             delay(400)
@@ -754,8 +790,6 @@ private fun BoardImageItem(
         }
     }
 
-    val entranceScale by animateFloatAsState(targetValue = if (appeared) 1f else 0.5f, label = "in-scale")
-    val entranceAlpha by animateFloatAsState(targetValue = if (appeared) 1f else 0f, label = "in-alpha")
     val trashScale by animateFloatAsState(targetValue = if (isOverTrash) 0.4f else 1f, label = "trash-scale")
     val trashAlpha by animateFloatAsState(targetValue = if (isOverTrash) 0.3f else 1f, label = "trash-alpha")
 
@@ -763,12 +797,13 @@ private fun BoardImageItem(
 
     Box(
         Modifier
-            .alpha(entranceAlpha * trashAlpha)
+            .align(Alignment.TopLeft)
+            .alpha(trashAlpha)
             .offset { with(density) { IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx()) } }
             .width(widthDp)
             .graphicsLayer {
                 rotationZ = rotation
-                val s = entranceScale * visualZoom * trashScale
+                val s = visualZoom * trashScale
                 scaleX = s
                 scaleY = s
             }
@@ -849,34 +884,32 @@ private fun TrashBin(modifier: Modifier = Modifier, highlighted: Boolean) {
 }
 
 @Composable
-private fun CorkTexture(bgIndex: Int, widthDp: Float, heightDp: Float) {
+private fun CorkTexture(bgIndex: Int) {
     val base = boardBase(bgIndex)
-    Canvas(Modifier.width(widthDp.dp).height(heightDp.dp)) {
+    val dotA = corkDotA(bgIndex)
+    val dotB = corkDotB(bgIndex)
+    Canvas(Modifier.fillMaxSize()) {
         drawRect(base)
         val rnd = Random(1337)
-        repeat(450) {
+        repeat(600) {
             val x = rnd.nextFloat() * size.width
             val y = rnd.nextFloat() * size.height
-            val r = rnd.nextFloat() * 2.6f + 0.6f
+            val r = rnd.nextFloat() * 3.2f + 0.8f
             val dark = rnd.nextBoolean()
-            drawCircle(
-                color = if (dark) androidx.compose.ui.graphics.Color(0xFF5D4037).copy(alpha = .16f) else androidx.compose.ui.graphics.Color(0xFFD7CCC8).copy(alpha = .12f),
-                radius = r,
-                center = Offset(x, y)
-            )
+            drawCircle(color = if (dark) dotA else dotB, radius = r, center = Offset(x, y))
         }
     }
 }
 
 @Composable
-private fun Vignette(bgIndex: Int, widthDp: Float, heightDp: Float) {
-    val strength = if (bgIndex == 3) .12f else .30f
+private fun Vignette(bgIndex: Int) {
+    val strength = if (bgIndex == 3) .10f else .25f
     Box(
-        Modifier.width(widthDp.dp).height(heightDp.dp).background(
+        Modifier.fillMaxSize().background(
             Brush.radialGradient(
                 colors = listOf(androidx.compose.ui.graphics.Color.Transparent, androidx.compose.ui.graphics.Color.Black.copy(alpha = strength)),
                 center = androidx.compose.ui.geometry.Offset.Unspecified,
-                radius = 900f
+                radius = 1200f
             )
         )
     )
@@ -899,19 +932,13 @@ private fun StickyNote(
     onDragEnd: (Float, Boolean) -> Unit
 ) {
     val density = LocalDensity.current
-    var pos by remember(item.noteId, item.boardId) { mutableStateOf(Offset(item.x, item.y)) }
+    var pos by remember(item.noteId, item.boardId) { mutableStateOf(Offset(item.x.coerceAtLeast(0f), item.y.coerceAtLeast(0f))) }
     var rotation by remember(item.noteId, item.boardId) { mutableFloatStateOf(item.rotation) }
     var scale by remember(item.noteId, item.boardId) { mutableFloatStateOf(item.scale) }
     var visualZoom by remember { mutableFloatStateOf(1f) }
-    var appeared by remember { mutableStateOf(false) }
     var lastInteraction by remember { mutableLongStateOf(0L) }
     var gestureActive by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        delay(stagger * 70L)
-        appeared = true
-    }
-    
     LaunchedEffect(lastInteraction) {
         if (lastInteraction > 0 && !gestureActive) {
             delay(500)
@@ -920,7 +947,7 @@ private fun StickyNote(
             onScaleChanged(scale)
         }
     }
-    
+
     LaunchedEffect(lastInteraction) {
         if (lastInteraction > 0) {
             delay(400)
@@ -928,8 +955,6 @@ private fun StickyNote(
         }
     }
 
-    val entranceScale by animateFloatAsState(targetValue = if (appeared) 1f else 0.5f, label = "in-scale")
-    val entranceAlpha by animateFloatAsState(targetValue = if (appeared) 1f else 0f, label = "in-alpha")
     val trashScale by animateFloatAsState(targetValue = if (isOverTrash) 0.4f else 1f, label = "trash-scale")
     val trashAlpha by animateFloatAsState(targetValue = if (isOverTrash) 0.3f else 1f, label = "trash-alpha")
 
@@ -939,12 +964,13 @@ private fun StickyNote(
 
     Box(
         Modifier
-            .alpha(entranceAlpha * trashAlpha)
+            .align(Alignment.TopLeft)
+            .alpha(trashAlpha)
             .offset { with(density) { IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx()) } }
             .width(widthDp)
             .graphicsLayer {
                 rotationZ = rotation
-                val s = entranceScale * visualZoom * trashScale
+                val s = visualZoom * trashScale
                 scaleX = s
                 scaleY = s
             }
@@ -994,9 +1020,11 @@ private fun StickyNote(
                 .combinedClickable(onClick = onOpen)
                 .padding(top = if (usePin) 20.dp else 14.dp, start = 12.dp, end = 12.dp, bottom = 16.dp)
         ) {
-            Column {
-                Text(note.title.ifBlank { "بدون عنوان" }, fontFamily = LalezarFont, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color(0xFF3E2723), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(note.body, fontFamily = VazirFont, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF5D4037), maxLines = 5, overflow = TextOverflow.Ellipsis, lineHeight = 17.sp)
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                Column {
+                    Text(note.title.ifBlank { "بدون عنوان" }, fontFamily = LalezarFont, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color(0xFF3E2723), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(note.body, fontFamily = VazirFont, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF5D4037), maxLines = 5, overflow = TextOverflow.Ellipsis, lineHeight = 17.sp)
+                }
             }
             CurledCorner(Modifier.align(Alignment.BottomEnd))
         }
