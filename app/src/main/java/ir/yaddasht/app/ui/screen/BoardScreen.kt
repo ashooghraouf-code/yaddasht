@@ -7,6 +7,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Paint
+import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.text.Layout
@@ -22,6 +23,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -104,6 +106,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import androidx.core.content.res.ResourcesCompat
 import coil.compose.AsyncImage
 import ir.yaddasht.app.data.Note
 import ir.yaddasht.app.data.NoteDao
@@ -170,6 +173,20 @@ private val BOARD_SIZES_DP = listOf(
 private val BASE_NOTE_WIDTH = 150f
 private val BASE_IMAGE_WIDTH = 150f
 
+// ✅ فونت واقعی اپ برای PDF (بدون ریسک کامپایل)
+private fun safeTypeface(context: Context, name: String, bold: Boolean): Typeface {
+    val id = context.resources.getIdentifier(name, "font", context.packageName)
+    return if (id != 0) {
+        try {
+            ResourcesCompat.getFont(context, id) ?: if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+        } catch (_: Exception) {
+            if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+        }
+    } else {
+        if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+    }
+}
+
 @Composable
 fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -192,9 +209,13 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
     var draggingNoteId by remember { mutableStateOf<Long?>(null) }
     var draggingImageId by remember { mutableStateOf<Long?>(null) }
     var dragY by remember { mutableFloatStateOf(0f) }
+    var fingerX by remember { mutableFloatStateOf(0f) }
+    var fingerY by remember { mutableFloatStateOf(0f) }
     var boardAreaHeightDp by remember { mutableFloatStateOf(0f) }
     var boardPxW by remember { mutableIntStateOf(0) }
     var boardPxH by remember { mutableIntStateOf(0) }
+    var vpW by remember { mutableIntStateOf(0) }
+    var vpH by remember { mutableIntStateOf(0) }
 
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
     var imageToDelete by remember { mutableStateOf<BoardImage?>(null) }
@@ -253,11 +274,16 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
         scope.launch(Dispatchers.IO) {
             try {
                 val d = density.density
+                val fontScale = context.resources.configuration.fontScale
+                val spPx = d * fontScale
                 val pxW = (if (boardPxW > 0) boardPxW else boardWidthDp * d).toInt().coerceAtLeast(1)
                 val pxH = (if (boardPxH > 0) boardPxH else boardHeightDpActual * d).toInt().coerceAtLeast(1)
                 val dir = File(context.cacheDir, "board_exports")
                 if (!dir.exists()) dir.mkdirs()
                 val file = File(dir, "board-${System.currentTimeMillis()}.pdf")
+
+                val titleType = safeTypeface(context, "lalezar", true)
+                val bodyType = safeTypeface(context, "vazir", false)
 
                 val pdfDocument = PdfDocument()
                 val pageInfo = PdfDocument.PageInfo.Builder(pxW, pxH, 1).create()
@@ -266,27 +292,30 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
 
                 canvas.drawColor(boardBase(bgIndex).toArgb())
 
-                val textPaint = TextPaint().apply {
-                    color = androidx.compose.ui.graphics.Color(0xFF5D4037).toArgb()
-                    textSize = 11f * d * 1.45f
-                    isAntiAlias = true
-                }
                 val titlePaint = TextPaint().apply {
                     color = androidx.compose.ui.graphics.Color(0xFF3E2723).toArgb()
-                    textSize = 15f * d * 1.45f
+                    textSize = 15f * spPx
                     isAntiAlias = true
-                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    typeface = titleType
+                }
+                val bodyPaint = TextPaint().apply {
+                    color = androidx.compose.ui.graphics.Color(0xFF5D4037).toArgb()
+                    textSize = 11f * spPx
+                    isAntiAlias = true
+                    typeface = bodyType
+                    // ✅ ارتفاع خط دقیقاً مثل صفحه: 17sp
+                    val lh = 17f * spPx
+                    setLineSpacing(lh - fontSpacing, 0f)
                 }
                 val bgPaint = Paint().apply { isAntiAlias = true }
                 val framePaint = Paint().apply { isAntiAlias = true; color = android.graphics.Color.WHITE }
 
-                // ═══ یادداشت‌ها: چرخش حول مرکز + بدون مقیاس دوبرابر + ارتفاع واقعی ═══
                 items.forEach { item ->
                     val note = notes.firstOrNull { it.id == item.noteId } ?: return@forEach
                     val scale = item.scale.coerceIn(0.3f, 3.0f)
                     val wPx = BASE_NOTE_WIDTH * scale * d
                     val padPx = 12f * d
-                    val topPadPx = 14f * d
+                    val topPadPx = (if (item.noteId.hashCode() and 1 == 0) 20f else 14f) * d
                     val bottomPadPx = 16f * d
                     val innerW = (wPx - 2f * padPx).toInt().coerceAtLeast(1)
 
@@ -296,7 +325,7 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                         .setMaxLines(1)
                         .setEllipsize(TextUtils.TruncateAt.END)
                         .build()
-                    val bodyLayout = StaticLayout.Builder.obtain(note.body, 0, note.body.length, textPaint, innerW)
+                    val bodyLayout = StaticLayout.Builder.obtain(note.body, 0, note.body.length, bodyPaint, innerW)
                         .setAlignment(Layout.Alignment.ALIGN_NORMAL)
                         .setMaxLines(5)
                         .setEllipsize(TextUtils.TruncateAt.END)
@@ -327,15 +356,14 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     canvas.restore()
                 }
 
-                // ═══ تصاویر: چرخش حول مرکز + قاب سفید ═══
                 images.forEach { img ->
                     val bitmap = loadBitmapFromUri(context, img.uri) ?: return@forEach
                     val scale = img.scale.coerceIn(0.3f, 3.0f)
-                    val wPx = BASE_IMAGE_WIDTH * scale * d
-                    val hPx = wPx * bitmap.height / bitmap.width.toFloat()
                     val frame = 4f * d
-                    val totalW = wPx + 2f * frame
-                    val totalH = hPx + 2f * frame
+                    val imgW = (BASE_IMAGE_WIDTH * scale - 8f) * d
+                    val imgH = imgW * bitmap.height / bitmap.width.toFloat()
+                    val totalW = imgW + 2f * frame
+                    val totalH = imgH + 2f * frame
 
                     val cx = img.x.coerceIn(0f, clampX) * d + totalW / 2f
                     val cy = img.y.coerceIn(0f, clampY) * d + totalH / 2f
@@ -346,7 +374,7 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     canvas.translate(-totalW / 2f, -totalH / 2f)
 
                     canvas.drawRoundRect(android.graphics.RectF(0f, 0f, totalW, totalH), 6f * d, 6f * d, framePaint)
-                    canvas.drawBitmap(bitmap, null, android.graphics.RectF(frame, frame, frame + wPx, frame + hPx), null)
+                    canvas.drawBitmap(bitmap, null, android.graphics.RectF(frame, frame, frame + imgW, frame + imgH), null)
 
                     canvas.restore()
                     bitmap.recycle()
@@ -509,6 +537,7 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     Box(
                         Modifier
                             .fillMaxSize()
+                            .onSizeChanged { s -> vpW = s.width; vpH = s.height }
                             .then(if (!isPhoneSize) Modifier.verticalScroll(scrollStateV).horizontalScroll(scrollStateH) else Modifier)
                     ) {
                         Box(
@@ -546,7 +575,7 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                                         onRotated = { rot -> BoardStore.rotate(context, note.id, currentBoard, rot); refresh() },
                                         onScaleChanged = { scale -> BoardStore.setScale(context, note.id, currentBoard, scale); refresh() },
                                         onDragStart = { draggingNoteId = note.id },
-                                        onDragUpdate = { y -> dragY = y },
+                                        onDragUpdate = { x, y -> dragY = y; fingerX = x; fingerY = y },
                                         onDragEnd = { y, canceled ->
                                             if (!canceled && y > trashTopDp) noteToDelete = note
                                             draggingNoteId = null
@@ -567,7 +596,7 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                                     onRotated = { rot -> BoardStore.rotateImage(context, img.id, currentBoard, rot); refresh() },
                                     onScaleChanged = { scale -> BoardStore.setImageScale(context, img.id, currentBoard, scale); refresh() },
                                     onDragStart = { draggingImageId = img.id },
-                                    onDragUpdate = { y -> dragY = y },
+                                    onDragUpdate = { x, y -> dragY = y; fingerX = x; fingerY = y },
                                     onDragEnd = { y, canceled ->
                                         if (!canceled && y > trashTopDp) imageToDelete = img
                                         draggingImageId = null
@@ -575,6 +604,25 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                                 )
                             }
                         }
+                    }
+
+                    // ═══ 🗺️ مینی‌مپ: موقعیت شما روی کاغذ ═══
+                    if (!isPhoneSize && boardPxW > 0 && boardPxH > 0 && vpW > 0 && vpH > 0) {
+                        MiniMap(
+                            paperW = boardPxW.toFloat(),
+                            paperH = boardPxH.toFloat(),
+                            viewW = vpW.toFloat(),
+                            viewH = vpH.toFloat(),
+                            scrollX = scrollStateH.value.toFloat(),
+                            scrollY = scrollStateV.value.toFloat(),
+                            finger = if (draggingNoteId != null || draggingImageId != null) Offset(fingerX, fingerY) else null,
+                            pxPerDp = density.density,
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(16.dp)
+                                .width(96.dp)
+                                .height((96f * boardPxH / boardPxW).dp)
+                        )
                     }
                 }
 
@@ -767,6 +815,54 @@ private fun loadBitmapFromUri(context: Context, uriString: String): Bitmap? {
 }
 
 @Composable
+private fun MiniMap(
+    paperW: Float,
+    paperH: Float,
+    viewW: Float,
+    viewH: Float,
+    scrollX: Float,
+    scrollY: Float,
+    finger: Offset?,
+    pxPerDp: Float,
+    modifier: Modifier
+) {
+    Canvas(
+        modifier
+            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.45f), RoundedCornerShape(6.dp))
+            .border(1.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+    ) {
+        val sx = size.width / paperW
+        val sy = size.height / paperH
+        val vw = (viewW * sx).coerceAtMost(size.width)
+        val vh = (viewH * sy).coerceAtMost(size.height)
+        val vx = (scrollX * sx).coerceIn(0f, (size.width - vw).coerceAtLeast(0f))
+        val vy = (scrollY * sy).coerceIn(0f, (size.height - vh).coerceAtLeast(0f))
+        drawRect(
+            androidx.compose.ui.graphics.Color.White.copy(alpha = 0.22f),
+            topLeft = Offset(vx, vy),
+            size = androidx.compose.ui.size(vw, vh)
+        )
+        drawRect(
+            androidx.compose.ui.graphics.Color.White,
+            topLeft = Offset(vx, vy),
+            size = androidx.compose.ui.size(vw, vh),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(1.5f)
+        )
+        finger?.let { f ->
+            val fx = (f.x * pxPerDp * sx).coerceIn(0f, size.width)
+            val fy = (f.y * pxPerDp * sy).coerceIn(0f, size.height)
+            drawCircle(androidx.compose.ui.graphics.Color(0xFFFFB74D), radius = 4.5f, center = Offset(fx, fy))
+            drawCircle(
+                androidx.compose.ui.graphics.Color.White,
+                radius = 4.5f,
+                center = Offset(fx, fy),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(1f)
+            )
+        }
+    }
+}
+
+@Composable
 private fun BoardImageItem(
     image: BoardImage,
     stagger: Int,
@@ -778,7 +874,7 @@ private fun BoardImageItem(
     onRotated: (Float) -> Unit,
     onScaleChanged: (Float) -> Unit,
     onDragStart: () -> Unit,
-    onDragUpdate: (Float) -> Unit,
+    onDragUpdate: (Float, Float) -> Unit,
     onDragEnd: (Float, Boolean) -> Unit
 ) {
     val density = LocalDensity.current
@@ -850,7 +946,7 @@ private fun BoardImageItem(
                                     rotation += rotationChange
                                     scale = (scale * zoomChange).coerceIn(0.3f, 3.0f)
                                     visualZoom = zoomChange.coerceIn(0.5f, 2.0f)
-                                    onDragUpdate(pos.y)
+                                    onDragUpdate(pos.x, pos.y)
                                     lastInteraction = System.currentTimeMillis()
                                 }
                                 event.changes.forEach { it.consume() }
@@ -949,7 +1045,7 @@ private fun StickyNote(
     onRotated: (Float) -> Unit,
     onScaleChanged: (Float) -> Unit,
     onDragStart: () -> Unit,
-    onDragUpdate: (Float) -> Unit,
+    onDragUpdate: (Float, Float) -> Unit,
     onDragEnd: (Float, Boolean) -> Unit
 ) {
     val density = LocalDensity.current
@@ -1023,7 +1119,7 @@ private fun StickyNote(
                                     rotation += rotationChange
                                     scale = (scale * zoomChange).coerceIn(0.3f, 3.0f)
                                     visualZoom = zoomChange.coerceIn(0.5f, 2.0f)
-                                    onDragUpdate(pos.y)
+                                    onDragUpdate(pos.x, pos.y)
                                     lastInteraction = System.currentTimeMillis()
                                 }
                                 event.changes.forEach { it.consume() }
