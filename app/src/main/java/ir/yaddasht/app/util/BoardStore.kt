@@ -4,7 +4,7 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
-data class Board(val id: Long, val name: String, val background: Int, val sizeIndex: Int = 1)
+data class Board(val id: Long, val name: String, val background: Int, val sizeIndex: Int = 0)
 
 data class BoardItem(
     val noteId: Long,
@@ -36,7 +36,7 @@ object BoardStore {
     fun boards(c: Context): List<Board> {
         val json = prefs(c).getString(KEY_BOARDS, "") ?: ""
         if (json.isBlank()) {
-            val default = listOf(Board(1L, "اصلی", 0, 1))
+            val default = listOf(Board(1L, "اصلی", 0, 0))
             saveBoards(c, default)
             return default
         }
@@ -48,11 +48,11 @@ object BoardStore {
                     o.getLong("id"),
                     o.getString("name"),
                     o.optInt("background", 0),
-                    o.optInt("sizeIndex", 1)
+                    o.optInt("sizeIndex", 0)
                 )
             }
         } catch (_: Exception) {
-            listOf(Board(1L, "اصلی", 0, 1))
+            listOf(Board(1L, "اصلی", 0, 0))
         }
     }
 
@@ -69,7 +69,7 @@ object BoardStore {
         prefs(c).edit().putString(KEY_BOARDS, arr.toString()).apply()
     }
 
-    fun addBoard(c: Context, name: String, background: Int = 0, sizeIndex: Int = 1): Board {
+    fun addBoard(c: Context, name: String, background: Int = 0, sizeIndex: Int = 0): Board {
         val list = boards(c).toMutableList()
         val b = Board(System.currentTimeMillis(), name, background, sizeIndex)
         list.add(b)
@@ -126,9 +126,9 @@ object BoardStore {
         val list = allItems(c).toMutableList()
         if (list.any { it.noteId == noteId && it.boardId == boardId }) return
         val count = list.count { it.boardId == boardId }
-        val x = 20f + (count % 3) * 40f
-        val y = 20f + (count / 3) * 50f
-        val rot = listOf(-4f, 3f, -2f, 5f, 0f)[count % 5]
+        val x = 16f + (count % 2) * 170f
+        val y = 16f + (count / 2) * 120f
+        val rot = listOf(-3f, 2f, -1.5f, 3f, 0f)[count % 5]
         list.add(BoardItem(noteId, boardId, x, y, rot, 1.0f))
         saveItems(c, list)
     }
@@ -202,8 +202,8 @@ object BoardStore {
     fun addImage(c: Context, boardId: Long, uri: String): BoardImage {
         val list = allImages(c).toMutableList()
         val count = list.count { it.boardId == boardId }
-        val x = 30f + (count % 3) * 30f
-        val y = 30f + (count / 3) * 40f
+        val x = 20f + (count % 2) * 160f
+        val y = 20f + (count / 2) * 140f
         val img = BoardImage(System.currentTimeMillis(), boardId, uri, x, y, 0f, 1.0f)
         list.add(img)
         saveImages(c, list)
@@ -237,16 +237,7 @@ object BoardStore {
         saveImages(c, allImages(c).filterNot { it.id == imageId && it.boardId == boardId })
     }
 
-    fun canUndo(c: Context, boardId: Long): Boolean {
-        val json = prefs(c).getString("undo:$boardId", "[]") ?: "[]"
-        return try {
-            JSONArray(json).length() > 0
-        } catch (_: Exception) {
-            false
-        }
-    }
+    fun canUndo(c: Context, boardId: Long): Boolean = false
 
-    fun undo(c: Context, boardId: Long): Boolean {
-        return false
-    }
+    fun undo(c: Context, boardId: Long): Boolean = false
 }
