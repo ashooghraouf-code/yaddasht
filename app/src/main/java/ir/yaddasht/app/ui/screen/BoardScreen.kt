@@ -7,6 +7,8 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
+import android.os.Build
+import android.view.PixelCopy
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -113,9 +115,8 @@ private fun pinColor(index: Int): Color = listOf(
     Color(0xFFFDD835), Color(0xFF8E24AA), Color(0xFFFB8C00)
 )[index.coerceIn(0, 5)]
 
-private val SIZE_WIDTHS = listOf(130, 180, 240)
-private val SIZE_LABELS = listOf("کوچک S", "متوسط M", "بزرگ L")
-private val IMAGE_WIDTHS = listOf(120, 180, 240)
+private val BASE_NOTE_WIDTH = 150f
+private val BASE_IMAGE_WIDTH = 150f
 
 @Composable
 fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Unit) {
@@ -130,7 +131,6 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
     var showAddBoard by remember { mutableStateOf(false) }
     var showAddNote by remember { mutableStateOf(false) }
     var boardName by remember { mutableStateOf("") }
-    var sizeForNote by remember { mutableStateOf<Long?>(null) }
     var canUndo by remember { mutableStateOf(BoardStore.canUndo(context, currentBoard)) }
 
     var showSearch by remember { mutableStateOf(false) }
@@ -205,24 +205,47 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                 return
             }
             val view = activity.window.decorView.rootView
-            val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bmp)
-            view.draw(canvas)
-
-            val dir = File(context.cacheDir, "board_shares")
-            if (!dir.exists()) dir.mkdirs()
-            val file = File(dir, "board-${System.currentTimeMillis()}.png")
-            file.outputStream().use { out -> bmp.compress(Bitmap.CompressFormat.PNG, 100, out) }
-            bmp.recycle()
-
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "image/png"
-                putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(Intent.EXTRA_SUBJECT, "تابلوی ${boards.firstOrNull { it.id == currentBoard }?.name ?: ""}")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+                PixelCopy.request(activity.window, bitmap, { result ->
+                    if (result == PixelCopy.SUCCESS) {
+                        val dir = File(context.cacheDir, "board_shares")
+                        if (!dir.exists()) dir.mkdirs()
+                        val file = File(dir, "board-${System.currentTimeMillis()}.png")
+                        file.outputStream().use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
+                        bitmap.recycle()
+                        
+                        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "image/png"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            putExtra(Intent.EXTRA_SUBJECT, "تابلوی ${boards.firstOrNull { it.id == currentBoard }?.name ?: ""}")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری تابلو"))
+                    }
+                }, android.os.Handler(activity.mainLooper))
+            } else {
+                val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bmp)
+                view.draw(canvas)
+                
+                val dir = File(context.cacheDir, "board_shares")
+                if (!dir.exists()) dir.mkdirs()
+                val file = File(dir, "board-${System.currentTimeMillis()}.png")
+                file.outputStream().use { out -> bmp.compress(Bitmap.CompressFormat.PNG, 100, out) }
+                bmp.recycle()
+                
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_SUBJECT, "تابلوی ${boards.firstOrNull { it.id == currentBoard }?.name ?: ""}")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری تابلو"))
             }
-            context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری تابلو"))
         } catch (e: Exception) {
             Toast.makeText(context, "خطا: ${e.message}", Toast.LENGTH_LONG).show()
         }
@@ -391,7 +414,10 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                                 BoardStore.rotate(context, note.id, currentBoard, rot)
                                 refresh()
                             },
-                            onSize = { sizeForNote = note.id },
+                            onScaleChanged = { scale ->
+                                BoardStore.setScale(context, note.id, currentBoard, scale)
+                                refresh()
+                            },
                             onDragStart = { draggingNoteId = note.id },
                             onDragUpdate = { y -> dragY = y },
                             onDragEnd = { y, canceled ->
@@ -422,6 +448,10 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
                         },
                         onRotated = { rot ->
                             BoardStore.rotateImage(context, img.id, currentBoard, rot)
+                            refresh()
+                        },
+                        onScaleChanged = { scale ->
+                            BoardStore.setImageScale(context, img.id, currentBoard, scale)
                             refresh()
                         },
                         onDragStart = { draggingImageId = img.id },
@@ -550,38 +580,6 @@ fun BoardScreen(notes: List<Note>, onOpenNote: (Long) -> Unit, onBack: () -> Uni
             confirmButton = { TextButton(onClick = { showAddNote = false }) { Text("بستن") } }
         )
     }
-
-    sizeForNote?.let { noteId ->
-        val current = items.firstOrNull { it.noteId == noteId }?.sizeIndex ?: 1
-        AlertDialog(
-            onDismissRequest = { sizeForNote = null },
-            title = { Text("📐 اندازه یادداشت", fontFamily = LalezarFont, fontSize = 20.sp) },
-            text = {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SIZE_LABELS.forEachIndexed { i, label ->
-                        Surface(
-                            onClick = {
-                                BoardStore.setSize(context, noteId, currentBoard, i)
-                                refresh()
-                                sizeForNote = null
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (i == current) Color(0xFFFFB74D) else Color(0xFFEFEFEF),
-                            shadowElevation = 3.dp
-                        ) {
-                            Text(
-                                label,
-                                color = if (i == current) Color(0xFF3E2723) else Color(0xFF555555),
-                                fontFamily = VazirFont, fontSize = 14.sp,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { sizeForNote = null }) { Text("بستن") } }
-        )
-    }
 }
 
 @Composable
@@ -592,6 +590,7 @@ private fun BoardImageItem(
     isOverTrash: Boolean,
     onMoved: (Float, Float) -> Unit,
     onRotated: (Float) -> Unit,
+    onScaleChanged: (Float) -> Unit,
     onDragStart: () -> Unit,
     onDragUpdate: (Float) -> Unit,
     onDragEnd: (Float, Boolean) -> Unit,
@@ -600,6 +599,7 @@ private fun BoardImageItem(
     val density = LocalDensity.current
     var pos by remember(image.id, image.boardId) { mutableStateOf(Offset(image.x, image.y)) }
     var rotation by remember(image.id, image.boardId) { mutableFloatStateOf(image.rotation) }
+    var scale by remember(image.id, image.boardId) { mutableFloatStateOf(image.scale) }
     var visualZoom by remember { mutableFloatStateOf(1f) }
     var appeared by remember { mutableStateOf(false) }
     var lastInteraction by remember { mutableLongStateOf(0L) }
@@ -615,6 +615,7 @@ private fun BoardImageItem(
             delay(500)
             onMoved(pos.x, pos.y)
             onRotated(rotation)
+            onScaleChanged(scale)
         }
     }
 
@@ -643,7 +644,7 @@ private fun BoardImageItem(
         label = "trash-alpha"
     )
 
-    val widthDp = IMAGE_WIDTHS[image.sizeIndex.coerceIn(0, 2)].dp
+    val widthDp = (BASE_IMAGE_WIDTH * scale).dp
 
     Box(
         Modifier
@@ -656,9 +657,9 @@ private fun BoardImageItem(
             .width(widthDp)
             .graphicsLayer {
                 rotationZ = rotation
-                val scale = entranceScale * visualZoom * trashScale
-                scaleX = scale
-                scaleY = scale
+                val s = entranceScale * visualZoom * trashScale
+                scaleX = s
+                scaleY = s
             }
             .pointerInput(image.id, image.boardId) {
                 awaitEachGesture {
@@ -682,7 +683,8 @@ private fun BoardImageItem(
                                 if (moved) {
                                     pos += panChange / density.density
                                     rotation += rotationChange
-                                    visualZoom = (visualZoom * zoomChange).coerceIn(0.5f, 2.0f)
+                                    scale = (scale * zoomChange).coerceIn(0.3f, 3.0f)
+                                    visualZoom = zoomChange.coerceIn(0.5f, 2.0f)
                                     onDragUpdate(pos.y)
                                     lastInteraction = System.currentTimeMillis()
                                 }
@@ -805,7 +807,7 @@ private fun StickyNote(
     onOpen: () -> Unit,
     onMoved: (Float, Float) -> Unit,
     onRotated: (Float) -> Unit,
-    onSize: () -> Unit,
+    onScaleChanged: (Float) -> Unit,
     onDragStart: () -> Unit,
     onDragUpdate: (Float) -> Unit,
     onDragEnd: (Float, Boolean) -> Unit,
@@ -814,6 +816,7 @@ private fun StickyNote(
     val density = LocalDensity.current
     var pos by remember(item.noteId, item.boardId) { mutableStateOf(Offset(item.x, item.y)) }
     var rotation by remember(item.noteId, item.boardId) { mutableFloatStateOf(item.rotation) }
+    var scale by remember(item.noteId, item.boardId) { mutableFloatStateOf(item.scale) }
     var visualZoom by remember { mutableFloatStateOf(1f) }
     var appeared by remember { mutableStateOf(false) }
     var lastInteraction by remember { mutableLongStateOf(0L) }
@@ -829,6 +832,7 @@ private fun StickyNote(
             delay(500)
             onMoved(pos.x, pos.y)
             onRotated(rotation)
+            onScaleChanged(scale)
         }
     }
 
@@ -857,7 +861,7 @@ private fun StickyNote(
         label = "trash-alpha"
     )
 
-    val widthDp = SIZE_WIDTHS[item.sizeIndex.coerceIn(0, 2)].dp
+    val widthDp = (BASE_NOTE_WIDTH * scale).dp
     val body = stickyBody(note.color)
     val usePin = variant % 2 == 0
 
@@ -872,9 +876,9 @@ private fun StickyNote(
             .width(widthDp)
             .graphicsLayer {
                 rotationZ = rotation
-                val scale = entranceScale * visualZoom * trashScale
-                scaleX = scale
-                scaleY = scale
+                val s = entranceScale * visualZoom * trashScale
+                scaleX = s
+                scaleY = s
             }
             .pointerInput(item.noteId, item.boardId) {
                 awaitEachGesture {
@@ -898,7 +902,8 @@ private fun StickyNote(
                                 if (moved) {
                                     pos += panChange / density.density
                                     rotation += rotationChange
-                                    visualZoom = (visualZoom * zoomChange).coerceIn(0.5f, 2.0f)
+                                    scale = (scale * zoomChange).coerceIn(0.3f, 3.0f)
+                                    visualZoom = zoomChange.coerceIn(0.5f, 2.0f)
                                     onDragUpdate(pos.y)
                                     lastInteraction = System.currentTimeMillis()
                                 }
@@ -920,7 +925,7 @@ private fun StickyNote(
                 .background(
                     Brush.linearGradient(listOf(body, body, stickyEdge(note.color)))
                 )
-                .combinedClickable(onClick = onOpen, onLongClick = onSize)
+                .combinedClickable(onClick = onOpen)
                 .padding(
                     top = if (usePin) 20.dp else 14.dp,
                     start = 12.dp,
