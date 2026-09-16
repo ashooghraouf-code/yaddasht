@@ -114,6 +114,7 @@ import ir.yaddasht.app.data.Note
 import ir.yaddasht.app.data.NoteDao
 import ir.yaddasht.app.ui.theme.LalezarFont
 import ir.yaddasht.app.ui.theme.VazirFont
+import ir.yaddasht.app.util.Board
 import ir.yaddasht.app.util.BoardImage
 import ir.yaddasht.app.util.BoardItem
 import ir.yaddasht.app.util.BoardStore
@@ -220,6 +221,11 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
 
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
     var imageToDelete by remember { mutableStateOf<BoardImage?>(null) }
+    var boardToDelete by remember { mutableStateOf<Board?>(null) }
+
+    // ✅ اندازهٔ واقعیِ اندازه‌گیری‌شدهٔ هر آیتم (برای PDF دقیق)
+    val noteSizes = remember { mutableStateOf(mutableMapOf<Long, Pair<Int, Int>>()) }
+    val imageSizes = remember { mutableStateOf(mutableMapOf<Long, Pair<Int, Int>>()) }
 
     val refresh: () -> Unit = {
         boards = BoardStore.boards(context)
@@ -266,7 +272,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
         }
     }
 
-    // ✅ سطح حساس سطل زباله کاهش یافت: ۱۵۰dp → ۷۰dp
     val trashTopDp = if (boardAreaHeightDp > 1f) boardAreaHeightDp - 70f else Float.MAX_VALUE
     val isOverTrash = (draggingNoteId != null || draggingImageId != null) && dragY > trashTopDp
 
@@ -307,7 +312,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     typeface = bodyType
                 }
 
-                // ✅ محاسبهٔ lineSpacing برای انطباق دقیق با صفحه (lineHeight = 17sp)
                 val targetLineHeight = 17f * spPx
                 val fm = bodyPaint.fontMetrics
                 val naturalLineHeight = fm.descent - fm.ascent + fm.leading
@@ -319,10 +323,13 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                 items.forEach { item ->
                     val note = notes.firstOrNull { it.id == item.noteId } ?: return@forEach
                     val scale = item.scale.coerceIn(0.3f, 3.0f)
-                    val wPx = BASE_NOTE_WIDTH * scale * d
+
+                    // ✅ استفاده از اندازهٔ واقعیِ اندازه‌گیری‌شده روی صفحه
+                    val measured = noteSizes.value[item.noteId]
+                    val wPx = measured?.first?.toFloat() ?: (BASE_NOTE_WIDTH * scale * d)
+                    val hPx = measured?.second?.toFloat() ?: (200f * d)
                     val padPx = 12f * d
                     val topPadPx = (if (item.noteId.hashCode() and 1 == 0) 20f else 14f) * d
-                    val bottomPadPx = 16f * d
                     val innerW = (wPx - 2f * padPx).toInt().coerceAtLeast(1)
 
                     val titleText = note.title.ifBlank { "بدون عنوان" }
@@ -340,8 +347,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                         bodyBuilder.setLineSpacing(extraLineSpacing, 1f)
                     }
                     val bodyLayout = bodyBuilder.build()
-
-                    val hPx = topPadPx + titleLayout.height + bodyLayout.height + bottomPadPx
 
                     val cx = item.x.coerceIn(0f, clampX) * d + wPx / 2f
                     val cy = item.y.coerceIn(0f, clampY) * d + hPx / 2f
@@ -370,11 +375,13 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                 images.forEach { img ->
                     val bitmap = loadBitmapFromUri(context, img.uri) ?: return@forEach
                     val scale = img.scale.coerceIn(0.3f, 3.0f)
+
+                    val measuredImg = imageSizes.value[img.id]
+                    val totalW = measuredImg?.first?.toFloat() ?: (BASE_IMAGE_WIDTH * scale * d)
+                    val totalH = measuredImg?.second?.toFloat() ?: (BASE_IMAGE_WIDTH * scale * d)
                     val frame = 4f * d
-                    val imgW = (BASE_IMAGE_WIDTH * scale - 8f) * d
-                    val imgH = imgW * bitmap.height / bitmap.width.toFloat()
-                    val totalW = imgW + 2f * frame
-                    val totalH = imgH + 2f * frame
+                    val imgW = (totalW - 2f * frame).coerceAtLeast(1f)
+                    val imgH = (totalH - 2f * frame).coerceAtLeast(1f)
 
                     val cx = img.x.coerceIn(0f, clampX) * d + totalW / 2f
                     val cy = img.y.coerceIn(0f, clampY) * d + totalH / 2f
@@ -434,6 +441,11 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                         val selected = b.id == currentBoard
                         Surface(
                             onClick = { currentBoard = b.id; refresh(); searchQuery = "" },
+                            // ✅ لمس طولانی = حذف تابلو
+                            modifier = Modifier.combinedClickable(
+                                onClick = { currentBoard = b.id; refresh(); searchQuery = "" },
+                                onLongClick = { boardToDelete = b }
+                            ),
                             shape = RoundedCornerShape(10.dp),
                             color = if (selected) androidx.compose.ui.graphics.Color(0xFFFFB74D) else androidx.compose.ui.graphics.Color.White.copy(alpha = .12f),
                             shadowElevation = if (selected) 6.dp else 0.dp
@@ -585,6 +597,7 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                                         onMoved = { x, y -> BoardStore.move(context, note.id, currentBoard, x, y); refresh() },
                                         onRotated = { rot -> BoardStore.rotate(context, note.id, currentBoard, rot); refresh() },
                                         onScaleChanged = { scale -> BoardStore.setScale(context, note.id, currentBoard, scale); refresh() },
+                                        onMeasured = { w, h -> noteSizes.value[item.noteId] = w to h },
                                         onDragStart = { draggingNoteId = note.id },
                                         onDragUpdate = { x, y -> dragY = y; fingerX = x; fingerY = y },
                                         onDragEnd = { y, canceled ->
@@ -606,6 +619,7 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                                     onMoved = { x, y -> BoardStore.moveImage(context, img.id, currentBoard, x, y); refresh() },
                                     onRotated = { rot -> BoardStore.rotateImage(context, img.id, currentBoard, rot); refresh() },
                                     onScaleChanged = { scale -> BoardStore.setImageScale(context, img.id, currentBoard, scale); refresh() },
+                                    onMeasured = { w, h -> imageSizes.value[img.id] = w to h },
                                     onDragStart = { draggingImageId = img.id },
                                     onDragUpdate = { x, y -> dragY = y; fingerX = x; fingerY = y },
                                     onDragEnd = { y, canceled ->
@@ -727,6 +741,33 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
             },
             dismissButton = {
                 TextButton(onClick = { imageToDelete = null }) {
+                    Text("انصراف")
+                }
+            }
+        )
+    }
+
+    boardToDelete?.let { b ->
+        AlertDialog(
+            onDismissRequest = { boardToDelete = null },
+            title = { Text("🗑️ حذف تابلو", fontFamily = LalezarFont, fontSize = 20.sp) },
+            text = { Text("تابلوی «${b.name}» همراه با همهٔ یادداشت‌ها و تصاویر روی آن حذف شود؟") },
+            confirmButton = {
+                TextButton(onClick = {
+                    BoardStore.removeBoard(context, b.id)
+                    if (currentBoard == b.id) {
+                        val remaining = BoardStore.boards(context)
+                        currentBoard = remaining.firstOrNull()?.id ?: 1L
+                    }
+                    refresh()
+                    boardToDelete = null
+                    Toast.makeText(context, "تابلو حذف شد", Toast.LENGTH_SHORT).show()
+                }) {
+                    Text("حذف تابلو", color = androidx.compose.ui.graphics.Color.Red, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { boardToDelete = null }) {
                     Text("انصراف")
                 }
             }
@@ -883,6 +924,7 @@ private fun BoardImageItem(
     onMoved: (Float, Float) -> Unit,
     onRotated: (Float) -> Unit,
     onScaleChanged: (Float) -> Unit,
+    onMeasured: (Int, Int) -> Unit,
     onDragStart: () -> Unit,
     onDragUpdate: (Float, Float) -> Unit,
     onDragEnd: (Float, Boolean) -> Unit
@@ -893,7 +935,6 @@ private fun BoardImageItem(
     }
     var rotation by remember(image.id, image.boardId) { mutableFloatStateOf(image.rotation) }
     var scale by remember(image.id, image.boardId) { mutableFloatStateOf(image.scale) }
-    var visualZoom by remember { mutableFloatStateOf(1f) }
     var lastInteraction by remember { mutableLongStateOf(0L) }
     var gestureActive by remember { mutableStateOf(false) }
 
@@ -903,13 +944,6 @@ private fun BoardImageItem(
             onMoved(pos.x, pos.y)
             onRotated(rotation)
             onScaleChanged(scale)
-        }
-    }
-
-    LaunchedEffect(lastInteraction) {
-        if (lastInteraction > 0) {
-            delay(400)
-            visualZoom = 1f
         }
     }
 
@@ -923,11 +957,11 @@ private fun BoardImageItem(
             .alpha(trashAlpha)
             .absoluteOffset { with(density) { IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx()) } }
             .width(widthDp)
+            .onSizeChanged { s -> onMeasured(s.width, s.height) }
             .graphicsLayer {
                 rotationZ = rotation
-                val s = visualZoom * trashScale
-                scaleX = s
-                scaleY = s
+                scaleX = trashScale
+                scaleY = trashScale
             }
             .pointerInput(image.id, image.boardId) {
                 awaitEachGesture {
@@ -938,11 +972,11 @@ private fun BoardImageItem(
                         val event = awaitPointerEvent()
                         canceled = event.changes.any { it.isConsumed }
                         if (!canceled) {
-                            val zoomChange = event.calculateZoom()
-                            val rotationChange = event.calculateRotation()
+                            val pointerCount = event.changes.count { it.pressed }
                             val panChange = event.calculatePan()
-                            val active = panChange != Offset.Zero || rotationChange != 0f || zoomChange != 1f
-                            if (active) {
+                            if (pointerCount >= 2) {
+                                val zoomChange = event.calculateZoom()
+                                val rotationChange = event.calculateRotation()
                                 if (!moved && (zoomChange != 1f || rotationChange != 0f || panChange.getDistance() > 8f)) {
                                     moved = true
                                     gestureActive = true
@@ -955,11 +989,27 @@ private fun BoardImageItem(
                                     )
                                     rotation += rotationChange
                                     scale = (scale * zoomChange).coerceIn(0.3f, 3.0f)
-                                    visualZoom = zoomChange.coerceIn(0.5f, 2.0f)
                                     onDragUpdate(pos.x, pos.y)
                                     lastInteraction = System.currentTimeMillis()
                                 }
                                 event.changes.forEach { it.consume() }
+                            } else {
+                                if (panChange.getDistance() > 0f) {
+                                    if (!moved && panChange.getDistance() > 4f) {
+                                        moved = true
+                                        gestureActive = true
+                                        onDragStart()
+                                    }
+                                    if (moved) {
+                                        pos = Offset(
+                                            (pos.x + panChange.x / density.density).coerceIn(0f, clampX),
+                                            (pos.y + panChange.y / density.density).coerceIn(0f, clampY)
+                                        )
+                                        onDragUpdate(pos.x, pos.y)
+                                        lastInteraction = System.currentTimeMillis()
+                                    }
+                                    event.changes.forEach { it.consume() }
+                                }
                             }
                         }
                     } while (!canceled && event.changes.any { it.pressed })
@@ -1054,6 +1104,7 @@ private fun StickyNote(
     onMoved: (Float, Float) -> Unit,
     onRotated: (Float) -> Unit,
     onScaleChanged: (Float) -> Unit,
+    onMeasured: (Int, Int) -> Unit,
     onDragStart: () -> Unit,
     onDragUpdate: (Float, Float) -> Unit,
     onDragEnd: (Float, Boolean) -> Unit
@@ -1064,7 +1115,6 @@ private fun StickyNote(
     }
     var rotation by remember(item.noteId, item.boardId) { mutableFloatStateOf(item.rotation) }
     var scale by remember(item.noteId, item.boardId) { mutableFloatStateOf(item.scale) }
-    var visualZoom by remember { mutableFloatStateOf(1f) }
     var lastInteraction by remember { mutableLongStateOf(0L) }
     var gestureActive by remember { mutableStateOf(false) }
 
@@ -1074,13 +1124,6 @@ private fun StickyNote(
             onMoved(pos.x, pos.y)
             onRotated(rotation)
             onScaleChanged(scale)
-        }
-    }
-
-    LaunchedEffect(lastInteraction) {
-        if (lastInteraction > 0) {
-            delay(400)
-            visualZoom = 1f
         }
     }
 
@@ -1096,11 +1139,11 @@ private fun StickyNote(
             .alpha(trashAlpha)
             .absoluteOffset { with(density) { IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx()) } }
             .width(widthDp)
+            .onSizeChanged { s -> onMeasured(s.width, s.height) }
             .graphicsLayer {
                 rotationZ = rotation
-                val s = visualZoom * trashScale
-                scaleX = s
-                scaleY = s
+                scaleX = trashScale
+                scaleY = trashScale
             }
             .pointerInput(item.noteId, item.boardId) {
                 awaitEachGesture {
@@ -1111,11 +1154,11 @@ private fun StickyNote(
                         val event = awaitPointerEvent()
                         canceled = event.changes.any { it.isConsumed }
                         if (!canceled) {
-                            val zoomChange = event.calculateZoom()
-                            val rotationChange = event.calculateRotation()
+                            val pointerCount = event.changes.count { it.pressed }
                             val panChange = event.calculatePan()
-                            val active = panChange != Offset.Zero || rotationChange != 0f || zoomChange != 1f
-                            if (active) {
+                            if (pointerCount >= 2) {
+                                val zoomChange = event.calculateZoom()
+                                val rotationChange = event.calculateRotation()
                                 if (!moved && (zoomChange != 1f || rotationChange != 0f || panChange.getDistance() > 8f)) {
                                     moved = true
                                     gestureActive = true
@@ -1128,11 +1171,27 @@ private fun StickyNote(
                                     )
                                     rotation += rotationChange
                                     scale = (scale * zoomChange).coerceIn(0.3f, 3.0f)
-                                    visualZoom = zoomChange.coerceIn(0.5f, 2.0f)
                                     onDragUpdate(pos.x, pos.y)
                                     lastInteraction = System.currentTimeMillis()
                                 }
                                 event.changes.forEach { it.consume() }
+                            } else {
+                                if (panChange.getDistance() > 0f) {
+                                    if (!moved && panChange.getDistance() > 4f) {
+                                        moved = true
+                                        gestureActive = true
+                                        onDragStart()
+                                    }
+                                    if (moved) {
+                                        pos = Offset(
+                                            (pos.x + panChange.x / density.density).coerceIn(0f, clampX),
+                                            (pos.y + panChange.y / density.density).coerceIn(0f, clampY)
+                                        )
+                                        onDragUpdate(pos.x, pos.y)
+                                        lastInteraction = System.currentTimeMillis()
+                                    }
+                                    event.changes.forEach { it.consume() }
+                                }
                             }
                         }
                     } while (!canceled && event.changes.any { it.pressed })
