@@ -190,7 +190,12 @@ private fun safeTypeface(context: Context, name: String, bold: Boolean): Typefac
 }
 
 @Composable
-fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit, onBack: () -> Unit) {
+fun BoardScreen(
+    notes: List<Note>,
+    noteDao: NoteDao,
+    onOpenNote: (Long) -> Unit,
+    onBack: () -> Unit
+) {
     val context = LocalContext.current
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
@@ -204,7 +209,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
     var showAddNote by remember { mutableStateOf(false) }
     var boardName by remember { mutableStateOf("") }
     var isExporting by remember { mutableStateOf(false) }
-
     var showSearch by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
@@ -322,25 +326,25 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                 items.forEach { item ->
                     val note = notes.firstOrNull { it.id == item.noteId } ?: return@forEach
                     val scale = item.scale.coerceIn(0.3f, 3.0f)
-
                     val usePin = item.noteId % 2 == 0L
                     val topPadPx = (if (usePin) 20f else 14f) * d
                     val bottomPadPx = 16f * d
                     val padPx = 12f * d
-
                     val measured = noteSizes.value[item.noteId]
                     val wPx = measured?.first?.toFloat() ?: (BASE_NOTE_WIDTH * scale * d)
                     val hPx = measured?.second?.toFloat() ?: (topPadPx + 200f * d + bottomPadPx)
                     val innerW = (wPx - 2f * padPx).toInt().coerceAtLeast(1)
 
                     val titleText = note.title.ifBlank { "بدون عنوان" }
-                    val titleLayout = StaticLayout.Builder.obtain(titleText, 0, titleText.length, titlePaint, innerW)
+                    val titleLayout = StaticLayout.Builder
+                        .obtain(titleText, 0, titleText.length, titlePaint, innerW)
                         .setAlignment(Layout.Alignment.ALIGN_NORMAL)
                         .setMaxLines(1)
                         .setEllipsize(TextUtils.TruncateAt.END)
                         .build()
 
-                    val bodyBuilder = StaticLayout.Builder.obtain(note.body, 0, note.body.length, bodyPaint, innerW)
+                    val bodyBuilder = StaticLayout.Builder
+                        .obtain(note.body, 0, note.body.length, bodyPaint, innerW)
                         .setAlignment(Layout.Alignment.ALIGN_NORMAL)
                         .setMaxLines(5)
                         .setEllipsize(TextUtils.TruncateAt.END)
@@ -376,14 +380,12 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                 images.forEach { img ->
                     val bitmap = loadBitmapFromUri(context, img.uri) ?: return@forEach
                     val scale = img.scale.coerceIn(0.3f, 3.0f)
-
                     val measuredImg = imageSizes.value[img.id]
                     val totalW = measuredImg?.first?.toFloat() ?: (BASE_IMAGE_WIDTH * scale * d)
                     val totalH = measuredImg?.second?.toFloat() ?: (BASE_IMAGE_WIDTH * scale * d)
                     val frame = 4f * d
                     val imgW = (totalW - 2f * frame).coerceAtLeast(1f)
                     val imgH = (totalH - 2f * frame).coerceAtLeast(1f)
-
                     val cx = img.x.coerceIn(0f, clampX) * d + totalW / 2f
                     val cy = img.y.coerceIn(0f, clampY) * d + totalH / 2f
 
@@ -391,10 +393,8 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     canvas.translate(cx, cy)
                     canvas.rotate(img.rotation)
                     canvas.translate(-totalW / 2f, -totalH / 2f)
-
                     canvas.drawRoundRect(android.graphics.RectF(0f, 0f, totalW, totalH), 6f * d, 6f * d, framePaint)
                     canvas.drawBitmap(bitmap, null, android.graphics.RectF(frame, frame, frame + imgW, frame + imgH), null)
-
                     canvas.restore()
                     bitmap.recycle()
                 }
@@ -427,7 +427,8 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
         Column(Modifier.fillMaxSize().background(boardBase(bgIndex))) {
             if (!isExporting) {
                 Row(
-                    Modifier.fillMaxWidth()
+                    Modifier
+                        .fillMaxWidth()
                         .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .28f))
                         .horizontalScroll(rememberScrollState())
                         .padding(horizontal = 8.dp, vertical = 10.dp),
@@ -456,7 +457,8 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                             Text(
                                 b.name,
                                 color = if (selected) androidx.compose.ui.graphics.Color(0xFF3E2723) else androidx.compose.ui.graphics.Color(0xFFFFE0B2),
-                                fontFamily = LalezarFont, fontSize = 15.sp,
+                                fontFamily = LalezarFont,
+                                fontSize = 15.sp,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                             )
                         }
@@ -513,8 +515,18 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     IconButton(onClick = { BoardStore.setBackground(context, currentBoard, (bgIndex + 1) % 4); refresh() }) {
                         Icon(Icons.Filled.Palette, "تغییر پس‌زمینه", tint = androidx.compose.ui.graphics.Color(0xFFFFE0B2))
                     }
-                    Surface(onClick = { BoardStore.setBoardSize(context, currentBoard, (boardSizeIndex + 1) % 4); refresh() }, shape = RoundedCornerShape(8.dp), color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.1f)) {
-                        Text(BOARD_SIZE_LABELS[boardSizeIndex], fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFFFFE0B2), fontFamily = VazirFont, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                    Surface(
+                        onClick = { BoardStore.setBoardSize(context, currentBoard, (boardSizeIndex + 1) % 4); refresh() },
+                        shape = RoundedCornerShape(8.dp),
+                        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.1f)
+                    ) {
+                        Text(
+                            BOARD_SIZE_LABELS[boardSizeIndex],
+                            fontSize = 11.sp,
+                            color = androidx.compose.ui.graphics.Color(0xFFFFE0B2),
+                            fontFamily = VazirFont,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
                     }
                     IconButton(onClick = { boardName = ""; showAddBoard = true }) {
                         Icon(Icons.Filled.Add, "تابلو جدید", tint = androidx.compose.ui.graphics.Color(0xFFFFE0B2))
@@ -523,7 +535,8 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
 
                 if (showSearch) {
                     Row(
-                        Modifier.fillMaxWidth()
+                        Modifier
+                            .fillMaxWidth()
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(androidx.compose.ui.graphics.Color.White.copy(alpha = .95f))
@@ -661,7 +674,9 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
 
         if (!isExporting) {
             Box(
-                Modifier.align(Alignment.BottomEnd).padding(18.dp)
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(18.dp)
                     .size(60.dp)
                     .shadow(12.dp, CircleShape)
                     .clip(CircleShape)
@@ -818,7 +833,8 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     LazyColumn {
                         items(available) { n ->
                             Box(
-                                Modifier.fillMaxWidth()
+                                Modifier
+                                    .fillMaxWidth()
                                     .padding(vertical = 4.dp)
                                     .rotate(listOf(-1.5f, 1f, -0.5f, 2f)[n.id.toInt() % 4])
                                     .clip(RoundedCornerShape(4.dp))
@@ -1024,7 +1040,8 @@ private fun BoardImageItem(
             }
     ) {
         Box(
-            Modifier.fillMaxWidth()
+            Modifier
+                .fillMaxWidth()
                 .shadow(7.dp, RoundedCornerShape(6.dp))
                 .clip(RoundedCornerShape(6.dp))
                 .background(androidx.compose.ui.graphics.Color.White)
@@ -1046,7 +1063,11 @@ private fun TrashBin(modifier: Modifier = Modifier, highlighted: Boolean) {
     val bg by animateFloatAsState(if (highlighted) 0.95f else 0.55f, label = "trash-bg")
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
-            modifier = Modifier.size(size).shadow(8.dp, CircleShape).clip(CircleShape).background(androidx.compose.ui.graphics.Color(0xFFE53935).copy(alpha = bg)),
+            modifier = Modifier
+                .size(size)
+                .shadow(8.dp, CircleShape)
+                .clip(CircleShape)
+                .background(androidx.compose.ui.graphics.Color(0xFFE53935).copy(alpha = bg)),
             contentAlignment = Alignment.Center
         ) {
             Icon(Icons.Filled.Delete, "حذف", tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(size * 0.5f))
@@ -1122,4 +1143,160 @@ private fun StickyNote(
     var gestureActive by remember { mutableStateOf(false) }
 
     LaunchedEffect(lastInteraction) {
-        if (lastInteraction > 0 && !gesture
+        if (lastInteraction > 0 && !gestureActive) {
+            delay(500)
+            onMoved(pos.x, pos.y)
+            onRotated(rotation)
+            onScaleChanged(scale)
+        }
+    }
+
+    val trashScale by animateFloatAsState(targetValue = if (isOverTrash) 0.4f else 1f, label = "trash-scale")
+    val trashAlpha by animateFloatAsState(targetValue = if (isOverTrash) 0.3f else 1f, label = "trash-alpha")
+
+    val widthDp = (BASE_NOTE_WIDTH * scale).dp
+    val body = stickyBody(note.color)
+    val usePin = item.noteId % 2 == 0L
+
+    Box(
+        Modifier
+            .alpha(trashAlpha)
+            .absoluteOffset { with(density) { IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx()) } }
+            .width(widthDp)
+            .onSizeChanged { s -> onMeasured(s.width, s.height) }
+            .graphicsLayer {
+                rotationZ = rotation
+                scaleX = trashScale
+                scaleY = trashScale
+            }
+            .pointerInput(item.noteId, item.boardId) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    var moved = false
+                    var canceled = false
+                    do {
+                        val event = awaitPointerEvent()
+                        canceled = event.changes.any { it.isConsumed }
+                        if (!canceled) {
+                            val pointerCount = event.changes.count { it.pressed }
+                            val panChange = event.calculatePan()
+                            if (pointerCount >= 2) {
+                                val zoomChange = event.calculateZoom()
+                                val rotationChange = event.calculateRotation()
+                                if (!moved && (zoomChange != 1f || rotationChange != 0f || panChange.getDistance() > 8f)) {
+                                    moved = true
+                                    gestureActive = true
+                                    onDragStart()
+                                }
+                                if (moved) {
+                                    pos = Offset(
+                                        (pos.x + panChange.x / density.density).coerceIn(0f, clampX),
+                                        (pos.y + panChange.y / density.density).coerceIn(0f, clampY)
+                                    )
+                                    rotation += rotationChange
+                                    scale = (scale * zoomChange).coerceIn(0.3f, 3.0f)
+                                    onDragUpdate(pos.x, pos.y)
+                                    lastInteraction = System.currentTimeMillis()
+                                }
+                                event.changes.forEach { it.consume() }
+                            } else {
+                                if (panChange.getDistance() > 0f) {
+                                    if (!moved && panChange.getDistance() > 4f) {
+                                        moved = true
+                                        gestureActive = true
+                                        onDragStart()
+                                    }
+                                    if (moved) {
+                                        pos = Offset(
+                                            (pos.x + panChange.x / density.density).coerceIn(0f, clampX),
+                                            (pos.y + panChange.y / density.density).coerceIn(0f, clampY)
+                                        )
+                                        onDragUpdate(pos.x, pos.y)
+                                        lastInteraction = System.currentTimeMillis()
+                                    }
+                                    event.changes.forEach { it.consume() }
+                                }
+                            }
+                        }
+                    } while (!canceled && event.changes.any { it.pressed })
+                    if (moved) {
+                        gestureActive = false
+                        onDragEnd(pos.y, canceled)
+                    }
+                }
+            }
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .shadow(7.dp, RoundedCornerShape(3.dp))
+                .clip(RoundedCornerShape(3.dp))
+                .background(Brush.linearGradient(listOf(body, body, stickyEdge(note.color))))
+                .combinedClickable(onClick = onOpen)
+                .padding(top = if (usePin) 20.dp else 14.dp, start = 12.dp, end = 12.dp, bottom = 16.dp)
+        ) {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                Column {
+                    Text(
+                        note.title.ifBlank { "بدون عنوان" },
+                        fontFamily = LalezarFont,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = androidx.compose.ui.graphics.Color(0xFF3E2723),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        note.body,
+                        fontFamily = VazirFont,
+                        fontSize = 11.sp,
+                        color = androidx.compose.ui.graphics.Color(0xFF5D4037),
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 17.sp
+                    )
+                }
+            }
+            CurledCorner(Modifier.align(Alignment.BottomEnd))
+        }
+        if (usePin) {
+            Thumbtack(pinColor(note.color), Modifier.align(Alignment.TopCenter).offset(y = (-8).dp))
+        } else {
+            TapeStrip(Modifier.align(Alignment.TopCenter).offset(y = (-9).dp))
+        }
+    }
+}
+
+@Composable
+private fun Thumbtack(color: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+    Box(modifier.size(20.dp)) {
+        Box(Modifier.size(20.dp).offset(y = 3.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .30f)))
+        Box(Modifier.size(20.dp).clip(CircleShape).background(Brush.radialGradient(listOf(color.copy(alpha = .95f), color, color.copy(alpha = .55f)))))
+        Box(Modifier.size(6.dp).align(Alignment.TopStart).offset(4.dp, 4.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Color.White.copy(alpha = .75f)))
+    }
+}
+
+@Composable
+private fun TapeStrip(modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .width(58.dp)
+            .height(18.dp)
+            .rotate(-3f)
+            .clip(RoundedCornerShape(2.dp))
+            .background(androidx.compose.ui.graphics.Color.White.copy(alpha = .38f))
+    )
+}
+
+@Composable
+private fun CurledCorner(modifier: Modifier = Modifier) {
+    Canvas(modifier.size(26.dp)) {
+        val p = androidx.compose.ui.graphics.Path().apply {
+            moveTo(size.width, 0f)
+            lineTo(size.width, size.height)
+            lineTo(0f, size.height)
+            close()
+        }
+        drawPath(p, Brush.linearGradient(listOf(androidx.compose.ui.graphics.Color.Black.copy(alpha = .22f), androidx.compose.ui.graphics.Color.Black.copy(alpha = .05f))))
+    }
+}
