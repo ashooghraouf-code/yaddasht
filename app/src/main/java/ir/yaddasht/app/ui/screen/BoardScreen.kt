@@ -223,7 +223,6 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
     var imageToDelete by remember { mutableStateOf<BoardImage?>(null) }
     var boardToDelete by remember { mutableStateOf<Board?>(null) }
 
-    // ✅ اندازهٔ واقعیِ اندازه‌گیری‌شدهٔ هر آیتم (برای PDF دقیق)
     val noteSizes = remember { mutableStateOf(mutableMapOf<Long, Pair<Int, Int>>()) }
     val imageSizes = remember { mutableStateOf(mutableMapOf<Long, Pair<Int, Int>>()) }
 
@@ -324,12 +323,14 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     val note = notes.firstOrNull { it.id == item.noteId } ?: return@forEach
                     val scale = item.scale.coerceIn(0.3f, 3.0f)
 
-                    // ✅ استفاده از اندازهٔ واقعیِ اندازه‌گیری‌شده روی صفحه
+                    val usePin = item.noteId % 2 == 0L
+                    val topPadPx = (if (usePin) 20f else 14f) * d
+                    val bottomPadPx = 16f * d
+                    val padPx = 12f * d
+
                     val measured = noteSizes.value[item.noteId]
                     val wPx = measured?.first?.toFloat() ?: (BASE_NOTE_WIDTH * scale * d)
-                    val hPx = measured?.second?.toFloat() ?: (200f * d)
-                    val padPx = 12f * d
-                    val topPadPx = (if (item.noteId.hashCode() and 1 == 0) 20f else 14f) * d
+                    val hPx = measured?.second?.toFloat() ?: (topPadPx + 200f * d + bottomPadPx)
                     val innerW = (wPx - 2f * padPx).toInt().coerceAtLeast(1)
 
                     val titleText = note.title.ifBlank { "بدون عنوان" }
@@ -440,10 +441,12 @@ fun BoardScreen(notes: List<Note>, noteDao: NoteDao, onOpenNote: (Long) -> Unit,
                     boards.forEach { b ->
                         val selected = b.id == currentBoard
                         Surface(
-                            onClick = { currentBoard = b.id; refresh(); searchQuery = "" },
-                            // ✅ لمس طولانی = حذف تابلو
                             modifier = Modifier.combinedClickable(
-                                onClick = { currentBoard = b.id; refresh(); searchQuery = "" },
+                                onClick = {
+                                    currentBoard = b.id
+                                    refresh()
+                                    searchQuery = ""
+                                },
                                 onLongClick = { boardToDelete = b }
                             ),
                             shape = RoundedCornerShape(10.dp),
@@ -1119,142 +1122,4 @@ private fun StickyNote(
     var gestureActive by remember { mutableStateOf(false) }
 
     LaunchedEffect(lastInteraction) {
-        if (lastInteraction > 0 && !gestureActive) {
-            delay(500)
-            onMoved(pos.x, pos.y)
-            onRotated(rotation)
-            onScaleChanged(scale)
-        }
-    }
-
-    val trashScale by animateFloatAsState(targetValue = if (isOverTrash) 0.4f else 1f, label = "trash-scale")
-    val trashAlpha by animateFloatAsState(targetValue = if (isOverTrash) 0.3f else 1f, label = "trash-alpha")
-
-    val widthDp = (BASE_NOTE_WIDTH * scale).dp
-    val body = stickyBody(note.color)
-    val usePin = variant % 2 == 0
-
-    Box(
-        Modifier
-            .alpha(trashAlpha)
-            .absoluteOffset { with(density) { IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx()) } }
-            .width(widthDp)
-            .onSizeChanged { s -> onMeasured(s.width, s.height) }
-            .graphicsLayer {
-                rotationZ = rotation
-                scaleX = trashScale
-                scaleY = trashScale
-            }
-            .pointerInput(item.noteId, item.boardId) {
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
-                    var moved = false
-                    var canceled = false
-                    do {
-                        val event = awaitPointerEvent()
-                        canceled = event.changes.any { it.isConsumed }
-                        if (!canceled) {
-                            val pointerCount = event.changes.count { it.pressed }
-                            val panChange = event.calculatePan()
-                            if (pointerCount >= 2) {
-                                val zoomChange = event.calculateZoom()
-                                val rotationChange = event.calculateRotation()
-                                if (!moved && (zoomChange != 1f || rotationChange != 0f || panChange.getDistance() > 8f)) {
-                                    moved = true
-                                    gestureActive = true
-                                    onDragStart()
-                                }
-                                if (moved) {
-                                    pos = Offset(
-                                        (pos.x + panChange.x / density.density).coerceIn(0f, clampX),
-                                        (pos.y + panChange.y / density.density).coerceIn(0f, clampY)
-                                    )
-                                    rotation += rotationChange
-                                    scale = (scale * zoomChange).coerceIn(0.3f, 3.0f)
-                                    onDragUpdate(pos.x, pos.y)
-                                    lastInteraction = System.currentTimeMillis()
-                                }
-                                event.changes.forEach { it.consume() }
-                            } else {
-                                if (panChange.getDistance() > 0f) {
-                                    if (!moved && panChange.getDistance() > 4f) {
-                                        moved = true
-                                        gestureActive = true
-                                        onDragStart()
-                                    }
-                                    if (moved) {
-                                        pos = Offset(
-                                            (pos.x + panChange.x / density.density).coerceIn(0f, clampX),
-                                            (pos.y + panChange.y / density.density).coerceIn(0f, clampY)
-                                        )
-                                        onDragUpdate(pos.x, pos.y)
-                                        lastInteraction = System.currentTimeMillis()
-                                    }
-                                    event.changes.forEach { it.consume() }
-                                }
-                            }
-                        }
-                    } while (!canceled && event.changes.any { it.pressed })
-                    if (moved) {
-                        gestureActive = false
-                        onDragEnd(pos.y, canceled)
-                    }
-                }
-            }
-    ) {
-        Box(
-            Modifier.fillMaxWidth()
-                .shadow(7.dp, RoundedCornerShape(3.dp))
-                .clip(RoundedCornerShape(3.dp))
-                .background(Brush.linearGradient(listOf(body, body, stickyEdge(note.color))))
-                .combinedClickable(onClick = onOpen)
-                .padding(top = if (usePin) 20.dp else 14.dp, start = 12.dp, end = 12.dp, bottom = 16.dp)
-        ) {
-            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                Column {
-                    Text(note.title.ifBlank { "بدون عنوان" }, fontFamily = LalezarFont, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color(0xFF3E2723), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(note.body, fontFamily = VazirFont, fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF5D4037), maxLines = 5, overflow = TextOverflow.Ellipsis, lineHeight = 17.sp)
-                }
-            }
-            CurledCorner(Modifier.align(Alignment.BottomEnd))
-        }
-        if (usePin) {
-            Thumbtack(pinColor(note.color), Modifier.align(Alignment.TopCenter).offset(y = (-8).dp))
-        } else {
-            TapeStrip(Modifier.align(Alignment.TopCenter).offset(y = (-9).dp))
-        }
-    }
-}
-
-@Composable
-private fun Thumbtack(color: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
-    Box(modifier.size(20.dp)) {
-        Box(Modifier.size(20.dp).offset(y = 3.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .30f)))
-        Box(Modifier.size(20.dp).clip(CircleShape).background(Brush.radialGradient(listOf(color.copy(alpha = .95f), color, color.copy(alpha = .55f)))))
-        Box(Modifier.size(6.dp).align(Alignment.TopStart).offset(4.dp, 4.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Color.White.copy(alpha = .75f)))
-    }
-}
-
-@Composable
-private fun TapeStrip(modifier: Modifier = Modifier) {
-    Box(
-        modifier.width(58.dp)
-            .height(18.dp)
-            .rotate(-3f)
-            .clip(RoundedCornerShape(2.dp))
-            .background(androidx.compose.ui.graphics.Color.White.copy(alpha = .38f))
-    )
-}
-
-@Composable
-private fun CurledCorner(modifier: Modifier = Modifier) {
-    Canvas(modifier.size(26.dp)) {
-        val p = androidx.compose.ui.graphics.Path().apply {
-            moveTo(size.width, 0f)
-            lineTo(size.width, size.height)
-            lineTo(0f, size.height)
-            close()
-        }
-        drawPath(p, Brush.linearGradient(listOf(androidx.compose.ui.graphics.Color.Black.copy(alpha = .22f), androidx.compose.ui.graphics.Color.Black.copy(alpha = .05f))))
-    }
-}
+        if (lastInteraction > 0 && !gesture
