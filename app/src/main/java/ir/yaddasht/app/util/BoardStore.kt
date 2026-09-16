@@ -85,6 +85,16 @@ object BoardStore {
         saveBoards(c, boards(c).map { if (it.id == boardId) it.copy(sizeIndex = sizeIndex.coerceIn(0, 3)) else it })
     }
 
+    // ✅ حذف کامل تابلو همراه با آیتم‌ها و تصاویرش
+    fun removeBoard(c: Context, boardId: Long) {
+        val list = boards(c).toMutableList()
+        if (list.size <= 1) return
+        list.removeAll { it.id == boardId }
+        saveBoards(c, list)
+        saveItems(c, allItems(c).filterNot { it.boardId == boardId })
+        saveImages(c, allImages(c).filterNot { it.boardId == boardId })
+    }
+
     private fun allItems(c: Context): List<BoardItem> {
         val json = prefs(c).getString(KEY_ITEMS, "[]") ?: "[]"
         return try {
