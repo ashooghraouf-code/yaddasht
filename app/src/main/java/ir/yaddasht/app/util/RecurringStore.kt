@@ -90,8 +90,9 @@ object RecurringStore {
 
     fun remove(c: Context, id: Long) {
         save(c, tasks(c).filterNot { it.id == id })
-        val done = prefs(c).getStringSet(KEY_DONE, emptySet()) ?: emptySet()
-        prefs(c).edit().putStringSet(KEY_DONE, done.filterNot { it.startsWith("$id|") }).apply()
+        val done = prefs(c).getStringSet(KEY_DONE, emptySet<String>()) ?: emptySet<String>()
+        // ✅ اصلاح: filterNot یک List برمی‌گرداند، باید به Set تبدیل شود
+        prefs(c).edit().putStringSet(KEY_DONE, done.filterNot { it.startsWith("$id|") }.toSet()).apply()
     }
 
     fun isDueToday(t: RecurringTask, cal: Calendar): Boolean {
@@ -124,12 +125,12 @@ object RecurringStore {
     }
 
     fun isDone(c: Context, t: RecurringTask, cal: Calendar): Boolean {
-        val set = prefs(c).getStringSet(KEY_DONE, emptySet()) ?: emptySet()
+        val set = prefs(c).getStringSet(KEY_DONE, emptySet<String>()) ?: emptySet<String>()
         return set.contains("${t.id}|${dayKey(cal)}")
     }
 
     fun setDone(c: Context, t: RecurringTask, cal: Calendar, done: Boolean) {
-        val set = (prefs(c).getStringSet(KEY_DONE, emptySet()) ?: emptySet()).toMutableSet()
+        val set = (prefs(c).getStringSet(KEY_DONE, emptySet<String>()) ?: emptySet<String>()).toMutableSet()
         val key = "${t.id}|${dayKey(cal)}"
         if (done) set.add(key) else set.remove(key)
         prefs(c).edit().putStringSet(KEY_DONE, set).apply()
@@ -137,11 +138,19 @@ object RecurringStore {
 
     fun streak(c: Context, t: RecurringTask, cal: Calendar): Int {
         var count = 0
-        val c = cal.clone() as Calendar
-        if (!isDone(c, t, c)) c.add(Calendar.DAY_OF_YEAR, -1)
+        // ✅ اصلاح: تغییر نام متغیر محلی از `c` به `cur` برای جلوگیری از shadow شدن `c: Context`
+        val cur = cal.clone() as Calendar
+        if (!isDone(c, t, cur)) cur.add(Calendar.DAY_OF_YEAR, -1)
         while (true) {
-            if (!isDueToday(t, c)) { c.add(Calendar.DAY_OF_YEAR, -1); if (count == 0 && c.timeInMillis < dayStart(cal) - 400L * 86_400_000L) break; continue }
-            if (isDone(c, t, c)) { count++; c.add(Calendar.DAY_OF_YEAR, -1) } else break
+            if (!isDueToday(t, cur)) {
+                cur.add(Calendar.DAY_OF_YEAR, -1)
+                if (count == 0 && cur.timeInMillis < dayStart(cal) - 400L * 86_400_000L) break
+                continue
+            }
+            if (isDone(c, t, cur)) {
+                count++
+                cur.add(Calendar.DAY_OF_YEAR, -1)
+            } else break
             if (count > 3650) break
         }
         return count
