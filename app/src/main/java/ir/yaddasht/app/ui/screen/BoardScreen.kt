@@ -134,14 +134,21 @@ private val BOARD_SIZES_DP = BOARD_SIZES_PT
 
 private const val BASE_NOTE_WIDTH = 150f
 private const val BASE_IMAGE_WIDTH = 150f
-private const val EXPORT_QUALITY_SCALE = 2.5f
+// ✅ افزایش کیفیت خروجی به ۳.۵ برابر برای وضوح بسیار بالا
+private const val EXPORT_QUALITY_SCALE = 3.5f
 private const val FINGER_THROTTLE_MS = 50L
 
 private data class MiniMarker(val x: Float, val y: Float, val w: Float, val h: Float, val color: Color)
 
+// ✅ پالت رنگی جدید و حرفه‌ای هماهنگ با تم‌های نرم‌افزار
 private fun boardBase(index: Int): Color = listOf(
-    Color(0xFFA1887F), Color(0xFF6D4C41), Color(0xFF263238), Color(0xFFECEFF1)
-)[index.coerceIn(0, 3)]
+    Color(0xFFF5F5DC), // کرم روشن (کاغذ کاهی کلاسیک)
+    Color(0xFFE8EAF6), // خاکستری-آبی ملایم (مدرن)
+    Color(0xFF263238), // سرمه‌ای تیره (حالت شب/تخته سیاه)
+    Color(0xFFFFF3E0), // نارنجی بسیار ملایم (گرم)
+    Color(0xFFE0F2F1), // سبزآبی ملایم (آرامش‌بخش)
+    Color(0xFFFCE4EC)  // صورتی ملایم (لطیف)
+)[index.coerceIn(0, 5)]
 
 private fun stickyBody(index: Int): Color = listOf(
     Color(0xFFFFF59D), Color(0xFFF8BBD0), Color(0xFFB3E5FC),
@@ -202,8 +209,6 @@ private fun renderBoardToCanvas(
     noteSizes: Map<Long, Pair<Int, Int>>,
     imageSizes: Map<Long, Pair<Int, Int>>,
     bgIndex: Int,
-    clampX: Float,
-    clampY: Float,
     density: Float,
     pxW: Int,
     pxH: Int,
@@ -247,9 +252,9 @@ private fun renderBoardToCanvas(
         val measured = noteSizes[item.noteId]
         val baseWItem = measured?.first?.toFloat()?.let { it / density } ?: (BASE_NOTE_WIDTH * itemScale)
         val baseHItem = measured?.second?.toFloat()?.let { it / density } ?: (140f * itemScale)
-        val wPx = baseWItem * scale
-        val hPx = baseHItem * scale
-        val innerW = (wPx - 2f * padPx).toInt().coerceAtLeast(1)
+        val drawW = baseWItem * scale
+        val drawH = baseHItem * scale
+        val innerW = (drawW - 2f * padPx).toInt().coerceAtLeast(1)
         
         val titleText = note.title.ifBlank { "بدون عنوان" }
         val titleLayout = StaticLayout.Builder
@@ -269,16 +274,17 @@ private fun renderBoardToCanvas(
         }
         val bodyLayout = bodyBuilder.build()
         
-        val cx = item.x.coerceIn(0f, clampX) * scale + wPx / 2f
-        val cy = item.y.coerceIn(0f, clampY) * scale + hPx / 2f
+        // ✅ حذف coerceIn برای جلوگیری از روی هم افتادن یادداشت‌ها در خروجی
+        val drawX = item.x * scale
+        val drawY = item.y * scale
         
         canvas.save()
-        canvas.translate(cx, cy)
+        canvas.translate(drawX + drawW / 2f, drawY + drawH / 2f)
         canvas.rotate(item.rotation)
-        canvas.translate(-wPx / 2f, -hPx / 2f)
+        canvas.translate(-drawW / 2f, -drawH / 2f)
         
         bgPaint.color = stickyBody(note.color).toArgb()
-        canvas.drawRoundRect(RectF(0f, 0f, wPx, hPx), 3f * scale, 3f * scale, bgPaint)
+        canvas.drawRoundRect(RectF(0f, 0f, drawW, drawH), 3f * scale, 3f * scale, bgPaint)
         
         canvas.save()
         canvas.translate(padPx, topPadPx)
@@ -299,19 +305,20 @@ private fun renderBoardToCanvas(
         val measuredImg = imageSizes[img.id]
         val baseWImg = measuredImg?.first?.toFloat()?.let { it / density } ?: (BASE_IMAGE_WIDTH * itemScale)
         val baseHImg = measuredImg?.second?.toFloat()?.let { it / density } ?: (BASE_IMAGE_WIDTH * itemScale)
-        val totalW = baseWImg * scale
-        val totalH = baseHImg * scale
+        val drawW = baseWImg * scale
+        val drawH = baseHImg * scale
         val frame = 4f * scale
-        val imgW = (totalW - 2f * frame).coerceAtLeast(1f)
-        val imgH = (totalH - 2f * frame).coerceAtLeast(1f)
-        val cx = img.x.coerceIn(0f, clampX) * scale + totalW / 2f
-        val cy = img.y.coerceIn(0f, clampY) * scale + totalH / 2f
+        val imgW = (drawW - 2f * frame).coerceAtLeast(1f)
+        val imgH = (drawH - 2f * frame).coerceAtLeast(1f)
+        
+        val drawX = img.x * scale
+        val drawY = img.y * scale
         
         canvas.save()
-        canvas.translate(cx, cy)
+        canvas.translate(drawX + drawW / 2f, drawY + drawH / 2f)
         canvas.rotate(img.rotation)
-        canvas.translate(-totalW / 2f, -totalH / 2f)
-        canvas.drawRoundRect(RectF(0f, 0f, totalW, totalH), 6f * scale, 6f * scale, framePaint)
+        canvas.translate(-drawW / 2f, -drawH / 2f)
+        canvas.drawRoundRect(RectF(0f, 0f, drawW, drawH), 6f * scale, 6f * scale, framePaint)
         canvas.drawBitmap(bitmap, null, RectF(frame, frame, frame + imgW, frame + imgH), null)
         canvas.restore()
         bitmap.recycle()
@@ -439,9 +446,6 @@ fun BoardScreen(
         val snapshotNoteSizes = noteSizes.value.toMap()
         val snapshotImageSizes = imageSizes.value.toMap()
         val snapshotBg = bgIndex
-        val sClampX = clampX
-        val sClampY = clampY
-        val sDensity = density.density
         val sSizeIndex = boardSizeIndex
         val sPhone = isPhoneSize
         val sPxW = boardPxW
@@ -453,15 +457,15 @@ fun BoardScreen(
                 val baseW: Float
                 val baseH: Float
                 if (sPhone) {
-                    baseW = sPxW.toFloat()
-                    baseH = sPxH.toFloat()
+                    baseW = sPxW.toFloat().coerceAtLeast(100f)
+                    baseH = sPxH.toFloat().coerceAtLeast(100f)
                 } else {
                     baseW = BOARD_SIZES_PT[sSizeIndex].first
                     baseH = BOARD_SIZES_PT[sSizeIndex].second
                 }
                 
-                val pxW = (baseW * EXPORT_QUALITY_SCALE).toInt().coerceAtLeast(100)
-                val pxH = (baseH * EXPORT_QUALITY_SCALE).toInt().coerceAtLeast(100)
+                val pxW = (baseW * EXPORT_QUALITY_SCALE).toInt().coerceAtLeast(300)
+                val pxH = (baseH * EXPORT_QUALITY_SCALE).toInt().coerceAtLeast(300)
                 
                 val dir = File(context.cacheDir, "board_exports")
                 if (!dir.exists()) dir.mkdirs()
@@ -470,13 +474,13 @@ fun BoardScreen(
                 if (asPdf) {
                     val pdfDocument = PdfDocument()
                     val page = pdfDocument.startPage(PdfDocument.PageInfo.Builder(pxW, pxH, 1).create())
-                    renderBoardToCanvas(context, page.canvas, snapshotNotes, snapshotItems, snapshotImages, snapshotNoteSizes, snapshotImageSizes, snapshotBg, sClampX, sClampY, sDensity, pxW, pxH, baseW, baseH)
+                    renderBoardToCanvas(context, page.canvas, snapshotNotes, snapshotItems, snapshotImages, snapshotNoteSizes, snapshotImageSizes, snapshotBg, density.density, pxW, pxH, baseW, baseH)
                     pdfDocument.finishPage(page)
                     FileOutputStream(file).use { out -> pdfDocument.writeTo(out) }
                     pdfDocument.close()
                 } else {
                     val bitmap = Bitmap.createBitmap(pxW, pxH, Bitmap.Config.ARGB_8888)
-                    renderBoardToCanvas(context, AndroidCanvas(bitmap), snapshotNotes, snapshotItems, snapshotImages, snapshotNoteSizes, snapshotImageSizes, snapshotBg, sClampX, sClampY, sDensity, pxW, pxH, baseW, baseH)
+                    renderBoardToCanvas(context, AndroidCanvas(bitmap), snapshotNotes, snapshotItems, snapshotImages, snapshotNoteSizes, snapshotImageSizes, snapshotBg, density.density, pxW, pxH, baseW, baseH)
                     FileOutputStream(file).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
                     bitmap.recycle()
                 }
@@ -491,7 +495,7 @@ fun BoardScreen(
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                     context.startActivity(Intent.createChooser(intent, "اشتراک‌گذاری تابلو"))
-                    Toast.makeText(context, "✅ خروجی آماده شد (${pxW}×${pxH})", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "✅ خروجی با کیفیت بالا آماده شد", Toast.LENGTH_LONG).show()
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
@@ -571,7 +575,7 @@ fun BoardScreen(
                         }
                     }
                     
-                    IconButton(onClick = { BoardStore.setBackground(context, currentBoard, (bgIndex + 1) % 4); refresh() }) {
+                    IconButton(onClick = { BoardStore.setBackground(context, currentBoard, (bgIndex + 1) % 6); refresh() }) {
                         Icon(Icons.Filled.Palette, "پس‌زمینه", tint = Color(0xFFFFE0B2))
                     }
                     
@@ -752,7 +756,7 @@ fun BoardScreen(
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(color = Color.White)
-                    Text("در حال ساخت خروجی...", color = Color.White, modifier = Modifier.padding(top = 16.dp), fontFamily = VazirFont)
+                    Text("در حال ساخت خروجی با کیفیت بالا...", color = Color.White, modifier = Modifier.padding(top = 16.dp), fontFamily = VazirFont)
                 }
             }
         }
@@ -879,7 +883,7 @@ fun BoardScreen(
                             Spacer(Modifier.width(12.dp))
                             Column {
                                 Text("🖼️ PNG", fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = VazirFont)
-                                Text("تصویر با کیفیت بالا", fontSize = 11.sp, color = Color.Gray, fontFamily = VazirFont)
+                                Text("تصویر با کیفیت بسیار بالا", fontSize = 11.sp, color = Color.Gray, fontFamily = VazirFont)
                             }
                         }
                     }
@@ -992,22 +996,35 @@ private fun MiniMap(
     val finger = fingerState.value
     val scrollX = scrollStateH.value.toFloat()
     val scrollY = scrollStateV.value.toFloat()
-    ComposeCanvas(modifier.background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(6.dp)).border(1.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(6.dp))) {
+    ComposeCanvas(modifier.background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(6.dp)).border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(6.dp))) {
         val sx = size.width / paperW
         val sy = size.height / paperH
+        
+        // ✅ رسم دقیق نشانگرها با حاشیه برای وضوح بیشتر
         markers.forEach { m ->
+            val mw = (m.w * sx).coerceAtLeast(3f)
+            val mh = (m.h * sy).coerceAtLeast(3f)
             drawRect(
                 color = m.color.copy(alpha = 0.9f),
                 topLeft = Offset(m.x * sx, m.y * sy),
-                size = Size((m.w * sx).coerceAtLeast(2.5f), (m.h * sy).coerceAtLeast(2.5f))
+                size = Size(mw, mh)
+            )
+            drawRect(
+                color = Color.White.copy(alpha = 0.6f),
+                topLeft = Offset(m.x * sx, m.y * sy),
+                size = Size(mw, mh),
+                style = Stroke(1f)
             )
         }
+        
         val vw = (viewW * sx).coerceAtMost(size.width)
         val vh = (viewH * sy).coerceAtMost(size.height)
         val vx = (scrollX * sx).coerceIn(0f, (size.width - vw).coerceAtLeast(0f))
         val vy = (scrollY * sy).coerceIn(0f, (size.height - vh).coerceAtLeast(0f))
-        drawRect(Color.White.copy(alpha = 0.18f), topLeft = Offset(vx, vy), size = Size(vw, vh))
+        
+        drawRect(Color.White.copy(alpha = 0.15f), topLeft = Offset(vx, vy), size = Size(vw, vh))
         drawRect(Color.White, topLeft = Offset(vx, vy), size = Size(vw, vh), style = Stroke(1.5f))
+        
         finger?.let { f ->
             val fx = (f.x * pxPerDp * sx).coerceIn(0f, size.width)
             val fy = (f.y * pxPerDp * sy).coerceIn(0f, size.height)
@@ -1131,7 +1148,7 @@ private fun CorkTexture(bgIndex: Int) {
 
 @Composable
 private fun Vignette(bgIndex: Int) {
-    val strength = if (bgIndex == 3) 0.10f else 0.25f
+    val strength = if (bgIndex == 2) 0.40f else 0.25f // vignette قوی‌تر برای حالت تیره
     val brush = remember(bgIndex) {
         Brush.radialGradient(
             colors = listOf(Color.Transparent, Color.Black.copy(alpha = strength)),
