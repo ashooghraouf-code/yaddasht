@@ -92,6 +92,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -143,6 +144,15 @@ private val BOARD_SIZES_DP = BOARD_SIZES_PT
 private const val BASE_NOTE_WIDTH = 150f
 private const val BASE_IMAGE_WIDTH = 150f
 private const val EXPORT_QUALITY_SCALE = 2.5f
+
+// ✅ نشانگر ریز روی مینی‌مپ
+private data class MiniMarker(
+    val x: Float,
+    val y: Float,
+    val w: Float,
+    val h: Float,
+    val color: Color
+)
 
 private fun boardBase(index: Int): Color = listOf(
     Color(0xFFA1887F), Color(0xFF6D4C41), Color(0xFF263238), Color(0xFFECEFF1)
@@ -199,7 +209,6 @@ private fun loadBitmapFromUri(context: Context, uriString: String): Bitmap? {
     }
 }
 
-// ✅ تابع رندر مستقل - هیچ وابستگی به Composable ندارد
 private fun renderBoardToCanvas(
     context: Context,
     canvas: Canvas,
@@ -361,6 +370,8 @@ fun BoardScreen(
     var draggingImageId by remember { mutableStateOf<Long?>(null) }
     var fingerX by remember { mutableFloatStateOf(0f) }
     var fingerY by remember { mutableFloatStateOf(0f) }
+    // ✅ انگشت روی تابلو نگه داشته شده
+    var boardTouchActive by remember { mutableStateOf(false) }
 
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
     var imageToDelete by remember { mutableStateOf<BoardImage?>(null) }
@@ -414,11 +425,41 @@ fun BoardScreen(
         }
     }
 
+    // ✅ نشانگرهای ریز برای مینی‌مپ
+    val miniMarkers = remember(visibleItems, images, notes) {
+        val list = mutableListOf<MiniMarker>()
+        visibleItems.forEach { item ->
+            val n = notes.firstOrNull { it.id == item.noteId }
+            if (n != null) {
+                list.add(
+                    MiniMarker(
+                        x = item.x,
+                        y = item.y,
+                        w = BASE_NOTE_WIDTH * item.scale,
+                        h = 120f * item.scale,
+                        color = stickyBody(n.color)
+                    )
+                )
+            }
+        }
+        images.forEach { img ->
+            list.add(
+                MiniMarker(
+                    x = img.x,
+                    y = img.y,
+                    w = BASE_IMAGE_WIDTH * img.scale,
+                    h = 120f * img.scale,
+                    color = Color.White
+                )
+            )
+        }
+        list
+    }
+
     fun exportBoard(asPdf: Boolean) {
         if (isExporting) return
         isExporting = true
 
-        // Snapshot همهٔ داده‌ها قبل از thread
         val snapshotNotes = notes.toList()
         val snapshotItems = items.toList()
         val snapshotImages = images.toList()
@@ -687,6 +728,26 @@ fun BoardScreen(
                             Modifier
                                 .then(if (isPhoneSize) Modifier.fillMaxSize() else Modifier.width(boardWidthDp.dp).height(boardHeightDpActual.dp))
                                 .onSizeChanged { s -> boardPxW = s.width; boardPxH = s.height }
+                                // ✅ مشاهدهٔ لمس روی تابلو بدون مصرف رویداد (اسکرول و ژست‌ها دست‌نخورده می‌مانند)
+                                .pointerInput(Unit) {
+                                    awaitEachGesture {
+                                        val down = awaitFirstDown(requireUnconsumed = false)
+                                        boardTouchActive = true
+                                        fingerX = down.position.x / density.density
+                                        fingerY = down.position.y / density.density
+                                        var pressed = true
+                                        while (pressed) {
+                                            val ev = awaitPointerEvent(PointerEventPass.Main)
+                                            val ch = ev.changes.firstOrNull()
+                                            if (ch != null && ch.pressed) {
+                                                fingerX = ch.position.x / density.density
+                                                fingerY = ch.position.y / density.density
+                                            }
+                                            pressed = ev.changes.any { it.pressed }
+                                        }
+                                        boardTouchActive = false
+                                    }
+                                }
                         ) {
                             CorkTexture(bgIndex)
                             Vignette(bgIndex)
@@ -745,7 +806,10 @@ fun BoardScreen(
                         }
                     }
 
-                    if (!isPhoneSize && (draggingNoteId != null || draggingImageId != null) && boardPxW > 0 && boardPxH > 0 && vpW > 0 && vpH > 0) {
+                    // ✅ مینی‌مپ: هنگام نگه‌داشتن انگشت یا جابه‌جایی روشن می‌شود
+                    if ((boardTouchActive || draggingNoteId != null || draggingImageId != null) &&
+                        boardPxW > 0 && boardPxH > 0 && vpW > 0 && vpH > 0
+                    ) {
                         MiniMap(
                             paperW = boardPxW.toFloat(),
                             paperH = boardPxH.toFloat(),
@@ -755,6 +819,7 @@ fun BoardScreen(
                             scrollY = scrollStateV.value.toFloat(),
                             finger = Offset(fingerX, fingerY),
                             pxPerDp = density.density,
+                            markers = miniMarkers,
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
                                 .padding(16.dp)
@@ -1092,6 +1157,7 @@ private fun MiniMap(
     scrollY: Float,
     finger: Offset?,
     pxPerDp: Float,
+    markers: List<MiniMarker>,
     modifier: Modifier
 ) {
     ComposeCanvas(
@@ -1101,12 +1167,24 @@ private fun MiniMap(
     ) {
         val sx = size.width / paperW
         val sy = size.height / paperH
+
+        // ✅ نشانگرهای ریز یادداشت‌ها و عکس‌ها
+        markers.forEach { m ->
+            val mw = (m.w * sx).coerceAtLeast(2.5f)
+            val mh = (m.h * sy).coerceAtLeast(2.5f)
+            drawRect(
+                color = m.color.copy(alpha = 0.9f),
+                topLeft = Offset(m.x * sx, m.y * sy),
+                size = Size(mw, mh)
+            )
+        }
+
         val vw = (viewW * sx).coerceAtMost(size.width)
         val vh = (viewH * sy).coerceAtMost(size.height)
         val vx = (scrollX * sx).coerceIn(0f, (size.width - vw).coerceAtLeast(0f))
         val vy = (scrollY * sy).coerceIn(0f, (size.height - vh).coerceAtLeast(0f))
         drawRect(
-            Color.White.copy(alpha = 0.22f),
+            Color.White.copy(alpha = 0.18f),
             topLeft = Offset(vx, vy),
             size = Size(vw, vh)
         )
