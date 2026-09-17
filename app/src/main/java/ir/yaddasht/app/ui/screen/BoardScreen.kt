@@ -84,6 +84,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
@@ -208,6 +209,13 @@ fun BoardScreen(
 
     var boardPxW by remember { mutableIntStateOf(0) }
     var boardPxH by remember { mutableIntStateOf(0) }
+    var vpW by remember { mutableIntStateOf(0) }
+    var vpH by remember { mutableIntStateOf(0) }
+
+    var draggingNoteId by remember { mutableStateOf<Long?>(null) }
+    var draggingImageId by remember { mutableStateOf<Long?>(null) }
+    var fingerX by remember { mutableFloatStateOf(0f) }
+    var fingerY by remember { mutableFloatStateOf(0f) }
 
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
     var imageToDelete by remember { mutableStateOf<BoardImage?>(null) }
@@ -559,12 +567,13 @@ fun BoardScreen(
                     Box(
                         Modifier
                             .fillMaxSize()
-                            .onSizeChanged { s -> boardPxW = s.width; boardPxH = s.height }
+                            .onSizeChanged { s -> vpW = s.width; vpH = s.height; boardPxW = s.width; boardPxH = s.height }
                             .then(if (!isPhoneSize) Modifier.verticalScroll(scrollStateV).horizontalScroll(scrollStateH) else Modifier)
                     ) {
                         Box(
                             Modifier
                                 .then(if (isPhoneSize) Modifier.fillMaxSize() else Modifier.width(boardWidthDp.dp).height(boardHeightDpActual.dp))
+                                .onSizeChanged { s -> boardPxW = s.width; boardPxH = s.height }
                         ) {
                             CorkTexture(bgIndex)
                             Vignette(bgIndex)
@@ -589,12 +598,16 @@ fun BoardScreen(
                                         stagger = idx,
                                         clampX = clampX,
                                         clampY = clampY,
+                                        isDraggingThis = draggingNoteId == note.id,
                                         onOpen = { onOpenNote(note.id) },
                                         onLongPress = { noteToDelete = note },
                                         onMoved = { x, y -> BoardStore.move(context, note.id, currentBoard, x, y); refresh() },
                                         onRotated = { rot -> BoardStore.rotate(context, note.id, currentBoard, rot); refresh() },
                                         onScaleChanged = { scale -> BoardStore.setScale(context, note.id, currentBoard, scale); refresh() },
-                                        onMeasured = { w, h -> noteSizes.value[item.noteId] = w to h }
+                                        onMeasured = { w, h -> noteSizes.value[item.noteId] = w to h },
+                                        onDragStart = { draggingNoteId = note.id },
+                                        onDragUpdate = { x, y -> fingerX = x; fingerY = y },
+                                        onDragEnd = { draggingNoteId = null }
                                     )
                                 }
                             }
@@ -605,14 +618,36 @@ fun BoardScreen(
                                     stagger = visibleItems.size + idx,
                                     clampX = clampX,
                                     clampY = clampY,
+                                    isDraggingThis = draggingImageId == img.id,
                                     onLongPress = { imageToDelete = img },
                                     onMoved = { x, y -> BoardStore.moveImage(context, img.id, currentBoard, x, y); refresh() },
                                     onRotated = { rot -> BoardStore.rotateImage(context, img.id, currentBoard, rot); refresh() },
                                     onScaleChanged = { scale -> BoardStore.setImageScale(context, img.id, currentBoard, scale); refresh() },
-                                    onMeasured = { w, h -> imageSizes.value[img.id] = w to h }
+                                    onMeasured = { w, h -> imageSizes.value[img.id] = w to h },
+                                    onDragStart = { draggingImageId = img.id },
+                                    onDragUpdate = { x, y -> fingerX = x; fingerY = y },
+                                    onDragEnd = { draggingImageId = null }
                                 )
                             }
                         }
+                    }
+
+                    if (!isPhoneSize && boardPxW > 0 && boardPxH > 0 && vpW > 0 && vpH > 0) {
+                        MiniMap(
+                            paperW = boardPxW.toFloat(),
+                            paperH = boardPxH.toFloat(),
+                            viewW = vpW.toFloat(),
+                            viewH = vpH.toFloat(),
+                            scrollX = scrollStateH.value.toFloat(),
+                            scrollY = scrollStateV.value.toFloat(),
+                            finger = if (draggingNoteId != null || draggingImageId != null) Offset(fingerX, fingerY) else null,
+                            pxPerDp = density.density,
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(16.dp)
+                                .width(96.dp)
+                                .height((96f * boardPxH / boardPxW).dp)
+                        )
                     }
                 }
             }
@@ -831,16 +866,68 @@ private fun loadBitmapFromUri(context: Context, uriString: String): Bitmap? {
 }
 
 @Composable
+private fun MiniMap(
+    paperW: Float,
+    paperH: Float,
+    viewW: Float,
+    viewH: Float,
+    scrollX: Float,
+    scrollY: Float,
+    finger: Offset?,
+    pxPerDp: Float,
+    modifier: Modifier
+) {
+    Canvas(
+        modifier
+            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.45f), RoundedCornerShape(6.dp))
+            .border(1.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+    ) {
+        val sx = size.width / paperW
+        val sy = size.height / paperH
+        val vw = (viewW * sx).coerceAtMost(size.width)
+        val vh = (viewH * sy).coerceAtMost(size.height)
+        val vx = (scrollX * sx).coerceIn(0f, (size.width - vw).coerceAtLeast(0f))
+        val vy = (scrollY * sy).coerceIn(0f, (size.height - vh).coerceAtLeast(0f))
+        drawRect(
+            androidx.compose.ui.graphics.Color.White.copy(alpha = 0.22f),
+            topLeft = Offset(vx, vy),
+            size = Size(vw, vh)
+        )
+        drawRect(
+            androidx.compose.ui.graphics.Color.White,
+            topLeft = Offset(vx, vy),
+            size = Size(vw, vh),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(1.5f)
+        )
+        finger?.let { f ->
+            val fx = (f.x * pxPerDp * sx).coerceIn(0f, size.width)
+            val fy = (f.y * pxPerDp * sy).coerceIn(0f, size.height)
+            drawCircle(androidx.compose.ui.graphics.Color(0xFFFFB74D), radius = 4.5f, center = Offset(fx, fy))
+            drawCircle(
+                androidx.compose.ui.graphics.Color.White,
+                radius = 4.5f,
+                center = Offset(fx, fy),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(1f)
+            )
+        }
+    }
+}
+
+@Composable
 private fun BoardImageItem(
     image: BoardImage,
     stagger: Int,
     clampX: Float,
     clampY: Float,
+    isDraggingThis: Boolean,
     onLongPress: () -> Unit,
     onMoved: (Float, Float) -> Unit,
     onRotated: (Float) -> Unit,
     onScaleChanged: (Float) -> Unit,
-    onMeasured: (Int, Int) -> Unit
+    onMeasured: (Int, Int) -> Unit,
+    onDragStart: () -> Unit,
+    onDragUpdate: (Float, Float) -> Unit,
+    onDragEnd: () -> Unit
 ) {
     val density = LocalDensity.current
     var pos by remember(image.id, image.boardId) {
@@ -864,6 +951,7 @@ private fun BoardImageItem(
 
     Box(
         Modifier
+            .alpha(if (isDraggingThis) 0.85f else 1f)
             .absoluteOffset { with(density) { IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx()) } }
             .width(widthDp)
             .onSizeChanged { s -> onMeasured(s.width, s.height) }
@@ -893,6 +981,7 @@ private fun BoardImageItem(
                                     )
                                     rotation += rotationChange
                                     scale = (scale * zoomChange).coerceIn(0.3f, 3.0f)
+                                    onDragUpdate(pos.x, pos.y)
                                     lastInteraction = System.currentTimeMillis()
                                 }
                                 event.changes.forEach { it.consume() }
@@ -901,12 +990,14 @@ private fun BoardImageItem(
                                     if (!moved && panChange.getDistance() > 4f) {
                                         moved = true
                                         gestureActive = true
+                                        onDragStart()
                                     }
                                     if (moved) {
                                         pos = Offset(
                                             (pos.x + panChange.x / density.density).coerceIn(0f, clampX),
                                             (pos.y + panChange.y / density.density).coerceIn(0f, clampY)
                                         )
+                                        onDragUpdate(pos.x, pos.y)
                                         lastInteraction = System.currentTimeMillis()
                                     }
                                     event.changes.forEach { it.consume() }
@@ -916,6 +1007,7 @@ private fun BoardImageItem(
                     } while (!canceled && event.changes.any { it.pressed })
                     if (moved) {
                         gestureActive = false
+                        onDragEnd()
                     }
                 }
             }
@@ -923,7 +1015,7 @@ private fun BoardImageItem(
         Box(
             Modifier
                 .fillMaxWidth()
-                .shadow(7.dp, RoundedCornerShape(6.dp))
+                .shadow(if (isDraggingThis) 14.dp else 7.dp, RoundedCornerShape(6.dp))
                 .clip(RoundedCornerShape(6.dp))
                 .background(androidx.compose.ui.graphics.Color.White)
                 .padding(4.dp)
@@ -982,12 +1074,16 @@ private fun StickyNote(
     stagger: Int,
     clampX: Float,
     clampY: Float,
+    isDraggingThis: Boolean,
     onOpen: () -> Unit,
     onLongPress: () -> Unit,
     onMoved: (Float, Float) -> Unit,
     onRotated: (Float) -> Unit,
     onScaleChanged: (Float) -> Unit,
-    onMeasured: (Int, Int) -> Unit
+    onMeasured: (Int, Int) -> Unit,
+    onDragStart: () -> Unit,
+    onDragUpdate: (Float, Float) -> Unit,
+    onDragEnd: () -> Unit
 ) {
     val density = LocalDensity.current
     var pos by remember(item.noteId, item.boardId) {
@@ -1013,6 +1109,7 @@ private fun StickyNote(
 
     Box(
         Modifier
+            .alpha(if (isDraggingThis) 0.85f else 1f)
             .absoluteOffset { with(density) { IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx()) } }
             .width(widthDp)
             .onSizeChanged { s -> onMeasured(s.width, s.height) }
@@ -1042,6 +1139,7 @@ private fun StickyNote(
                                     )
                                     rotation += rotationChange
                                     scale = (scale * zoomChange).coerceIn(0.3f, 3.0f)
+                                    onDragUpdate(pos.x, pos.y)
                                     lastInteraction = System.currentTimeMillis()
                                 }
                                 event.changes.forEach { it.consume() }
@@ -1050,12 +1148,14 @@ private fun StickyNote(
                                     if (!moved && panChange.getDistance() > 4f) {
                                         moved = true
                                         gestureActive = true
+                                        onDragStart()
                                     }
                                     if (moved) {
                                         pos = Offset(
                                             (pos.x + panChange.x / density.density).coerceIn(0f, clampX),
                                             (pos.y + panChange.y / density.density).coerceIn(0f, clampY)
                                         )
+                                        onDragUpdate(pos.x, pos.y)
                                         lastInteraction = System.currentTimeMillis()
                                     }
                                     event.changes.forEach { it.consume() }
@@ -1065,6 +1165,7 @@ private fun StickyNote(
                     } while (!canceled && event.changes.any { it.pressed })
                     if (moved) {
                         gestureActive = false
+                        onDragEnd()
                     }
                 }
             }
@@ -1072,7 +1173,7 @@ private fun StickyNote(
         Box(
             Modifier
                 .fillMaxWidth()
-                .shadow(7.dp, RoundedCornerShape(3.dp))
+                .shadow(if (isDraggingThis) 14.dp else 7.dp, RoundedCornerShape(3.dp))
                 .clip(RoundedCornerShape(3.dp))
                 .background(Brush.linearGradient(listOf(body, body, stickyEdge(note.color))))
                 .combinedClickable(
