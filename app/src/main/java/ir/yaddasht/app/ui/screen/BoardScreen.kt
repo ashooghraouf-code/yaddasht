@@ -75,8 +75,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -91,10 +89,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageShader
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
@@ -343,22 +338,22 @@ fun BoardScreen(
     var showAddNote by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
     var boardName by remember { mutableStateOf("") }
-    var newBoardSizeIndex by remember { mutableIntStateOf(1) }
+    var newBoardSizeIndex by remember { mutableStateOf(1) }
     var isExporting by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     
-    var boardPxW by remember { mutableIntStateOf(0) }
-    var boardPxH by remember { mutableIntStateOf(0) }
-    var vpW by remember { mutableIntStateOf(0) }
-    var vpH by remember { mutableIntStateOf(0) }
+    var boardPxW by remember { mutableStateOf(0) }
+    var boardPxH by remember { mutableStateOf(0) }
+    var vpW by remember { mutableStateOf(0) }
+    var vpH by remember { mutableStateOf(0) }
     
     var draggingNoteId by remember { mutableStateOf<Long?>(null) }
     var draggingImageId by remember { mutableStateOf<Long?>(null) }
     var boardTouchActive by remember { mutableStateOf(false) }
     
     val fingerState = remember { mutableStateOf<Offset?>(null) }
-    var lastFingerWrite by remember { mutableLongStateOf(0L) }
+    var lastFingerWrite by remember { mutableStateOf(0L) }
     
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
     var imageToDelete by remember { mutableStateOf<BoardImage?>(null) }
@@ -1042,9 +1037,9 @@ private fun BoardImageItem(
     var pos by remember(image.id, image.boardId) {
         mutableStateOf(Offset(image.x.coerceIn(0f, clampX), image.y.coerceIn(0f, clampY)))
     }
-    var rotation by remember(image.id, image.boardId) { mutableFloatStateOf(image.rotation) }
-    var scale by remember(image.id, image.boardId) { mutableFloatStateOf(image.scale) }
-    var lastInteraction by remember { mutableLongStateOf(0L) }
+    var rotation by remember(image.id, image.boardId) { mutableStateOf(image.rotation) }
+    var scale by remember(image.id, image.boardId) { mutableStateOf(image.scale) }
+    var lastInteraction by remember { mutableStateOf(0L) }
     var gestureActive by remember { mutableStateOf(false) }
     
     LaunchedEffect(lastInteraction) {
@@ -1056,7 +1051,7 @@ private fun BoardImageItem(
         }
     }
     
-    val widthDp = (BASE_IMAGE_WIDTH * scale).dp
+    val widthDp = (150f * scale).dp
     Box(
         Modifier.alpha(if (isDraggingThis) 0.85f else 1f).absoluteOffset { with(density) { IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx()) } }.width(widthDp).onSizeChanged { s -> onMeasured(s.width, s.height) }.graphicsLayer { rotationZ = rotation }.pointerInput(image.id, image.boardId) {
             awaitEachGesture {
@@ -1118,32 +1113,26 @@ private fun BoardImageItem(
 
 @Composable
 private fun CorkTexture(bgIndex: Int) {
-    val density = LocalDensity.current
-    val brush = remember(bgIndex, density.density) {
-        val tile = (160 * density.density).toInt().coerceAtLeast(64)
-        val bmp = Bitmap.createBitmap(tile, tile, Bitmap.Config.ARGB_8888)
-        val c = AndroidCanvas(bmp)
-        c.drawColor(boardBase(bgIndex).toArgb())
+    val base = boardBase(bgIndex)
+    val dotA = corkDotA(bgIndex)
+    val dotB = corkDotB(bgIndex)
+    ComposeCanvas(Modifier.fillMaxSize()) {
+        drawRect(base)
         val rnd = Random(1337)
-        val paint = Paint().apply { isAntiAlias = true }
-        val colorA = corkDotA(bgIndex).toArgb()
-        val colorB = corkDotB(bgIndex).toArgb()
-        repeat(140) {
-            val r = (rnd.nextFloat() * 2.6f + 0.6f) * density.density
-            val x = r + rnd.nextFloat() * (tile - 2 * r)
-            val y = r + rnd.nextFloat() * (tile - 2 * r)
-            paint.color = if (rnd.nextBoolean()) colorA else colorB
-            c.drawCircle(x, y, r, paint)
+        repeat(600) {
+            val x = rnd.nextFloat() * size.width
+            val y = rnd.nextFloat() * size.height
+            val r = rnd.nextFloat() * 3.2f + 0.8f
+            val dark = rnd.nextBoolean()
+            drawCircle(color = if (dark) dotA else dotB, radius = r, center = Offset(x, y))
         }
-        Brush.shader(ImageShader(bmp.asImageBitmap(), TileMode.Repeated, TileMode.Repeated))
     }
-    Box(Modifier.fillMaxSize().background(brush))
 }
 
 @Composable
 private fun Vignette(bgIndex: Int) {
+    val strength = if (bgIndex == 3) 0.10f else 0.25f
     val brush = remember(bgIndex) {
-        val strength = if (bgIndex == 3) .10f else .25f
         Brush.radialGradient(
             colors = listOf(Color.Transparent, Color.Black.copy(alpha = strength)),
             center = Offset.Unspecified,
@@ -1176,9 +1165,9 @@ private fun StickyNote(
     var pos by remember(item.noteId, item.boardId) {
         mutableStateOf(Offset(item.x.coerceIn(0f, clampX), item.y.coerceIn(0f, clampY)))
     }
-    var rotation by remember(item.noteId, item.boardId) { mutableFloatStateOf(item.rotation) }
-    var scale by remember(item.noteId, item.boardId) { mutableFloatStateOf(item.scale) }
-    var lastInteraction by remember { mutableLongStateOf(0L) }
+    var rotation by remember(item.noteId, item.boardId) { mutableStateOf(item.rotation) }
+    var scale by remember(item.noteId, item.boardId) { mutableStateOf(item.scale) }
+    var lastInteraction by remember { mutableStateOf(0L) }
     var gestureActive by remember { mutableStateOf(false) }
     
     LaunchedEffect(lastInteraction) {
@@ -1190,7 +1179,7 @@ private fun StickyNote(
         }
     }
     
-    val widthDp = (BASE_NOTE_WIDTH * scale).dp
+    val widthDp = (150f * scale).dp
     val body = stickyBody(note.color)
     val usePin = item.noteId % 2 == 0L
     Box(
