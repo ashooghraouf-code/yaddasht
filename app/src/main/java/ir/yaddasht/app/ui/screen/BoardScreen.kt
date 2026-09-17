@@ -32,7 +32,6 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -135,18 +134,20 @@ private val BOARD_SIZES_DP = BOARD_SIZES_PT
 
 private const val BASE_NOTE_WIDTH = 150f
 private const val BASE_IMAGE_WIDTH = 150f
+// ✅ افزایش کیفیت خروجی به ۳.۵ برابر برای وضوح بسیار بالا
 private const val EXPORT_QUALITY_SCALE = 3.5f
 private const val FINGER_THROTTLE_MS = 50L
 
 private data class MiniMarker(val x: Float, val y: Float, val w: Float, val h: Float, val color: Color)
 
+// ✅ پالت رنگی جدید و حرفه‌ای هماهنگ با تم‌های نرم‌افزار
 private fun boardBase(index: Int): Color = listOf(
-    Color(0xFFF5F5DC),
-    Color(0xFFE8EAF6),
-    Color(0xFF263238),
-    Color(0xFFFFF3E0),
-    Color(0xFFE0F2F1),
-    Color(0xFFFCE4EC)
+    Color(0xFFF5F5DC), // کرم روشن (کاغذ کاهی کلاسیک)
+    Color(0xFFE8EAF6), // خاکستری-آبی ملایم (مدرن)
+    Color(0xFF263238), // سرمه‌ای تیره (حالت شب/تخته سیاه)
+    Color(0xFFFFF3E0), // نارنجی بسیار ملایم (گرم)
+    Color(0xFFE0F2F1), // سبزآبی ملایم (آرامش‌بخش)
+    Color(0xFFFCE4EC)  // صورتی ملایم (لطیف)
 )[index.coerceIn(0, 5)]
 
 private fun stickyBody(index: Int): Color = listOf(
@@ -273,6 +274,7 @@ private fun renderBoardToCanvas(
         }
         val bodyLayout = bodyBuilder.build()
         
+        // ✅ حذف coerceIn برای جلوگیری از روی هم افتادن یادداشت‌ها در خروجی
         val drawX = item.x * scale
         val drawY = item.y * scale
         
@@ -723,36 +725,18 @@ fun BoardScreen(
                         }
                     }
                     
-                    val jumpTo: (Float, Float) -> Unit = { bx, by ->
-                        val d = density.density
-                        val viewWdp = vpW / d
-                        val viewHdp = vpH / d
-                        val maxX = (boardWidthDp - viewWdp).coerceAtLeast(0f)
-                        val maxY = (boardHeightDpActual - viewHdp).coerceAtLeast(0f)
-                        val tx = ((bx - viewWdp / 2f).coerceIn(0f, maxX) * d).toInt()
-                        val ty = ((by - viewHdp / 2f).coerceIn(0f, maxY) * d).toInt()
-                        scope.launch {
-                            scrollStateH.scrollTo(tx)
-                            scrollStateV.scrollTo(ty)
-                        }
-                    }
-                    
-                    if (!isPhoneSize && boardWidthDp > 0f && boardHeightDpActual > 0f && vpW > 0 && vpH > 0) {
+                    if ((boardTouchActive || draggingNoteId != null || draggingImageId != null) && boardPxW > 0 && boardPxH > 0 && vpW > 0 && vpH > 0) {
                         MiniMap(
-                            paperW = boardWidthDp,
-                            paperH = boardHeightDpActual,
-                            viewW = vpW / density.density,
-                            viewH = vpH / density.density,
-                            scrollX = scrollStateH.value / density.density,
-                            scrollY = scrollStateV.value / density.density,
+                            paperW = boardPxW.toFloat(),
+                            paperH = boardPxH.toFloat(),
+                            viewW = vpW.toFloat(),
+                            viewH = vpH.toFloat(),
+                            scrollStateH = scrollStateH,
+                            scrollStateV = scrollStateV,
                             fingerState = fingerState,
+                            pxPerDp = density.density,
                             markers = miniMarkers,
-                            onJump = jumpTo,
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(16.dp)
-                                .width(96.dp)
-                                .height((96f * boardHeightDpActual / boardWidthDp).coerceAtLeast(48f).dp)
+                            modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).width(96.dp).height((96f * boardPxH / boardPxW).dp)
                         )
                     }
                 }
@@ -1002,27 +986,21 @@ private fun MiniMap(
     paperH: Float,
     viewW: Float,
     viewH: Float,
-    scrollX: Float,
-    scrollY: Float,
+    scrollStateH: ScrollState,
+    scrollStateV: ScrollState,
     fingerState: State<Offset?>,
+    pxPerDp: Float,
     markers: List<MiniMarker>,
-    onJump: (Float, Float) -> Unit,
     modifier: Modifier
 ) {
     val finger = fingerState.value
-    ComposeCanvas(
-        modifier
-            .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(6.dp))
-            .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(6.dp))
-            .pointerInput(paperW, paperH, viewW, viewH) {
-                detectTapGestures { tap ->
-                    onJump(tap.x / size.width * paperW, tap.y / size.height * paperH)
-                }
-            }
-    ) {
+    val scrollX = scrollStateH.value.toFloat()
+    val scrollY = scrollStateV.value.toFloat()
+    ComposeCanvas(modifier.background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(6.dp)).border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(6.dp))) {
         val sx = size.width / paperW
         val sy = size.height / paperH
         
+        // ✅ رسم دقیق نشانگرها با حاشیه برای وضوح بیشتر
         markers.forEach { m ->
             val mw = (m.w * sx).coerceAtLeast(3f)
             val mh = (m.h * sy).coerceAtLeast(3f)
@@ -1048,8 +1026,8 @@ private fun MiniMap(
         drawRect(Color.White, topLeft = Offset(vx, vy), size = Size(vw, vh), style = Stroke(1.5f))
         
         finger?.let { f ->
-            val fx = (f.x * sx).coerceIn(0f, size.width)
-            val fy = (f.y * sy).coerceIn(0f, size.height)
+            val fx = (f.x * pxPerDp * sx).coerceIn(0f, size.width)
+            val fy = (f.y * pxPerDp * sy).coerceIn(0f, size.height)
             drawCircle(Color(0xFFFFB74D), radius = 5f, center = Offset(fx, fy))
             drawCircle(Color.White, radius = 5f, center = Offset(fx, fy), style = Stroke(1.5f))
         }
@@ -1170,7 +1148,7 @@ private fun CorkTexture(bgIndex: Int) {
 
 @Composable
 private fun Vignette(bgIndex: Int) {
-    val strength = if (bgIndex == 2) 0.40f else 0.25f
+    val strength = if (bgIndex == 2) 0.40f else 0.25f // vignette قوی‌تر برای حالت تیره
     val brush = remember(bgIndex) {
         Brush.radialGradient(
             colors = listOf(Color.Transparent, Color.Black.copy(alpha = strength)),
