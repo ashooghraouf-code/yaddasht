@@ -69,6 +69,8 @@ import ir.yaddasht.app.util.BoardImage
 import ir.yaddasht.app.util.BoardItem
 import ir.yaddasht.app.util.BoardStore
 import kotlinx.coroutines.*
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.*
@@ -79,7 +81,7 @@ private val BOARD_SIZE_DESC = listOf(
     "اندازهٔ صفحهٔ گوشی",
     "۲۱۰×۲۹۷ میلی‌متر",
     "۲۹۷×۴۲۰ میلی‌متر",
-    "۴۲۰×۵۹۴ میلی‌متر"
+    "۴۲×۵۹۴ میلی‌متر"
 )
 
 private val BOARD_SIZES_PT = listOf(
@@ -96,6 +98,10 @@ private const val BASE_IMAGE_WIDTH = 150f
 private val EXPORT_RASTER_SCALE = 300f / 72f
 private const val MAX_EXPORT_PIXELS = 35_000_000f
 private const val FINGER_THROTTLE_MS = 50L
+
+private const val PREFS_BOARD_CONNECTIONS = "board_connections"
+private const val CONN_TYPE_NOTE = "note"
+private const val CONN_TYPE_IMAGE = "image"
 
 private data class MiniMarker(
     val id: Long,
@@ -119,6 +125,25 @@ private data class LiveDrag(
     val color: Color
 )
 
+private data class ConnRef(
+    val type: String,
+    val id: Long
+)
+
+private data class BoardConnection(
+    val id: Long,
+    val from: ConnRef,
+    val to: ConnRef,
+    val colorIndex: Int
+)
+
+private data class Endpoint(
+    val x: Float,
+    val y: Float,
+    val w: Float,
+    val h: Float
+)
+
 private fun boardBase(index: Int): Color = listOf(
     Color(0xFFF5F5DC),
     Color(0xFFE8EAF6),
@@ -140,6 +165,15 @@ private fun stickyBody(index: Int): Color = listOf(
 private fun stickyEdge(index: Int): Color = stickyBody(index).copy(alpha = .55f)
 
 private fun pinColor(index: Int): Color = listOf(
+    Color(0xFFE53935),
+    Color(0xFF1E88E5),
+    Color(0xFF43A047),
+    Color(0xFFFDD835),
+    Color(0xFF8E24AA),
+    Color(0xFFFB8C00)
+)[index.coerceIn(0, 5)]
+
+private fun connectionColor(index: Int): Color = listOf(
     Color(0xFFE53935),
     Color(0xFF1E88E5),
     Color(0xFF43A047),
@@ -185,6 +219,173 @@ private fun loadBitmapFromUri(context: Context, uriString: String): Bitmap? {
         }
     } catch (e: Exception) {
         null
+    }
+}
+
+private fun connectionsPrefs(context: Context) =
+    context.getSharedPreferences(PREFS_BOARD_CONNECTIONS, Context.MODE_PRIVATE)
+
+private fun connectionKey(boardId: Long): String = "conn_$boardId"
+
+private fun loadConnections(context: Context, boardId: Long): List<BoardConnection> {
+    val json = connectionsPrefs(context).getString(connectionKey(boardId), null)
+        ?: return emptyList()
+
+    return try {
+        val arr = JSONArray(json)
+        val out = mutableListOf<BoardConnection>()
+
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+
+            val id = o.optLong("id", System.nanoTime())
+            val fromType = o.optString("fromType")
+            val fromId = o.optLong("fromId", -1L)
+            val toType = o.optString("toType")
+            val toId = o.optLong("toId", -1L)
+            val colorIndex = o.optInt("colorIndex", i % 6)
+
+            val fromValid = fromId >= 0L &&
+                (fromType == CONN_TYPE_NOTE || fromType == CONN_TYPE_IMAGE)
+
+            val toValid = toId >= 0L &&
+                (toType == CONN_TYPE_NOTE || toType == CONN_TYPE_IMAGE)
+
+            if (fromValid && toValid) {
+                out.add(
+                    BoardConnection(
+                        id = id,
+                        from = ConnRef(fromType, fromId),
+                        to = ConnRef(toType, toId),
+                        colorIndex = colorIndex
+                    )
+                )
+            }
+        }
+
+        out
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+private fun saveConnections(
+    context: Context,
+    boardId: Long,
+    connections: List<BoardConnection>
+) {
+    val arr = JSONArray()
+
+    connections.forEach { c ->
+        val o = JSONObject()
+        o.put("id", c.id)
+        o.put("fromType", c.from.type)
+        o.put("fromId", c.from.id)
+        o.put("toType", c.to.type)
+        o.put("toId", c.to.id)
+        o.put("colorIndex", c.colorIndex)
+        arr.put(o)
+    }
+
+    connectionsPrefs(context)
+        .edit()
+        .putString(connectionKey(boardId), arr.toString())
+        .apply()
+}
+
+private fun connectionEndpoint(
+    ref: ConnRef,
+    boardId: Long,
+    items: List<BoardItem>,
+    images: List<BoardImage>,
+    noteSizes: Map<String, Pair<Int, Int>>,
+    imageSizes: Map<Long, Pair<Int, Int>>,
+    densityF: Float,
+    live: LiveDrag? = null
+): Endpoint? {
+    val d = densityF.coerceAtLeast(1f)
+
+    if (ref.type == CONN_TYPE_NOTE) {
+        val lv = live
+        if (lv != null && lv.id == ref.id && !lv.isImage) {
+            return Endpoint(
+                x = lv.x + lv.w / 2f,
+                y = lv.y + lv.h / 2f,
+                w = lv.w,
+                h = lv.h
+            )
+        }
+
+        val item = items.firstOrNull { it.noteId == ref.id && it.boardId == boardId }
+            ?: return null
+
+        val sc = item.scale.coerceIn(0.3f, 3.0f)
+        val key = "${item.noteId}:${item.boardId}"
+        val measured = noteSizes[key]
+
+        val w = measured?.first?.toFloat()?.let { it / d }
+            ?: (BASE_NOTE_WIDTH * sc)
+
+        val h = measured?.second?.toFloat()?.let { it / d }
+            ?: (140f * sc)
+
+        return Endpoint(
+            x = item.x + w / 2f,
+            y = item.y + h / 2f,
+            w = w,
+            h = h
+        )
+    } else {
+        val lv = live
+        if (lv != null && lv.id == ref.id && lv.isImage) {
+            return Endpoint(
+                x = lv.x + lv.w / 2f,
+                y = lv.y + lv.h / 2f,
+                w = lv.w,
+                h = lv.h
+            )
+        }
+
+        val img = images.firstOrNull { it.id == ref.id && it.boardId == boardId }
+            ?: return null
+
+        val sc = img.scale.coerceIn(0.3f, 3.0f)
+        val measured = imageSizes[img.id]
+
+        val w = measured?.first?.toFloat()?.let { it / d }
+            ?: (BASE_IMAGE_WIDTH * sc)
+
+        val h = measured?.second?.toFloat()?.let { it / d }
+            ?: (BASE_IMAGE_WIDTH * sc)
+
+        return Endpoint(
+            x = img.x + w / 2f,
+            y = img.y + h / 2f,
+            w = w,
+            h = h
+        )
+    }
+}
+
+private fun connectionEndpointLabel(
+    ref: ConnRef,
+    boardId: Long,
+    items: List<BoardItem>,
+    images: List<BoardImage>,
+    notes: List<Note>
+): String {
+    return if (ref.type == CONN_TYPE_NOTE) {
+        val onBoard = items.any { it.noteId == ref.id && it.boardId == boardId }
+        val note = notes.firstOrNull { it.id == ref.id }
+
+        when {
+            note == null -> "یادداشت حذف‌شده"
+            !onBoard -> "یادداشت خارج از تابلو"
+            else -> note.title.ifBlank { note.body.take(24).ifBlank { "بدون عنوان" } }
+        }
+    } else {
+        val img = images.firstOrNull { it.id == ref.id && it.boardId == boardId }
+        if (img == null) "تصویر حذف‌شده" else "تصویر"
     }
 }
 
@@ -350,15 +551,22 @@ fun BoardScreen(
     var currentBoard by remember { mutableStateOf(boards.firstOrNull()?.id ?: 1L) }
     var items by remember { mutableStateOf(BoardStore.items(context, currentBoard)) }
     var images by remember { mutableStateOf(BoardStore.images(context, currentBoard)) }
+    var connections by remember(currentBoard) {
+        mutableStateOf(loadConnections(context, currentBoard))
+    }
 
     var showAddBoard by remember { mutableStateOf(false) }
     var showAddNote by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var showConnectionsDialog by remember { mutableStateOf(false) }
     var boardName by remember { mutableStateOf("") }
     var newBoardSizeIndex by remember { mutableStateOf(1) }
     var isExporting by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+
+    var connectMode by remember { mutableStateOf(false) }
+    var pendingConnection by remember { mutableStateOf<ConnRef?>(null) }
 
     var boardPxW by remember { mutableStateOf(0) }
     var boardPxH by remember { mutableStateOf(0) }
@@ -385,6 +593,13 @@ fun BoardScreen(
         boards = BoardStore.boards(context)
         items = BoardStore.items(context, currentBoard)
         images = BoardStore.images(context, currentBoard)
+        connections = loadConnections(context, currentBoard)
+    }
+
+    LaunchedEffect(currentBoard) {
+        pendingConnection = null
+        connectMode = false
+        showConnectionsDialog = false
     }
 
     val updateFinger: (Float, Float) -> Unit = { x, y ->
@@ -476,6 +691,73 @@ fun BoardScreen(
             rotation = rotation,
             color = Color.White
         )
+    }
+
+    fun handleConnectSelect(ref: ConnRef) {
+        if (!connectMode) return
+
+        val p = pendingConnection
+
+        if (p == null) {
+            pendingConnection = ref
+            Toast.makeText(context, "مبدأ انتخاب شد؛ حالا مقصد را بزنید", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (p.type == ref.type && p.id == ref.id) {
+            pendingConnection = null
+            Toast.makeText(context, "انتخاب لغو شد", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val exists = connections.any {
+            (it.from == p && it.to == ref) || (it.from == ref && it.to == p)
+        }
+
+        if (exists) {
+            pendingConnection = null
+            Toast.makeText(context, "این اتصال قبلاً وجود دارد", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val fromOk = connectionEndpoint(
+            ref = p,
+            boardId = currentBoard,
+            items = items,
+            images = images,
+            noteSizes = noteSizes.value,
+            imageSizes = imageSizes.value,
+            densityF = densityF
+        ) != null
+
+        val toOk = connectionEndpoint(
+            ref = ref,
+            boardId = currentBoard,
+            items = items,
+            images = images,
+            noteSizes = noteSizes.value,
+            imageSizes = imageSizes.value,
+            densityF = densityF
+        ) != null
+
+        if (!fromOk || !toOk) {
+            pendingConnection = null
+            Toast.makeText(context, "آیتم انتخاب‌شده روی تابلو نیست", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val newConn = BoardConnection(
+            id = System.nanoTime(),
+            from = p,
+            to = ref,
+            colorIndex = connections.size % 6
+        )
+
+        connections = connections + newConn
+        saveConnections(context, currentBoard, connections)
+        pendingConnection = null
+
+        Toast.makeText(context, "🔗 اتصال ایجاد شد", Toast.LENGTH_SHORT).show()
     }
 
     val pickImageLauncher = rememberLauncherForActivityResult(
@@ -723,7 +1005,7 @@ fun BoardScreen(
 
                     Surface(shape = RoundedCornerShape(8.dp), color = Color.White.copy(alpha = 0.12f)) {
                         Text(
-                            "📝${items.size} 🖼${images.size}",
+                            "📝${items.size} 🖼${images.size} 🔗${connections.size}",
                             fontSize = 11.sp,
                             color = Color(0xFFFFE0B2),
                             fontFamily = VazirFont,
@@ -741,9 +1023,7 @@ fun BoardScreen(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Filled.Image, "عکس", tint = Color(0xFFFFE0B2), modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("عکس", color = Color(0xFFFFE0B2), fontSize = 12.sp, fontFamily = VazirFont)
+                            Text("🖼️ عکس", color = Color(0xFFFFE0B2), fontSize = 12.sp, fontFamily = VazirFont)
                         }
                     }
 
@@ -756,14 +1036,51 @@ fun BoardScreen(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                if (showSearch) Icons.Filled.SearchOff else Icons.Filled.Search,
-                                "جستجو",
-                                tint = Color(0xFFFFE0B2),
-                                modifier = Modifier.size(20.dp)
+                            Text("🔍 جستجو", color = Color(0xFFFFE0B2), fontSize = 12.sp, fontFamily = VazirFont)
+                        }
+                    }
+
+                    Surface(
+                        onClick = {
+                            connectMode = !connectMode
+                            pendingConnection = null
+                            Toast.makeText(
+                                context,
+                                if (connectMode) "🔗 حالت اتصال فعال شد" else "🔗 حالت اتصال غیرفعال شد",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (connectMode) Color(0xFFFFB74D).copy(alpha = 0.35f) else Color(0xFF4FC3F7).copy(alpha = 0.18f),
+                        border = BorderStroke(
+                            1.dp,
+                            if (connectMode) Color(0xFFFFB74D) else Color(0xFF4FC3F7).copy(alpha = 0.35f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                if (connectMode) "🔗 لغو اتصال" else "🔗 اتصال",
+                                color = Color(0xFFFFE0B2),
+                                fontSize = 12.sp,
+                                fontFamily = VazirFont
                             )
-                            Spacer(Modifier.width(6.dp))
-                            Text("جستجو", color = Color(0xFFFFE0B2), fontSize = 12.sp, fontFamily = VazirFont)
+                        }
+                    }
+
+                    Surface(
+                        onClick = { showConnectionsDialog = true },
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFAB47BC).copy(alpha = 0.18f),
+                        border = BorderStroke(1.dp, Color(0xFFAB47BC).copy(alpha = 0.35f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("🧵 لینک‌ها", color = Color(0xFFFFE0B2), fontSize = 12.sp, fontFamily = VazirFont)
                         }
                     }
 
@@ -777,9 +1094,7 @@ fun BoardScreen(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Filled.PictureAsPdf, "خروجی", tint = Color(0xFFFFCDD2), modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("خروجی", color = Color(0xFFFFCDD2), fontSize = 12.sp, fontFamily = VazirFont)
+                            Text("📤 خروجی", color = Color(0xFFFFCDD2), fontSize = 12.sp, fontFamily = VazirFont)
                         }
                     }
 
@@ -916,6 +1231,29 @@ fun BoardScreen(
                         }
                     }
                 }
+
+                if (connectMode) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFFFFB74D).copy(alpha = .92f))
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (pendingConnection == null) {
+                                "🔗 حالت اتصال فعال است. ابتدا روی آیتم مبدأ بزنید."
+                            } else {
+                                "🔗 مبدأ انتخاب شد. حالا روی آیتم مقصد بزنید."
+                            },
+                            color = Color(0xFF3E2723),
+                            fontSize = 12.sp,
+                            fontFamily = VazirFont
+                        )
+                    }
+                }
             }
 
             Box(Modifier.fillMaxSize()) {
@@ -983,6 +1321,20 @@ fun BoardScreen(
                                 CorkTexture(bgIndex)
                                 Vignette(bgIndex)
 
+                                ConnectionsLayer(
+                                    connections = connections,
+                                    pending = pendingConnection,
+                                    live = liveDragState.value,
+                                    boardId = currentBoard,
+                                    items = items,
+                                    images = images,
+                                    notes = notes,
+                                    noteSizes = noteSizes.value,
+                                    imageSizes = imageSizes.value,
+                                    densityF = densityF,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+
                                 if (visibleItems.isEmpty() && images.isEmpty() && !isExporting) {
                                     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                                         Column(
@@ -1001,7 +1353,7 @@ fun BoardScreen(
                                                 color = Color.White.copy(alpha = .85f)
                                             )
                                             Text(
-                                                "با دکمهٔ + یادداشت بچسبانید یا با دکمهٔ «عکس» تصویر اضافه کنید",
+                                                "با دکمهٔ + یادداشت بچسبانید، با دکمهٔ عکس تصویر اضافه کنید و با 🔗 آیتم‌ها را به هم وصل کنید",
                                                 fontFamily = VazirFont,
                                                 fontSize = 13.sp,
                                                 color = Color.White.copy(alpha = .6f),
@@ -1021,7 +1373,11 @@ fun BoardScreen(
                                             clampX = clampX,
                                             clampY = clampY,
                                             isDraggingThis = draggingNoteId == note.id,
+                                            connectMode = connectMode,
                                             onTap = { onOpenNote(note.id) },
+                                            onConnectSelect = {
+                                                handleConnectSelect(ConnRef(CONN_TYPE_NOTE, note.id))
+                                            },
                                             onLongPress = { noteToDelete = note },
                                             onMoved = { x, y ->
                                                 BoardStore.move(context, note.id, currentBoard, x, y)
@@ -1099,7 +1455,11 @@ fun BoardScreen(
                                         clampX = clampX,
                                         clampY = clampY,
                                         isDraggingThis = draggingImageId == img.id,
+                                        connectMode = connectMode,
                                         onTap = { },
+                                        onConnectSelect = {
+                                            handleConnectSelect(ConnRef(CONN_TYPE_IMAGE, img.id))
+                                        },
                                         onLongPress = { imageToDelete = img },
                                         onMoved = { x, y ->
                                             BoardStore.moveImage(context, img.id, currentBoard, x, y)
@@ -1250,6 +1610,11 @@ fun BoardScreen(
                 TextButton(
                     onClick = {
                         BoardStore.removeItem(context, note.id, currentBoard)
+                        connections = connections.filterNot {
+                            (it.from.type == CONN_TYPE_NOTE && it.from.id == note.id) ||
+                                (it.to.type == CONN_TYPE_NOTE && it.to.id == note.id)
+                        }
+                        saveConnections(context, currentBoard, connections)
                         refresh()
                         noteToDelete = null
                         Toast.makeText(context, "از تابلو حذف شد", Toast.LENGTH_SHORT).show()
@@ -1269,6 +1634,11 @@ fun BoardScreen(
                                 noteDao.deleteById(note.id)
                                 BoardStore.removeItem(context, note.id, currentBoard)
                                 withContext(Dispatchers.Main) {
+                                    connections = connections.filterNot {
+                                        (it.from.type == CONN_TYPE_NOTE && it.from.id == note.id) ||
+                                            (it.to.type == CONN_TYPE_NOTE && it.to.id == note.id)
+                                    }
+                                    saveConnections(context, currentBoard, connections)
                                     refresh()
                                     noteToDelete = null
                                     Toast.makeText(context, "کلاً حذف شد", Toast.LENGTH_SHORT).show()
@@ -1292,6 +1662,11 @@ fun BoardScreen(
                 TextButton(
                     onClick = {
                         BoardStore.removeImage(context, img.id, currentBoard)
+                        connections = connections.filterNot {
+                            (it.from.type == CONN_TYPE_IMAGE && it.from.id == img.id) ||
+                                (it.to.type == CONN_TYPE_IMAGE && it.to.id == img.id)
+                        }
+                        saveConnections(context, currentBoard, connections)
                         refresh()
                         imageToDelete = null
                         Toast.makeText(context, "تصویر حذف شد", Toast.LENGTH_SHORT).show()
@@ -1312,15 +1687,18 @@ fun BoardScreen(
         AlertDialog(
             onDismissRequest = { boardToDelete = null },
             title = { Text("🗑️ حذف تابلو", fontFamily = LalezarFont, fontSize = 20.sp) },
-            text = { Text("تابلوی «${b.name}» همراه با همهٔ یادداشت‌ها و تصاویر روی آن حذف شود؟") },
+            text = { Text("تابلوی «${b.name}» همراه با همهٔ یادداشت‌ها، تصاویر و اتصالات روی آن حذف شود؟") },
             confirmButton = {
                 TextButton(
                     onClick = {
                         BoardStore.removeBoard(context, b.id)
+                        connectionsPrefs(context).edit().remove(connectionKey(b.id)).apply()
+
                         if (currentBoard == b.id) {
                             val remaining = BoardStore.boards(context)
                             currentBoard = remaining.firstOrNull()?.id ?: 1L
                         }
+
                         refresh()
                         boardToDelete = null
                         Toast.makeText(context, "تابلو حذف شد", Toast.LENGTH_SHORT).show()
@@ -1334,6 +1712,27 @@ fun BoardScreen(
                     Text("انصراف")
                 }
             }
+        )
+    }
+
+    if (showConnectionsDialog) {
+        ConnectionsDialog(
+            connections = connections,
+            boardId = currentBoard,
+            items = items,
+            images = images,
+            notes = notes,
+            onDelete = { id ->
+                connections = connections.filter { it.id != id }
+                saveConnections(context, currentBoard, connections)
+            },
+            onClearAll = {
+                connections = emptyList()
+                saveConnections(context, currentBoard, connections)
+                showConnectionsDialog = false
+                Toast.makeText(context, "همهٔ اتصالات حذف شدند", Toast.LENGTH_SHORT).show()
+            },
+            onDismiss = { showConnectionsDialog = false }
         )
     }
 
@@ -1603,6 +2002,215 @@ private fun DrawScope.drawRotatedRect(
 }
 
 @Composable
+private fun ConnectionsLayer(
+    connections: List<BoardConnection>,
+    pending: ConnRef?,
+    live: LiveDrag?,
+    boardId: Long,
+    items: List<BoardItem>,
+    images: List<BoardImage>,
+    notes: List<Note>,
+    noteSizes: Map<String, Pair<Int, Int>>,
+    imageSizes: Map<Long, Pair<Int, Int>>,
+    densityF: Float,
+    modifier: Modifier
+) {
+    ComposeCanvas(modifier) {
+        val d = densityF.coerceAtLeast(1f)
+
+        connections.forEach { conn ->
+            val a = connectionEndpoint(
+                ref = conn.from,
+                boardId = boardId,
+                items = items,
+                images = images,
+                noteSizes = noteSizes,
+                imageSizes = imageSizes,
+                densityF = d,
+                live = live
+            ) ?: return@forEach
+
+            val b = connectionEndpoint(
+                ref = conn.to,
+                boardId = boardId,
+                items = items,
+                images = images,
+                noteSizes = noteSizes,
+                imageSizes = imageSizes,
+                densityF = d,
+                live = live
+            ) ?: return@forEach
+
+            val dx = b.x - a.x
+            val dy = b.y - a.y
+            val distDp = sqrt(dx * dx + dy * dy)
+
+            if (distDp < 1f) return@forEach
+
+            val nx = -dy / distDp
+            val ny = dx / distDp
+            val bendDp = (distDp * 0.18f).coerceIn(20f, 120f)
+
+            val cxDp = (a.x + b.x) / 2f + nx * bendDp
+            val cyDp = (a.y + b.y) / 2f + ny * bendDp
+
+            val ax = a.x * d
+            val ay = a.y * d
+            val bx = b.x * d
+            val by = b.y * d
+            val cx = cxDp * d
+            val cy = cyDp * d
+
+            val path = Path().apply {
+                moveTo(ax, ay)
+                quadraticTo(cx, cy, bx, by)
+            }
+
+            val isActive = pending != null &&
+                (pending == conn.from || pending == conn.to)
+
+            val color = connectionColor(conn.colorIndex)
+            val alpha = if (isActive) 1f else 0.82f
+            val strokeWidth = if (isActive) 4.5f * d else 3f * d
+
+            drawPath(
+                path = path,
+                color = color.copy(alpha = alpha),
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+
+            drawCircle(
+                color = color.copy(alpha = alpha),
+                radius = 4.5f * d,
+                center = Offset(ax, ay)
+            )
+
+            drawCircle(
+                color = color.copy(alpha = alpha),
+                radius = 4.5f * d,
+                center = Offset(bx, by)
+            )
+
+            drawCircle(
+                color = Color.White.copy(alpha = 0.75f),
+                radius = 4.5f * d,
+                center = Offset(ax, ay),
+                style = Stroke(1.2f * d)
+            )
+
+            drawCircle(
+                color = Color.White.copy(alpha = 0.75f),
+                radius = 4.5f * d,
+                center = Offset(bx, by),
+                style = Stroke(1.2f * d)
+            )
+        }
+
+        pending?.let { p ->
+            val e = connectionEndpoint(
+                ref = p,
+                boardId = boardId,
+                items = items,
+                images = images,
+                noteSizes = noteSizes,
+                imageSizes = imageSizes,
+                densityF = d,
+                live = live
+            )
+
+            if (e != null) {
+                drawCircle(
+                    color = Color(0xFFFFB74D),
+                    radius = 10f * d,
+                    center = Offset(e.x * d, e.y * d),
+                    style = Stroke(2.5f * d)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionsDialog(
+    connections: List<BoardConnection>,
+    boardId: Long,
+    items: List<BoardItem>,
+    images: List<BoardImage>,
+    notes: List<Note>,
+    onDelete: (Long) -> Unit,
+    onClearAll: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("🧵 مدیریت اتصالات", fontFamily = LalezarFont, fontSize = 20.sp) },
+        text = {
+            if (connections.isEmpty()) {
+                Text(
+                    "هنوز اتصالی ایجاد نشده است.\n\nدکمهٔ 🔗 اتصال را بزنید، سپس روی آیتم مبدأ و بعد آیتم مقصد لمس کنید.",
+                    fontFamily = VazirFont,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 320.dp)
+                ) {
+                    items(connections) { conn ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(12.dp)
+                                    .background(connectionColor(conn.colorIndex), CircleShape)
+                            )
+
+                            Spacer(Modifier.width(8.dp))
+
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "${connectionEndpointLabel(conn.from, boardId, items, images, notes)} ↔ ${connectionEndpointLabel(conn.to, boardId, items, images, notes)}",
+                                    fontSize = 13.sp,
+                                    fontFamily = VazirFont,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    "برای حذف، دکمهٔ 🗑 را بزنید",
+                                    fontSize = 10.sp,
+                                    color = Color.Gray,
+                                    fontFamily = VazirFont
+                                )
+                            }
+
+                            TextButton(onClick = { onDelete(conn.id) }) {
+                                Text("🗑", color = Color.Red, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onClearAll) {
+                Text("پاک کردن همه", color = Color.Red, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("بستن")
+            }
+        }
+    )
+}
+
+@Composable
 private fun MiniMapContainer(
     modifier: Modifier,
     touchActive: State<Boolean>,
@@ -1827,7 +2435,9 @@ private fun BoardImageItem(
     clampX: Float,
     clampY: Float,
     isDraggingThis: Boolean,
+    connectMode: Boolean,
     onTap: () -> Unit,
+    onConnectSelect: () -> Unit,
     onLongPress: () -> Unit,
     onMoved: (Float, Float) -> Unit,
     onRotated: (Float) -> Unit,
@@ -1843,7 +2453,10 @@ private fun BoardImageItem(
     val currentClampX by rememberUpdatedState(clampX)
     val currentClampY by rememberUpdatedState(clampY)
 
+    val currentConnectMode by rememberUpdatedState(connectMode)
+
     val currentOnTap by rememberUpdatedState(onTap)
+    val currentOnConnectSelect by rememberUpdatedState(onConnectSelect)
     val currentOnLongPress by rememberUpdatedState(onLongPress)
     val currentOnDragStart by rememberUpdatedState(onDragStart)
     val currentOnDragUpdate by rememberUpdatedState(onDragUpdate)
@@ -1900,7 +2513,7 @@ private fun BoardImageItem(
                     var previousPointerCount = 1
                     var totalMovement = 0f
 
-                    var mode = 0 // 0 none, 1 drag, 2 transform
+                    var mode = 0
                     var dragStarted = false
                     var changed = false
                     var sawMultiTouch = false
@@ -1997,11 +2610,15 @@ private fun BoardImageItem(
                         }
                         currentOnDragEnd()
                     } else if (!sawMultiTouch && totalMovement <= dragSlopPx) {
-                        val elapsed = System.currentTimeMillis() - downTime
-                        if (elapsed >= longPressMs) {
-                            currentOnLongPress()
+                        if (currentConnectMode) {
+                            currentOnConnectSelect()
                         } else {
-                            currentOnTap()
+                            val elapsed = System.currentTimeMillis() - downTime
+                            if (elapsed >= longPressMs) {
+                                currentOnLongPress()
+                            } else {
+                                currentOnTap()
+                            }
                         }
                     }
                 }
@@ -2064,7 +2681,9 @@ private fun StickyNote(
     clampX: Float,
     clampY: Float,
     isDraggingThis: Boolean,
+    connectMode: Boolean,
     onTap: () -> Unit,
+    onConnectSelect: () -> Unit,
     onLongPress: () -> Unit,
     onMoved: (Float, Float) -> Unit,
     onRotated: (Float) -> Unit,
@@ -2080,7 +2699,10 @@ private fun StickyNote(
     val currentClampX by rememberUpdatedState(clampX)
     val currentClampY by rememberUpdatedState(clampY)
 
+    val currentConnectMode by rememberUpdatedState(connectMode)
+
     val currentOnTap by rememberUpdatedState(onTap)
+    val currentOnConnectSelect by rememberUpdatedState(onConnectSelect)
     val currentOnLongPress by rememberUpdatedState(onLongPress)
     val currentOnDragStart by rememberUpdatedState(onDragStart)
     val currentOnDragUpdate by rememberUpdatedState(onDragUpdate)
@@ -2139,7 +2761,7 @@ private fun StickyNote(
                     var previousPointerCount = 1
                     var totalMovement = 0f
 
-                    var mode = 0 // 0 none, 1 drag, 2 transform
+                    var mode = 0
                     var dragStarted = false
                     var changed = false
                     var sawMultiTouch = false
@@ -2236,11 +2858,15 @@ private fun StickyNote(
                         }
                         currentOnDragEnd()
                     } else if (!sawMultiTouch && totalMovement <= dragSlopPx) {
-                        val elapsed = System.currentTimeMillis() - downTime
-                        if (elapsed >= longPressMs) {
-                            currentOnLongPress()
+                        if (currentConnectMode) {
+                            currentOnConnectSelect()
                         } else {
-                            currentOnTap()
+                            val elapsed = System.currentTimeMillis() - downTime
+                            if (elapsed >= longPressMs) {
+                                currentOnLongPress()
+                            } else {
+                                currentOnTap()
+                            }
                         }
                     }
                 }
