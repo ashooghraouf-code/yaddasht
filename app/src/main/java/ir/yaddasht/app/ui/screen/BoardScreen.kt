@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Paint
+import android.graphics.Path as AndroidPath
 import android.graphics.RectF
 import android.graphics.Typeface as AndroidTypeface
 import android.graphics.pdf.PdfDocument
@@ -81,7 +82,7 @@ private val BOARD_SIZE_DESC = listOf(
     "اندازهٔ صفحهٔ گوشی",
     "۲۱۰×۲۹۷ میلی‌متر",
     "۲۹۷×۴۲۰ میلی‌متر",
-    "۴۲×۵۹۴ میلی‌متر"
+    "۴۲۰×۵۹۴ میلی‌متر"
 )
 
 private val BOARD_SIZES_PT = listOf(
@@ -389,12 +390,110 @@ private fun connectionEndpointLabel(
     }
 }
 
+private fun drawConnectionsToCanvas(
+    canvas: AndroidCanvas,
+    connections: List<BoardConnection>,
+    boardId: Long,
+    items: List<BoardItem>,
+    images: List<BoardImage>,
+    noteSizes: Map<String, Pair<Int, Int>>,
+    imageSizes: Map<Long, Pair<Int, Int>>,
+    density: Float,
+    scale: Float
+) {
+    if (connections.isEmpty()) return
+
+    val strokePaint = Paint().apply {
+        isAntiAlias = true
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    val fillPaint = Paint().apply {
+        isAntiAlias = true
+        style = Paint.Style.FILL
+    }
+
+    val outlinePaint = Paint().apply {
+        isAntiAlias = true
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        color = android.graphics.Color.WHITE
+        alpha = 191
+    }
+
+    connections.forEach { conn ->
+        val a = connectionEndpoint(
+            ref = conn.from,
+            boardId = boardId,
+            items = items,
+            images = images,
+            noteSizes = noteSizes,
+            imageSizes = imageSizes,
+            densityF = density
+        ) ?: return@forEach
+
+        val b = connectionEndpoint(
+            ref = conn.to,
+            boardId = boardId,
+            items = items,
+            images = images,
+            noteSizes = noteSizes,
+            imageSizes = imageSizes,
+            densityF = density
+        ) ?: return@forEach
+
+        val dx = b.x - a.x
+        val dy = b.y - a.y
+        val distDp = sqrt(dx * dx + dy * dy)
+
+        if (distDp < 1f) return@forEach
+
+        val nx = -dy / distDp
+        val ny = dx / distDp
+        val bendDp = (distDp * 0.18f).coerceIn(20f, 120f)
+
+        val cxDp = (a.x + b.x) / 2f + nx * bendDp
+        val cyDp = (a.y + b.y) / 2f + ny * bendDp
+
+        val ax = a.x * scale
+        val ay = a.y * scale
+        val bx = b.x * scale
+        val by = b.y * scale
+        val qx = cxDp * scale
+        val qy = cyDp * scale
+
+        val path = AndroidPath().apply {
+            moveTo(ax, ay)
+            quadTo(qx, qy, bx, by)
+        }
+
+        val colorArgb = connectionColor(conn.colorIndex).toArgb()
+
+        strokePaint.color = colorArgb
+        strokePaint.strokeWidth = (3f * scale).coerceAtLeast(2f)
+        canvas.drawPath(path, strokePaint)
+
+        val r = (4.5f * scale).coerceAtLeast(3f)
+
+        fillPaint.color = colorArgb
+        canvas.drawCircle(ax, ay, r, fillPaint)
+        canvas.drawCircle(bx, by, r, fillPaint)
+
+        outlinePaint.strokeWidth = (1.2f * scale).coerceAtLeast(1f)
+        canvas.drawCircle(ax, ay, r, outlinePaint)
+        canvas.drawCircle(bx, by, r, outlinePaint)
+    }
+}
+
 private fun renderBoardToCanvas(
     ctx: Context,
     canvas: AndroidCanvas,
     notes: List<Note>,
     items: List<BoardItem>,
     images: List<BoardImage>,
+    connections: List<BoardConnection>,
+    boardId: Long,
     noteSizes: Map<String, Pair<Int, Int>>,
     imageSizes: Map<Long, Pair<Int, Int>>,
     bgIndex: Int,
@@ -414,6 +513,18 @@ private fun renderBoardToCanvas(
     val bodyType = safeTypeface(ctx, "vazir", false)
 
     canvas.drawColor(boardBase(bgIndex).toArgb())
+
+    drawConnectionsToCanvas(
+        canvas = canvas,
+        connections = connections,
+        boardId = boardId,
+        items = items,
+        images = images,
+        noteSizes = noteSizes,
+        imageSizes = imageSizes,
+        density = density,
+        scale = scale
+    )
 
     val titlePaint = TextPaint().apply {
         color = Color(0xFF3E2723).toArgb()
@@ -825,10 +936,12 @@ fun BoardScreen(
         val snapshotNotes = notes.toList()
         val snapshotItems = items.toList()
         val snapshotImages = images.toList()
+        val snapshotConnections = connections.toList()
         val snapshotNoteSizes = noteSizes.value.toMap()
         val snapshotImageSizes = imageSizes.value.toMap()
 
         val snapshotBg = bgIndex
+        val sBoardId = currentBoard
         val sSizeIndex = boardSizeIndex
         val sPhone = isPhoneSize
         val sPxW = boardPxW
@@ -868,6 +981,8 @@ fun BoardScreen(
                     notes = snapshotNotes,
                     items = snapshotItems,
                     images = snapshotImages,
+                    connections = snapshotConnections,
+                    boardId = sBoardId,
                     noteSizes = snapshotNoteSizes,
                     imageSizes = snapshotImageSizes,
                     bgIndex = snapshotBg,
@@ -2515,483 +2630,4 @@ private fun BoardImageItem(
 
                     var mode = 0
                     var dragStarted = false
-                    var changed = false
-                    var sawMultiTouch = false
-
-                    val downTime = System.currentTimeMillis()
-                    var continueGesture = true
-
-                    do {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        val pressed = event.changes.filter { it.pressed }
-
-                        if (pressed.isEmpty()) {
-                            continueGesture = false
-                        } else {
-                            val centroid = centroidOf(pressed)
-                            val countChanged = pressed.size != previousPointerCount
-                            val pan = if (countChanged) Offset.Zero else centroid - lastCentroid
-
-                            lastCentroid = centroid
-                            previousPointerCount = pressed.size
-                            totalMovement += pan.getDistance()
-
-                            if (pressed.size >= 2) {
-                                sawMultiTouch = true
-
-                                if (!countChanged) {
-                                    val rawZoom = event.calculateZoom()
-                                    val rawRot = event.calculateRotation()
-
-                                    val zoom = if (rawZoom.isNaN() || rawZoom.isInfinite()) 1f else rawZoom
-                                    val rot = if (rawRot.isNaN() || rawRot.isInfinite()) 0f else rawRot
-
-                                    val hasChange = pan != Offset.Zero || zoom != 1f || rot != 0f
-
-                                    if (hasChange) {
-                                        changed = true
-                                        if (!dragStarted) {
-                                            dragStarted = true
-                                            mode = 2
-                                            currentOnDragStart()
-                                        }
-
-                                        mode = 2
-                                        pos = Offset(
-                                            (pos.x + pan.x / densityF).coerceIn(0f, currentClampX),
-                                            (pos.y + pan.y / densityF).coerceIn(0f, currentClampY)
-                                        )
-                                        rotation += rot
-                                        val newScale = scale * zoom
-                                        scale = if (newScale.isNaN() || newScale.isInfinite()) {
-                                            scale
-                                        } else {
-                                            newScale.coerceIn(0.3f, 3.0f)
-                                        }
-
-                                        currentOnDragUpdate(pos.x, pos.y, rotation, scale)
-                                    }
-                                }
-
-                                event.changes.forEach { it.consume() }
-                            } else {
-                                if (mode == 2) mode = 1
-
-                                val distanceFromDown = centroid - initialDown
-                                if (mode == 0 && distanceFromDown.getDistance() > dragSlopPx) {
-                                    mode = 1
-                                    changed = true
-                                    if (!dragStarted) {
-                                        dragStarted = true
-                                        currentOnDragStart()
-                                    }
-                                }
-
-                                if (mode == 1) {
-                                    if (pan != Offset.Zero) changed = true
-
-                                    pos = Offset(
-                                        (pos.x + pan.x / densityF).coerceIn(0f, currentClampX),
-                                        (pos.y + pan.y / densityF).coerceIn(0f, currentClampY)
-                                    )
-
-                                    currentOnDragUpdate(pos.x, pos.y, rotation, scale)
-                                    event.changes.forEach { it.consume() }
-                                }
-                            }
-                        }
-                    } while (continueGesture)
-
-                    if (dragStarted) {
-                        if (changed) {
-                            currentOnMoved(pos.x, pos.y)
-                            currentOnRotated(rotation)
-                            currentOnScaleChanged(scale)
-                        }
-                        currentOnDragEnd()
-                    } else if (!sawMultiTouch && totalMovement <= dragSlopPx) {
-                        if (currentConnectMode) {
-                            currentOnConnectSelect()
-                        } else {
-                            val elapsed = System.currentTimeMillis() - downTime
-                            if (elapsed >= longPressMs) {
-                                currentOnLongPress()
-                            } else {
-                                currentOnTap()
-                            }
-                        }
-                    }
-                }
-            }
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .shadow(if (isDraggingThis) 14.dp else 7.dp, RoundedCornerShape(6.dp))
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color.White)
-                .padding(4.dp)
-        ) {
-            AsyncImage(
-                model = Uri.parse(image.uri),
-                contentDescription = "تصویر",
-                contentScale = ContentScale.FillWidth,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
-}
-
-@Composable
-private fun CorkTexture(bgIndex: Int) {
-    val base = boardBase(bgIndex)
-    val dotA = corkDotA(bgIndex)
-    val dotB = corkDotB(bgIndex)
-
-    ComposeCanvas(Modifier.fillMaxSize()) {
-        drawRect(base)
-        val rnd = Random(1337)
-        repeat(600) {
-            val x = rnd.nextFloat() * size.width
-            val y = rnd.nextFloat() * size.height
-            val r = rnd.nextFloat() * 3.2f + 0.8f
-            val dark = rnd.nextBoolean()
-            drawCircle(color = if (dark) dotA else dotB, radius = r, center = Offset(x, y))
-        }
-    }
-}
-
-@Composable
-private fun Vignette(bgIndex: Int) {
-    val strength = if (bgIndex == 2) 0.40f else 0.25f
-    val brush = remember(bgIndex) {
-        Brush.radialGradient(
-            colors = listOf(Color.Transparent, Color.Black.copy(alpha = strength)),
-            center = Offset.Unspecified,
-            radius = 1200f
-        )
-    }
-    Box(Modifier.fillMaxSize().background(brush))
-}
-
-@Composable
-private fun StickyNote(
-    note: Note,
-    item: BoardItem,
-    clampX: Float,
-    clampY: Float,
-    isDraggingThis: Boolean,
-    connectMode: Boolean,
-    onTap: () -> Unit,
-    onConnectSelect: () -> Unit,
-    onLongPress: () -> Unit,
-    onMoved: (Float, Float) -> Unit,
-    onRotated: (Float) -> Unit,
-    onScaleChanged: (Float) -> Unit,
-    onMeasured: (Int, Int) -> Unit,
-    onDragStart: () -> Unit,
-    onDragUpdate: (Float, Float, Float, Float) -> Unit,
-    onDragEnd: () -> Unit
-) {
-    val density = LocalDensity.current
-    val densityF = density.density
-
-    val currentClampX by rememberUpdatedState(clampX)
-    val currentClampY by rememberUpdatedState(clampY)
-
-    val currentConnectMode by rememberUpdatedState(connectMode)
-
-    val currentOnTap by rememberUpdatedState(onTap)
-    val currentOnConnectSelect by rememberUpdatedState(onConnectSelect)
-    val currentOnLongPress by rememberUpdatedState(onLongPress)
-    val currentOnDragStart by rememberUpdatedState(onDragStart)
-    val currentOnDragUpdate by rememberUpdatedState(onDragUpdate)
-    val currentOnDragEnd by rememberUpdatedState(onDragEnd)
-    val currentOnMoved by rememberUpdatedState(onMoved)
-    val currentOnRotated by rememberUpdatedState(onRotated)
-    val currentOnScaleChanged by rememberUpdatedState(onScaleChanged)
-
-    var pos by remember(item.noteId, item.boardId, item.x, item.y) {
-        mutableStateOf(Offset(item.x.coerceIn(0f, clampX), item.y.coerceIn(0f, clampY)))
-    }
-    var rotation by remember(item.noteId, item.boardId, item.rotation) {
-        mutableStateOf(item.rotation)
-    }
-    var scale by remember(item.noteId, item.boardId, item.scale) {
-        mutableStateOf(item.scale)
-    }
-
-    val widthDp = (BASE_NOTE_WIDTH * scale).dp
-    val body = stickyBody(note.color)
-    val usePin = item.noteId % 2 == 0L
-
-    Box(
-        Modifier
-            .absoluteOffset {
-                with(density) {
-                    IntOffset(pos.x.dp.roundToPx(), pos.y.dp.roundToPx())
-                }
-            }
-            .width(widthDp)
-            .onSizeChanged { s -> onMeasured(s.width, s.height) }
-            .graphicsLayer { rotationZ = rotation }
-            .pointerInput(item.noteId, item.boardId, item.x, item.y, item.rotation, item.scale) {
-                val dragSlopPx = 6f * densityF
-                val longPressMs = 500L
-
-                fun centroidOf(changes: List<PointerInputChange>): Offset {
-                    var x = 0f
-                    var y = 0f
-                    changes.forEach {
-                        x += it.position.x
-                        y += it.position.y
-                    }
-                    val n = changes.size.toFloat().coerceAtLeast(1f)
-                    return Offset(x / n, y / n)
-                }
-
-                awaitEachGesture {
-                    val down = awaitFirstDown(
-                        requireUnconsumed = false,
-                        pass = PointerEventPass.Initial
-                    )
-
-                    val initialDown = down.position
-                    var lastCentroid = initialDown
-                    var previousPointerCount = 1
-                    var totalMovement = 0f
-
-                    var mode = 0
-                    var dragStarted = false
-                    var changed = false
-                    var sawMultiTouch = false
-
-                    val downTime = System.currentTimeMillis()
-                    var continueGesture = true
-
-                    do {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        val pressed = event.changes.filter { it.pressed }
-
-                        if (pressed.isEmpty()) {
-                            continueGesture = false
-                        } else {
-                            val centroid = centroidOf(pressed)
-                            val countChanged = pressed.size != previousPointerCount
-                            val pan = if (countChanged) Offset.Zero else centroid - lastCentroid
-
-                            lastCentroid = centroid
-                            previousPointerCount = pressed.size
-                            totalMovement += pan.getDistance()
-
-                            if (pressed.size >= 2) {
-                                sawMultiTouch = true
-
-                                if (!countChanged) {
-                                    val rawZoom = event.calculateZoom()
-                                    val rawRot = event.calculateRotation()
-
-                                    val zoom = if (rawZoom.isNaN() || rawZoom.isInfinite()) 1f else rawZoom
-                                    val rot = if (rawRot.isNaN() || rawRot.isInfinite()) 0f else rawRot
-
-                                    val hasChange = pan != Offset.Zero || zoom != 1f || rot != 0f
-
-                                    if (hasChange) {
-                                        changed = true
-                                        if (!dragStarted) {
-                                            dragStarted = true
-                                            mode = 2
-                                            currentOnDragStart()
-                                        }
-
-                                        mode = 2
-                                        pos = Offset(
-                                            (pos.x + pan.x / densityF).coerceIn(0f, currentClampX),
-                                            (pos.y + pan.y / densityF).coerceIn(0f, currentClampY)
-                                        )
-                                        rotation += rot
-                                        val newScale = scale * zoom
-                                        scale = if (newScale.isNaN() || newScale.isInfinite()) {
-                                            scale
-                                        } else {
-                                            newScale.coerceIn(0.3f, 3.0f)
-                                        }
-
-                                        currentOnDragUpdate(pos.x, pos.y, rotation, scale)
-                                    }
-                                }
-
-                                event.changes.forEach { it.consume() }
-                            } else {
-                                if (mode == 2) mode = 1
-
-                                val distanceFromDown = centroid - initialDown
-                                if (mode == 0 && distanceFromDown.getDistance() > dragSlopPx) {
-                                    mode = 1
-                                    changed = true
-                                    if (!dragStarted) {
-                                        dragStarted = true
-                                        currentOnDragStart()
-                                    }
-                                }
-
-                                if (mode == 1) {
-                                    if (pan != Offset.Zero) changed = true
-
-                                    pos = Offset(
-                                        (pos.x + pan.x / densityF).coerceIn(0f, currentClampX),
-                                        (pos.y + pan.y / densityF).coerceIn(0f, currentClampY)
-                                    )
-
-                                    currentOnDragUpdate(pos.x, pos.y, rotation, scale)
-                                    event.changes.forEach { it.consume() }
-                                }
-                            }
-                        }
-                    } while (continueGesture)
-
-                    if (dragStarted) {
-                        if (changed) {
-                            currentOnMoved(pos.x, pos.y)
-                            currentOnRotated(rotation)
-                            currentOnScaleChanged(scale)
-                        }
-                        currentOnDragEnd()
-                    } else if (!sawMultiTouch && totalMovement <= dragSlopPx) {
-                        if (currentConnectMode) {
-                            currentOnConnectSelect()
-                        } else {
-                            val elapsed = System.currentTimeMillis() - downTime
-                            if (elapsed >= longPressMs) {
-                                currentOnLongPress()
-                            } else {
-                                currentOnTap()
-                            }
-                        }
-                    }
-                }
-            }
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .shadow(if (isDraggingThis) 14.dp else 7.dp, RoundedCornerShape(3.dp))
-                .clip(RoundedCornerShape(3.dp))
-                .background(Brush.linearGradient(listOf(body, body, stickyEdge(note.color))))
-                .padding(
-                    top = if (usePin) 20.dp else 14.dp,
-                    start = 12.dp,
-                    end = 12.dp,
-                    bottom = 16.dp
-                )
-        ) {
-            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                Column {
-                    Text(
-                        note.title.ifBlank { "بدون عنوان" },
-                        fontFamily = LalezarFont,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF3E2723),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        note.body,
-                        fontFamily = VazirFont,
-                        fontSize = 11.sp,
-                        color = Color(0xFF5D4037),
-                        maxLines = 5,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = 17.sp
-                    )
-                }
-            }
-            CurledCorner(Modifier.align(Alignment.BottomEnd))
-        }
-
-        if (usePin) {
-            Thumbtack(
-                pinColor(note.color),
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = (-8).dp)
-            )
-        } else {
-            TapeStrip(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = (-9).dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun Thumbtack(color: Color, modifier: Modifier = Modifier) {
-    Box(modifier.size(20.dp)) {
-        Box(
-            Modifier
-                .size(20.dp)
-                .offset(y = 3.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = .30f))
-        )
-        Box(
-            Modifier
-                .size(20.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        listOf(
-                            color.copy(alpha = .95f),
-                            color,
-                            color.copy(alpha = .55f)
-                        )
-                    )
-                )
-        )
-        Box(
-            Modifier
-                .size(6.dp)
-                .align(Alignment.TopStart)
-                .offset(4.dp, 4.dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = .75f))
-        )
-    }
-}
-
-@Composable
-private fun TapeStrip(modifier: Modifier = Modifier) {
-    Box(
-        modifier
-            .width(58.dp)
-            .height(18.dp)
-            .rotate(-3f)
-            .clip(RoundedCornerShape(2.dp))
-            .background(Color.White.copy(alpha = .38f))
-    )
-}
-
-@Composable
-private fun CurledCorner(modifier: Modifier = Modifier) {
-    ComposeCanvas(modifier.size(26.dp)) {
-        val p = Path().apply {
-            moveTo(size.width, 0f)
-            lineTo(size.width, size.height)
-            lineTo(0f, size.height)
-            close()
-        }
-        drawPath(
-            p,
-            Brush.linearGradient(
-                listOf(
-                    Color.Black.copy(alpha = .22f),
-                    Color.Black.copy(alpha = .05f)
-                )
-            )
-        )
-    }
-}
-// ✅ پایان کامل فایل BoardScreen.kt
+                    var changed =
