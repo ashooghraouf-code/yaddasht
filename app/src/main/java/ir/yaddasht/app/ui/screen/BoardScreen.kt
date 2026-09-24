@@ -923,158 +923,222 @@ fun BoardScreen(
                 val scrollStateH = rememberScrollState()
 
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .onSizeChanged { s ->
-                                vpW = s.width
-                                vpH = s.height
-                            }
-                            .then(
-                                if (!isPhoneSize) {
-                                    Modifier
-                                        .verticalScroll(scrollStateV)
-                                        .horizontalScroll(scrollStateH)
-                                } else {
-                                    Modifier
-                                }
-                            )
-                    ) {
+                    Box(Modifier.fillMaxSize()) {
                         Box(
                             Modifier
+                                .fillMaxSize()
+                                .onSizeChanged { s ->
+                                    vpW = s.width
+                                    vpH = s.height
+                                }
                                 .then(
-                                    if (isPhoneSize) {
-                                        Modifier.fillMaxSize()
+                                    if (!isPhoneSize) {
+                                        Modifier
+                                            .verticalScroll(scrollStateV)
+                                            .horizontalScroll(scrollStateH)
                                     } else {
                                         Modifier
-                                            .width(boardWidthDp.dp)
-                                            .height(boardHeightDpActual.dp)
                                     }
                                 )
-                                .onSizeChanged { s ->
-                                    boardPxW = s.width
-                                    boardPxH = s.height
-                                }
-                                .pointerInput(Unit) {
-                                    awaitEachGesture {
-                                        val down = awaitFirstDown(
-                                            requireUnconsumed = false,
-                                            pass = PointerEventPass.Initial
-                                        )
-                                        boardTouchActive.value = true
-                                        updateFinger(down.position.x / densityF, down.position.y / densityF)
-
-                                        var pressed = true
-                                        while (pressed) {
-                                            val ev = awaitPointerEvent(PointerEventPass.Initial)
-                                            val ch = ev.changes.firstOrNull()
-                                            if (ch != null && ch.pressed) {
-                                                updateFinger(ch.position.x / densityF, ch.position.y / densityF)
-                                            }
-                                            pressed = ev.changes.any { it.pressed }
-                                        }
-
-                                        boardTouchActive.value = false
-                                        fingerState.value = null
-                                    }
-                                }
                         ) {
-                            CorkTexture(bgIndex)
-                            Vignette(bgIndex)
+                            Box(
+                                Modifier
+                                    .then(
+                                        if (isPhoneSize) {
+                                            Modifier.fillMaxSize()
+                                        } else {
+                                            Modifier
+                                                .width(boardWidthDp.dp)
+                                                .height(boardHeightDpActual.dp)
+                                        }
+                                    )
+                                    .onSizeChanged { s ->
+                                        boardPxW = s.width
+                                        boardPxH = s.height
+                                    }
+                                    .pointerInput(Unit) {
+                                        awaitEachGesture {
+                                            val down = awaitFirstDown(
+                                                requireUnconsumed = false,
+                                                pass = PointerEventPass.Initial
+                                            )
+                                            boardTouchActive.value = true
+                                            updateFinger(down.position.x / densityF, down.position.y / densityF)
 
-                            if (visibleItems.isEmpty() && images.isEmpty() && !isExporting) {
-                                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                                    Column(
-                                        Modifier.align(Alignment.Center),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Text(
-                                            if (searchQuery.isNotBlank()) "🔍" else "🗒️",
-                                            fontSize = 64.sp,
-                                            modifier = Modifier.rotate(if (searchQuery.isNotBlank()) 0f else -6f)
-                                        )
-                                        Text(
-                                            if (searchQuery.isNotBlank()) "یادداشتی یافت نشد" else "تابلو خالی است",
-                                            fontFamily = LalezarFont,
-                                            fontSize = 22.sp,
-                                            color = Color.White.copy(alpha = .85f)
-                                        )
-                                        Text(
-                                            "با دکمهٔ + یادداشت بچسبانید یا با دکمهٔ «عکس» تصویر اضافه کنید",
-                                            fontFamily = VazirFont,
-                                            fontSize = 13.sp,
-                                            color = Color.White.copy(alpha = .6f),
-                                            textAlign = TextAlign.Center,
-                                            modifier = Modifier.padding(horizontal = 24.dp)
+                                            var pressed = true
+                                            while (pressed) {
+                                                val ev = awaitPointerEvent(PointerEventPass.Initial)
+                                                val ch = ev.changes.firstOrNull()
+                                                if (ch != null && ch.pressed) {
+                                                    updateFinger(ch.position.x / densityF, ch.position.y / densityF)
+                                                }
+                                                pressed = ev.changes.any { it.pressed }
+                                            }
+
+                                            boardTouchActive.value = false
+                                            fingerState.value = null
+                                        }
+                                    }
+                            ) {
+                                CorkTexture(bgIndex)
+                                Vignette(bgIndex)
+
+                                if (visibleItems.isEmpty() && images.isEmpty() && !isExporting) {
+                                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                                        Column(
+                                            Modifier.align(Alignment.Center),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Text(
+                                                if (searchQuery.isNotBlank()) "🔍" else "🗒️",
+                                                fontSize = 64.sp,
+                                                modifier = Modifier.rotate(if (searchQuery.isNotBlank()) 0f else -6f)
+                                            )
+                                            Text(
+                                                if (searchQuery.isNotBlank()) "یادداشتی یافت نشد" else "تابلو خالی است",
+                                                fontFamily = LalezarFont,
+                                                fontSize = 22.sp,
+                                                color = Color.White.copy(alpha = .85f)
+                                            )
+                                            Text(
+                                                "با دکمهٔ + یادداشت بچسبانید یا با دکمهٔ «عکس» تصویر اضافه کنید",
+                                                fontFamily = VazirFont,
+                                                fontSize = 13.sp,
+                                                color = Color.White.copy(alpha = .6f),
+                                                textAlign = TextAlign.Center,
+                                                modifier = Modifier.padding(horizontal = 24.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                visibleItems.forEachIndexed { _, item ->
+                                    val note = notes.firstOrNull { it.id == item.noteId }
+                                    if (note != null) {
+                                        StickyNote(
+                                            note = note,
+                                            item = item,
+                                            clampX = clampX,
+                                            clampY = clampY,
+                                            isDraggingThis = draggingNoteId == note.id,
+                                            onTap = { onOpenNote(note.id) },
+                                            onLongPress = { noteToDelete = note },
+                                            onMoved = { x, y ->
+                                                BoardStore.move(context, note.id, currentBoard, x, y)
+                                                items = items.map {
+                                                    if (it.noteId == note.id && it.boardId == currentBoard) {
+                                                        it.copy(x = x, y = y)
+                                                    } else {
+                                                        it
+                                                    }
+                                                }
+                                            },
+                                            onRotated = { rot ->
+                                                BoardStore.rotate(context, note.id, currentBoard, rot)
+                                                items = items.map {
+                                                    if (it.noteId == note.id && it.boardId == currentBoard) {
+                                                        it.copy(rotation = rot)
+                                                    } else {
+                                                        it
+                                                    }
+                                                }
+                                            },
+                                            onScaleChanged = { sc ->
+                                                BoardStore.setScale(context, note.id, currentBoard, sc)
+                                                items = items.map {
+                                                    if (it.noteId == note.id && it.boardId == currentBoard) {
+                                                        it.copy(scale = sc)
+                                                    } else {
+                                                        it
+                                                    }
+                                                }
+                                            },
+                                            onMeasured = { w, h ->
+                                                val key = "${item.noteId}:${item.boardId}"
+                                                noteSizes.value = noteSizes.value.toMutableMap().apply {
+                                                    put(key, w to h)
+                                                }
+                                            },
+                                            onDragStart = {
+                                                draggingNoteId = note.id
+                                                setPreviewNote(
+                                                    item = item,
+                                                    note = note,
+                                                    x = item.x,
+                                                    y = item.y,
+                                                    rotation = item.rotation,
+                                                    scale = item.scale,
+                                                    immediate = true
+                                                )
+                                            },
+                                            onDragUpdate = { x, y, rot, sc ->
+                                                updateFinger(x, y)
+                                                setPreviewNote(
+                                                    item = item,
+                                                    note = note,
+                                                    x = x,
+                                                    y = y,
+                                                    rotation = rot,
+                                                    scale = sc,
+                                                    immediate = false
+                                                )
+                                            },
+                                            onDragEnd = {
+                                                draggingNoteId = null
+                                                fingerState.value = null
+                                                liveDragState.value = null
+                                                boardTouchActive.value = false
+                                            }
                                         )
                                     }
                                 }
-                            }
 
-                            visibleItems.forEachIndexed { _, item ->
-                                val note = notes.firstOrNull { it.id == item.noteId }
-                                if (note != null) {
-                                    StickyNote(
-                                        note = note,
-                                        item = item,
+                                images.forEachIndexed { _, img ->
+                                    BoardImageItem(
+                                        image = img,
                                         clampX = clampX,
                                         clampY = clampY,
-                                        isDraggingThis = draggingNoteId == note.id,
-                                        onTap = { onOpenNote(note.id) },
-                                        onLongPress = { noteToDelete = note },
+                                        isDraggingThis = draggingImageId == img.id,
+                                        onTap = { },
+                                        onLongPress = { imageToDelete = img },
                                         onMoved = { x, y ->
-                                            BoardStore.move(context, note.id, currentBoard, x, y)
-                                            items = items.map {
-                                                if (it.noteId == note.id && it.boardId == currentBoard) {
-                                                    it.copy(x = x, y = y)
-                                                } else {
-                                                    it
-                                                }
+                                            BoardStore.moveImage(context, img.id, currentBoard, x, y)
+                                            images = images.map {
+                                                if (it.id == img.id) it.copy(x = x, y = y) else it
                                             }
                                         },
                                         onRotated = { rot ->
-                                            BoardStore.rotate(context, note.id, currentBoard, rot)
-                                            items = items.map {
-                                                if (it.noteId == note.id && it.boardId == currentBoard) {
-                                                    it.copy(rotation = rot)
-                                                } else {
-                                                    it
-                                                }
+                                            BoardStore.rotateImage(context, img.id, currentBoard, rot)
+                                            images = images.map {
+                                                if (it.id == img.id) it.copy(rotation = rot) else it
                                             }
                                         },
                                         onScaleChanged = { sc ->
-                                            BoardStore.setScale(context, note.id, currentBoard, sc)
-                                            items = items.map {
-                                                if (it.noteId == note.id && it.boardId == currentBoard) {
-                                                    it.copy(scale = sc)
-                                                } else {
-                                                    it
-                                                }
+                                            BoardStore.setImageScale(context, img.id, currentBoard, sc)
+                                            images = images.map {
+                                                if (it.id == img.id) it.copy(scale = sc) else it
                                             }
                                         },
                                         onMeasured = { w, h ->
-                                            val key = "${item.noteId}:${item.boardId}"
-                                            noteSizes.value = noteSizes.value.toMutableMap().apply {
-                                                put(key, w to h)
+                                            imageSizes.value = imageSizes.value.toMutableMap().apply {
+                                                put(img.id, w to h)
                                             }
                                         },
                                         onDragStart = {
-                                            draggingNoteId = note.id
-                                            setPreviewNote(
-                                                item = item,
-                                                note = note,
-                                                x = item.x,
-                                                y = item.y,
-                                                rotation = item.rotation,
-                                                scale = item.scale,
+                                            draggingImageId = img.id
+                                            setPreviewImage(
+                                                img = img,
+                                                x = img.x,
+                                                y = img.y,
+                                                rotation = img.rotation,
+                                                scale = img.scale,
                                                 immediate = true
                                             )
                                         },
                                         onDragUpdate = { x, y, rot, sc ->
                                             updateFinger(x, y)
-                                            setPreviewNote(
-                                                item = item,
-                                                note = note,
+                                            setPreviewImage(
+                                                img = img,
                                                 x = x,
                                                 y = y,
                                                 rotation = rot,
@@ -1083,7 +1147,7 @@ fun BoardScreen(
                                             )
                                         },
                                         onDragEnd = {
-                                            draggingNoteId = null
+                                            draggingImageId = null
                                             fingerState.value = null
                                             liveDragState.value = null
                                             boardTouchActive.value = false
@@ -1091,105 +1155,43 @@ fun BoardScreen(
                                     )
                                 }
                             }
-
-                            images.forEachIndexed { _, img ->
-                                BoardImageItem(
-                                    image = img,
-                                    clampX = clampX,
-                                    clampY = clampY,
-                                    isDraggingThis = draggingImageId == img.id,
-                                    onTap = { },
-                                    onLongPress = { imageToDelete = img },
-                                    onMoved = { x, y ->
-                                        BoardStore.moveImage(context, img.id, currentBoard, x, y)
-                                        images = images.map {
-                                            if (it.id == img.id) it.copy(x = x, y = y) else it
-                                        }
-                                    },
-                                    onRotated = { rot ->
-                                        BoardStore.rotateImage(context, img.id, currentBoard, rot)
-                                        images = images.map {
-                                            if (it.id == img.id) it.copy(rotation = rot) else it
-                                        }
-                                    },
-                                    onScaleChanged = { sc ->
-                                        BoardStore.setImageScale(context, img.id, currentBoard, sc)
-                                        images = images.map {
-                                            if (it.id == img.id) it.copy(scale = sc) else it
-                                        }
-                                    },
-                                    onMeasured = { w, h ->
-                                        imageSizes.value = imageSizes.value.toMutableMap().apply {
-                                            put(img.id, w to h)
-                                        }
-                                    },
-                                    onDragStart = {
-                                        draggingImageId = img.id
-                                        setPreviewImage(
-                                            img = img,
-                                            x = img.x,
-                                            y = img.y,
-                                            rotation = img.rotation,
-                                            scale = img.scale,
-                                            immediate = true
-                                        )
-                                    },
-                                    onDragUpdate = { x, y, rot, sc ->
-                                        updateFinger(x, y)
-                                        setPreviewImage(
-                                            img = img,
-                                            x = x,
-                                            y = y,
-                                            rotation = rot,
-                                            scale = sc,
-                                            immediate = false
-                                        )
-                                    },
-                                    onDragEnd = {
-                                        draggingImageId = null
-                                        fingerState.value = null
-                                        liveDragState.value = null
-                                        boardTouchActive.value = false
-                                    }
-                                )
-                            }
                         }
+
+                        val miniWidthDp = 120f
+                        val miniHeightDp = if (boardWidthDp > 0f) {
+                            miniWidthDp * boardHeightDpActual / boardWidthDp
+                        } else {
+                            miniWidthDp
+                        }
+
+                        MiniMapContainer(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(16.dp)
+                                .width(miniWidthDp.dp)
+                                .height(miniHeightDp.dp),
+                            touchActive = boardTouchActive,
+                            draggingNoteId = draggingNoteId,
+                            draggingImageId = draggingImageId,
+                            isPhoneSize = isPhoneSize,
+                            hasBoardSize = boardPxW > 0 && boardPxH > 0 && vpW > 0 && vpH > 0,
+                            boardWidthDp = boardWidthDp.coerceAtLeast(1f),
+                            boardHeightDp = boardHeightDpActual.coerceAtLeast(1f),
+                            viewportWidthDp = with(density) { vpW.toDp().value }.coerceAtLeast(1f),
+                            viewportHeightDp = with(density) { vpH.toDp().value }.coerceAtLeast(1f),
+                            scrollStateH = scrollStateH,
+                            scrollStateV = scrollStateV,
+                            pxPerDp = densityF,
+                            fingerState = fingerState,
+                            liveDragState = liveDragState,
+                            visibleItems = visibleItems,
+                            images = images,
+                            notes = notes,
+                            noteSizes = noteSizes,
+                            imageSizes = imageSizes
+                        )
                     }
                 }
-
-                val miniWidthDp = 120f
-                val miniHeightDp = if (boardWidthDp > 0f) {
-                    miniWidthDp * boardHeightDpActual / boardWidthDp
-                } else {
-                    miniWidthDp
-                }
-
-                MiniMapContainer(
-                    modifier = Modifier
-                        .align(Alignment.BottomLeft)
-                        .padding(16.dp)
-                        .width(miniWidthDp.dp)
-                        .height(miniHeightDp.dp),
-                    touchActive = boardTouchActive,
-                    draggingNoteId = draggingNoteId,
-                    draggingImageId = draggingImageId,
-                    isPhoneSize = isPhoneSize,
-                    hasBoardSize = boardPxW > 0 && boardPxH > 0 && vpW > 0 && vpH > 0,
-                    boardWidthDp = boardWidthDp.coerceAtLeast(1f),
-                    boardHeightDp = boardHeightDpActual.coerceAtLeast(1f),
-                    viewportWidthDp = with(density) { vpW.toDp().value }.coerceAtLeast(1f),
-                    viewportHeightDp = with(density) { vpH.toDp().value }.coerceAtLeast(1f),
-                    scrollStateH = scrollStateH,
-                    scrollStateV = scrollStateV,
-                    pxPerDp = densityF,
-                    fingerState = fingerState,
-                    liveDragState = liveDragState,
-                    visibleItems = visibleItems,
-                    images = images,
-                    notes = notes,
-                    noteSizes = noteSizes,
-                    imageSizes = imageSizes
-                )
             }
         }
 
@@ -1515,7 +1517,7 @@ fun BoardScreen(
                 } else {
                     LazyColumn {
                         items(available) { n ->
-                            val rotIdx = floorMod(n.id, 4L).toInt()
+                            val rotIdx = ((n.id % 4L + 4L) % 4L).toInt()
                             Box(
                                 Modifier
                                     .fillMaxWidth()
