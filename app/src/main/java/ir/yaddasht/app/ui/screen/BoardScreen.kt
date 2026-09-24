@@ -35,9 +35,29 @@ import coil.compose.AsyncImage
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
-// ثابتهای اندازه پایه
-private const val BASE_IMAGE_WIDTH = 120
-private const val BASE_NOTE_WIDTH = 140
+// Import مدل‌های پروژه (بر اساس ساختار پکیج شما)
+import ir.app.data.model.BoardImage
+import ir.app.data.model.BoardItem
+import ir.app.data.model.Note
+
+private const val BASE_IMAGE_WIDTH = 120f
+private const val BASE_NOTE_WIDTH = 140f
+
+@Composable
+fun BoardScreen(
+    boardId: Long,
+    onBackClick: () -> Unit = {}
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFD7CCC8))
+    ) {
+        CorkTexture(bgIndex = 0)
+        Vignette(bgIndex = 0)
+        // ساختار اصلی بورد شما در اینجا قرار می‌گیرد
+    }
+}
 
 @Composable
 fun BoardImageItem(
@@ -98,17 +118,6 @@ fun BoardImageItem(
             .pointerInput(image.id, image.boardId, image.x, image.y, image.rotation, image.scale) {
                 val dragSlopPx = 6f * densityF
                 val longPressMs = 500L
-
-                fun centroidOf(changes: List<PointerInputChange>): Offset {
-                    var x = 0f
-                    var y = 0f
-                    changes.forEach {
-                        x += it.position.x
-                        y += it.position.y
-                    }
-                    val n = changes.size.toFloat()
-                    return Offset(x / n, y / n)
-                }
 
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -248,7 +257,7 @@ fun StickyNote(
     }
 
     val widthDp = (BASE_NOTE_WIDTH * scale).dp
-    val usePin = (item.noteId ?: 0L) % 2L == 0L
+    val usePin = ((item.noteId ?: 0L) % 2L) == 0L
 
     Box(
         modifier = Modifier
@@ -349,7 +358,7 @@ fun StickyNote(
             ) {
                 Text(
                     text = note.title.ifBlank { "بدون عنوان" },
-                    fontSize = (15 * scale).sp,
+                    fontSize = (15f * scale).sp,
                     color = Color(0xFF3E2723),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -357,8 +366,8 @@ fun StickyNote(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = note.body,
-                    fontSize = (11 * scale).sp,
-                    lineHeight = (17 * scale).sp,
+                    fontSize = (11f * scale).sp,
+                    lineHeight = (17f * scale).sp,
                     color = Color(0xFF5D4037),
                     maxLines = 5,
                     overflow = TextOverflow.Ellipsis
@@ -411,7 +420,6 @@ fun Vignette(bgIndex: Int) {
     )
 }
 
-// توابع کمکی رنگ‌ها (در صورت عدم وجود در پروژه)
 private fun stickyBody(colorInt: Int): Color = Color(if (colorInt == 0) 0xFFFFF9C4 else colorInt.toLong() or 0xFF000000)
 private fun pinColor(index: Int): Color = when (index % 4) {
     0 -> Color(0xFFE53935)
