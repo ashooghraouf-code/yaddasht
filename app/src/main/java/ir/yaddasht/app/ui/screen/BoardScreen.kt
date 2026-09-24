@@ -33,19 +33,7 @@ import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.absoluteOffset
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -55,58 +43,26 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SearchOff
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.*
+import androidx.compose.ui.draw.*
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.*
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.*
 import androidx.core.content.FileProvider
 import androidx.core.content.res.ResourcesCompat
 import coil.compose.AsyncImage
@@ -118,58 +74,64 @@ import ir.yaddasht.app.util.Board
 import ir.yaddasht.app.util.BoardImage
 import ir.yaddasht.app.util.BoardItem
 import ir.yaddasht.app.util.BoardStore
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import java.io.File
 import java.io.FileOutputStream
-import kotlin.math.roundToInt
+import kotlin.math.*
 import kotlin.random.Random
 
 private val BOARD_SIZE_LABELS = listOf("📱 گوشی", "📄 A4", "📐 A3", "🗺️ A2")
 private val BOARD_SIZE_DESC = listOf(
     "اندازهٔ صفحهٔ گوشی",
     "۲۱۰×۲۹۷ میلی‌متر",
-    "۲۹×۴۲۰ میلی‌متر",
-    "۴۲۰×۵۹۴ میلی‌متر"
+    "۲۹۷×۴۲۰ میلی‌متر",
+    "۴۲×۵۹۴ میلی‌متر"
 )
 
-// واحد مختصات تابلو: dp روی صفحه = pt در PDF
 private val BOARD_SIZES_PT = listOf(
     0f to 0f,
-    595f to 842f,    // A4
-    842f to 1191f,   // A3
-    1191f to 1684f   // A2
+    595f to 842f,
+    842f to 1191f,
+    1191f to 1684f
 )
 private val BOARD_SIZES_DP = BOARD_SIZES_PT
 
 private const val BASE_NOTE_WIDTH = 150f
 private const val BASE_IMAGE_WIDTH = 150f
 
-// PDF باید دقیقاً سایز چاپ باشد، پس مقیاس ۱ است.
-private const val EXPORT_PDF_SCALE = 1f
-
-// PNG با 300 DPI تولید می‌شود: 300 / 72
-private val EXPORT_PNG_SCALE = 300f / 72f
-
+private val EXPORT_RASTER_SCALE = 300f / 72f
+private const val MAX_EXPORT_PIXELS = 45_000_000f
 private const val FINGER_THROTTLE_MS = 50L
 
 private data class MiniMarker(
+    val id: Long,
+    val isImage: Boolean,
     val x: Float,
     val y: Float,
     val w: Float,
     val h: Float,
+    val rotation: Float,
+    val color: Color
+)
+
+private data class LiveDrag(
+    val id: Long,
+    val isImage: Boolean,
+    val x: Float,
+    val y: Float,
+    val w: Float,
+    val h: Float,
+    val rotation: Float,
     val color: Color
 )
 
 private fun boardBase(index: Int): Color = listOf(
-    Color(0xFFF5F5DC), // کرم روشن
-    Color(0xFFE8EAF6), // خاکستری-آبی ملایم
-    Color(0xFF263238), // سرمه‌ای تیره
-    Color(0xFFFFF3E0), // نارنجی ملایم
-    Color(0xFFE0F2F1), // سبزآبی ملایم
-    Color(0xFFFCE4EC)  // صورتی ملایم
+    Color(0xFFF5F5DC),
+    Color(0xFFE8EAF6),
+    Color(0xFF263238),
+    Color(0xFFFFF3E0),
+    Color(0xFFE0F2F1),
+    Color(0xFFFCE4EC)
 )[index.coerceIn(0, 5)]
 
 private fun stickyBody(index: Int): Color = listOf(
@@ -248,9 +210,10 @@ private fun renderBoardToCanvas(
     baseWDp: Float,
     baseHDp: Float
 ) {
-    val sx = outW / baseWDp.coerceAtLeast(1f)
-    val sy = outH / baseHDp.coerceAtLeast(1f)
-    val scale = if (sx < sy) sx else sy
+    val scale = minOf(
+        outW / baseWDp.coerceAtLeast(1f),
+        outH / baseHDp.coerceAtLeast(1f)
+    )
 
     val titleType = safeTypeface(ctx, "lalezar", true)
     val bodyType = safeTypeface(ctx, "vazir", false)
@@ -291,6 +254,7 @@ private fun renderBoardToCanvas(
 
         val sizeKey = "${item.noteId}:${item.boardId}"
         val measured = noteSizes[sizeKey]
+
         val baseWItem = measured?.first?.toFloat()?.let { it / density }
             ?: (BASE_NOTE_WIDTH * itemScale)
         val baseHItem = measured?.second?.toFloat()?.let { it / density }
@@ -385,6 +349,7 @@ fun BoardScreen(
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
+    val densityF = density.density
     val scope = rememberCoroutineScope()
 
     var boards by remember { mutableStateOf(BoardStore.boards(context)) }
@@ -411,7 +376,9 @@ fun BoardScreen(
 
     val boardTouchActive = remember { mutableStateOf(false) }
     val fingerState = remember { mutableStateOf<Offset?>(null) }
+    val liveDragState = remember { mutableStateOf<LiveDrag?>(null) }
     var lastFingerWrite by remember { mutableStateOf(0L) }
+    var lastPreviewWrite by remember { mutableStateOf(0L) }
 
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
     var imageToDelete by remember { mutableStateOf<BoardImage?>(null) }
@@ -434,6 +401,75 @@ fun BoardScreen(
         }
     }
 
+    fun notePreviewSize(item: BoardItem, currentScale: Float): Pair<Float, Float> {
+        val key = "${item.noteId}:${item.boardId}"
+        val measured = noteSizes.value[key]
+        if (measured != null) {
+            return (measured.first.toFloat() / densityF) to (measured.second.toFloat() / densityF)
+        }
+        return (BASE_NOTE_WIDTH * currentScale) to (140f * currentScale)
+    }
+
+    fun imagePreviewSize(img: BoardImage, currentScale: Float): Pair<Float, Float> {
+        val measured = imageSizes.value[img.id]
+        if (measured != null) {
+            return (measured.first.toFloat() / densityF) to (measured.second.toFloat() / densityF)
+        }
+        val w = BASE_IMAGE_WIDTH * currentScale
+        return w to w
+    }
+
+    fun setPreviewNote(
+        item: BoardItem,
+        note: Note,
+        x: Float,
+        y: Float,
+        rotation: Float,
+        scale: Float,
+        immediate: Boolean
+    ) {
+        val now = System.currentTimeMillis()
+        if (!immediate && now - lastPreviewWrite < FINGER_THROTTLE_MS) return
+        lastPreviewWrite = now
+
+        val (w, h) = notePreviewSize(item, scale)
+        liveDragState.value = LiveDrag(
+            id = note.id,
+            isImage = false,
+            x = x,
+            y = y,
+            w = w,
+            h = h,
+            rotation = rotation,
+            color = stickyBody(note.color)
+        )
+    }
+
+    fun setPreviewImage(
+        img: BoardImage,
+        x: Float,
+        y: Float,
+        rotation: Float,
+        scale: Float,
+        immediate: Boolean
+    ) {
+        val now = System.currentTimeMillis()
+        if (!immediate && now - lastPreviewWrite < FINGER_THROTTLE_MS) return
+        lastPreviewWrite = now
+
+        val (w, h) = imagePreviewSize(img, scale)
+        liveDragState.value = LiveDrag(
+            id = img.id,
+            isImage = true,
+            x = x,
+            y = y,
+            w = w,
+            h = h,
+            rotation = rotation,
+            color = Color.White
+        )
+    }
+
     val pickImageLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -444,8 +480,11 @@ fun BoardScreen(
                 val dir = File(context.filesDir, "board_images")
                 if (!dir.exists()) dir.mkdirs()
                 val file = File(dir, "img-${System.currentTimeMillis()}.jpg")
-                file.outputStream().use { out -> inputStream.copyTo(out) }
-                inputStream.close()
+                inputStream.use { input ->
+                    file.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
 
                 BoardStore.addImage(context, currentBoard, Uri.fromFile(file).toString())
                 refresh()
@@ -489,59 +528,6 @@ fun BoardScreen(
         }
     }
 
-    val miniMarkers = remember(
-        visibleItems,
-        images,
-        notes,
-        noteSizes.value,
-        imageSizes.value,
-        density.density
-    ) {
-        val dp = density.density
-        val list = mutableListOf<MiniMarker>()
-
-        visibleItems.forEach { item ->
-            val n = notes.firstOrNull { it.id == item.noteId } ?: return@forEach
-            val sizeKey = "${item.noteId}:${item.boardId}"
-            val measured = noteSizes.value[sizeKey]
-
-            val wDp = measured?.first?.toFloat()?.let { it / dp }
-                ?: (BASE_NOTE_WIDTH * item.scale)
-            val hDp = measured?.second?.toFloat()?.let { it / dp }
-                ?: (140f * item.scale)
-
-            list.add(
-                MiniMarker(
-                    x = item.x,
-                    y = item.y,
-                    w = wDp,
-                    h = hDp,
-                    color = stickyBody(n.color)
-                )
-            )
-        }
-
-        images.forEach { img ->
-            val measured = imageSizes.value[img.id]
-            val wDp = measured?.first?.toFloat()?.let { it / dp }
-                ?: (BASE_IMAGE_WIDTH * img.scale)
-            val hDp = measured?.second?.toFloat()?.let { it / dp }
-                ?: (BASE_IMAGE_WIDTH * img.scale)
-
-            list.add(
-                MiniMarker(
-                    x = img.x,
-                    y = img.y,
-                    w = wDp,
-                    h = hDp,
-                    color = Color.White
-                )
-            )
-        }
-
-        list
-    }
-
     fun exportBoard(asPdf: Boolean) {
         if (isExporting) return
         isExporting = true
@@ -558,7 +544,7 @@ fun BoardScreen(
         val sPxW = boardPxW
         val sPxH = boardPxH
         val sName = currentBoardData?.name ?: ""
-        val sDensity = density.density
+        val sDensity = densityF
         val sFontScale = context.resources.configuration.fontScale
 
         scope.launch(Dispatchers.IO) {
@@ -574,10 +560,34 @@ fun BoardScreen(
                     baseHDp = BOARD_SIZES_DP[sSizeIndex].second.coerceAtLeast(1f)
                 }
 
-                val outputScale = if (asPdf) EXPORT_PDF_SCALE else EXPORT_PNG_SCALE
+                var renderScale = EXPORT_RASTER_SCALE
+                val areaDp2 = baseWDp * baseHDp
 
-                val outW = (baseWDp * outputScale).roundToInt().coerceAtLeast(1)
-                val outH = (baseHDp * outputScale).roundToInt().coerceAtLeast(1)
+                while (areaDp2 * renderScale * renderScale > MAX_EXPORT_PIXELS && renderScale > 1f) {
+                    renderScale *= 0.9f
+                }
+
+                val rasterW = (baseWDp * renderScale).roundToInt().coerceAtLeast(1)
+                val rasterH = (baseHDp * renderScale).roundToInt().coerceAtLeast(1)
+
+                val bitmap = Bitmap.createBitmap(rasterW, rasterH, Bitmap.Config.ARGB_8888)
+
+                renderBoardToCanvas(
+                    ctx = context,
+                    canvas = AndroidCanvas(bitmap),
+                    notes = snapshotNotes,
+                    items = snapshotItems,
+                    images = snapshotImages,
+                    noteSizes = snapshotNoteSizes,
+                    imageSizes = snapshotImageSizes,
+                    bgIndex = snapshotBg,
+                    density = sDensity,
+                    fontScale = sFontScale,
+                    outW = rasterW,
+                    outH = rasterH,
+                    baseWDp = baseWDp,
+                    baseHDp = baseHDp
+                )
 
                 val dir = File(context.cacheDir, "board_exports")
                 if (!dir.exists()) dir.mkdirs()
@@ -588,57 +598,38 @@ fun BoardScreen(
                 )
 
                 if (asPdf) {
+                    val pageW = baseWDp.roundToInt().coerceAtLeast(1)
+                    val pageH = baseHDp.roundToInt().coerceAtLeast(1)
+
                     val pdfDocument = PdfDocument()
                     val page = pdfDocument.startPage(
-                        PdfDocument.PageInfo.Builder(outW, outH, 1).create()
+                        PdfDocument.PageInfo.Builder(pageW, pageH, 1).create()
                     )
 
-                    renderBoardToCanvas(
-                        ctx = context,
-                        canvas = page.canvas,
-                        notes = snapshotNotes,
-                        items = snapshotItems,
-                        images = snapshotImages,
-                        noteSizes = snapshotNoteSizes,
-                        imageSizes = snapshotImageSizes,
-                        bgIndex = snapshotBg,
-                        density = sDensity,
-                        fontScale = sFontScale,
-                        outW = outW,
-                        outH = outH,
-                        baseWDp = baseWDp,
-                        baseHDp = baseHDp
+                    val paint = Paint().apply {
+                        isAntiAlias = true
+                        isFilterBitmap = true
+                    }
+
+                    val pageCanvas = page.canvas
+                    pageCanvas.save()
+                    pageCanvas.scale(
+                        pageW.toFloat() / rasterW.toFloat(),
+                        pageH.toFloat() / rasterH.toFloat()
                     )
+                    pageCanvas.drawBitmap(bitmap, 0f, 0f, paint)
+                    pageCanvas.restore()
 
                     pdfDocument.finishPage(page)
                     FileOutputStream(file).use { out -> pdfDocument.writeTo(out) }
                     pdfDocument.close()
                 } else {
-                    val bitmap = Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
-
-                    renderBoardToCanvas(
-                        ctx = context,
-                        canvas = AndroidCanvas(bitmap),
-                        notes = snapshotNotes,
-                        items = snapshotItems,
-                        images = snapshotImages,
-                        noteSizes = snapshotNoteSizes,
-                        imageSizes = snapshotImageSizes,
-                        bgIndex = snapshotBg,
-                        density = sDensity,
-                        fontScale = sFontScale,
-                        outW = outW,
-                        outH = outH,
-                        baseWDp = baseWDp,
-                        baseHDp = baseHDp
-                    )
-
                     FileOutputStream(file).use { out ->
                         bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
                     }
-
-                    bitmap.recycle()
                 }
+
+                bitmap.recycle()
 
                 withContext(Dispatchers.Main) {
                     isExporting = false
@@ -667,8 +658,8 @@ fun BoardScreen(
 
                     Toast.makeText(
                         context,
-                        if (asPdf) "✅ PDF با سایز دقیق چاپ آماده شد"
-                        else "✅ PNG با کیفیت 300DPI آماده شد",
+                        if (asPdf) "✅ PDF با همان کیفیت و سایز دقیق آماده شد"
+                        else "✅ PNG با کیفیت بالا آماده شد",
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -815,7 +806,7 @@ fun BoardScreen(
                             val ratioX = newWDp / oldWDp
                             val ratioY = newHDp / oldHDp
 
-                            if (kotlin.math.abs(ratioX - 1f) > 0.001f || kotlin.math.abs(ratioY - 1f) > 0.001f) {
+                            if (abs(ratioX - 1f) > 0.001f || abs(ratioY - 1f) > 0.001f) {
                                 items.forEach { item ->
                                     BoardStore.move(
                                         context,
@@ -962,20 +953,14 @@ fun BoardScreen(
                                     awaitEachGesture {
                                         val down = awaitFirstDown(requireUnconsumed = false)
                                         boardTouchActive.value = true
-                                        updateFinger(
-                                            down.position.x / density.density,
-                                            down.position.y / density.density
-                                        )
+                                        updateFinger(down.position.x / densityF, down.position.y / densityF)
 
                                         var pressed = true
                                         while (pressed) {
                                             val ev = awaitPointerEvent(PointerEventPass.Main)
                                             val ch = ev.changes.firstOrNull()
                                             if (ch != null && ch.pressed) {
-                                                updateFinger(
-                                                    ch.position.x / density.density,
-                                                    ch.position.y / density.density
-                                                )
+                                                updateFinger(ch.position.x / densityF, ch.position.y / densityF)
                                             }
                                             pressed = ev.changes.any { it.pressed }
                                         }
@@ -1066,11 +1051,34 @@ fun BoardScreen(
                                                 put(key, w to h)
                                             }
                                         },
-                                        onDragStart = { draggingNoteId = note.id },
-                                        onDragUpdate = { x, y -> updateFinger(x, y) },
+                                        onDragStart = {
+                                            draggingNoteId = note.id
+                                            setPreviewNote(
+                                                item = item,
+                                                note = note,
+                                                x = item.x,
+                                                y = item.y,
+                                                rotation = item.rotation,
+                                                scale = item.scale,
+                                                immediate = true
+                                            )
+                                        },
+                                        onDragUpdate = { x, y, rot, sc ->
+                                            updateFinger(x, y)
+                                            setPreviewNote(
+                                                item = item,
+                                                note = note,
+                                                x = x,
+                                                y = y,
+                                                rotation = rot,
+                                                scale = sc,
+                                                immediate = false
+                                            )
+                                        },
                                         onDragEnd = {
                                             draggingNoteId = null
                                             fingerState.value = null
+                                            liveDragState.value = null
                                         }
                                     )
                                 }
@@ -1107,11 +1115,32 @@ fun BoardScreen(
                                             put(img.id, w to h)
                                         }
                                     },
-                                    onDragStart = { draggingImageId = img.id },
-                                    onDragUpdate = { x, y -> updateFinger(x, y) },
+                                    onDragStart = {
+                                        draggingImageId = img.id
+                                        setPreviewImage(
+                                            img = img,
+                                            x = img.x,
+                                            y = img.y,
+                                            rotation = img.rotation,
+                                            scale = img.scale,
+                                            immediate = true
+                                        )
+                                    },
+                                    onDragUpdate = { x, y, rot, sc ->
+                                        updateFinger(x, y)
+                                        setPreviewImage(
+                                            img = img,
+                                            x = x,
+                                            y = y,
+                                            rotation = rot,
+                                            scale = sc,
+                                            immediate = false
+                                        )
+                                    },
                                     onDragEnd = {
                                         draggingImageId = null
                                         fingerState.value = null
+                                        liveDragState.value = null
                                     }
                                 )
                             }
@@ -1119,31 +1148,38 @@ fun BoardScreen(
                     }
                 }
 
-                val miniHeightDp = if (boardPxW > 0) {
-                    120f * boardPxH / boardPxW
+                val miniWidthDp = 120f
+                val miniHeightDp = if (boardWidthDp > 0f) {
+                    miniWidthDp * boardHeightDpActual / boardWidthDp
                 } else {
-                    120f
+                    miniWidthDp
                 }
 
                 MiniMapContainer(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(16.dp)
-                        .width(120.dp)
+                        .width(miniWidthDp.dp)
                         .height(miniHeightDp.dp),
                     touchActive = boardTouchActive,
                     draggingNoteId = draggingNoteId,
                     draggingImageId = draggingImageId,
                     isPhoneSize = isPhoneSize,
-                    boardPxW = boardPxW,
-                    boardPxH = boardPxH,
-                    vpW = vpW,
-                    vpH = vpH,
+                    hasBoardSize = boardPxW > 0 && boardPxH > 0 && vpW > 0 && vpH > 0,
+                    boardWidthDp = boardWidthDp.coerceAtLeast(1f),
+                    boardHeightDp = boardHeightDpActual.coerceAtLeast(1f),
+                    viewportWidthDp = with(density) { vpW.toDp().value }.coerceAtLeast(1f),
+                    viewportHeightDp = with(density) { vpH.toDp().value }.coerceAtLeast(1f),
                     scrollStateH = scrollStateH,
                     scrollStateV = scrollStateV,
+                    pxPerDp = densityF,
                     fingerState = fingerState,
-                    pxPerDp = density.density,
-                    markers = miniMarkers
+                    liveDragState = liveDragState,
+                    visibleItems = visibleItems,
+                    images = images,
+                    notes = notes,
+                    noteSizes = noteSizes,
+                    imageSizes = imageSizes
                 )
             }
         }
@@ -1510,6 +1546,45 @@ fun BoardScreen(
     }
 }
 
+private fun DrawScope.drawRotatedRect(
+    center: Offset,
+    halfW: Float,
+    halfH: Float,
+    rotation: Float,
+    fillColor: Color,
+    strokeColor: Color,
+    strokeWidth: Float
+) {
+    val rad = rotation.toDouble() * PI / 180.0
+    val c = cos(rad).toFloat()
+    val s = sin(rad).toFloat()
+
+    fun corner(dx: Float, dy: Float): Offset {
+        return Offset(
+            center.x + dx * c - dy * s,
+            center.y + dx * s + dy * c
+        )
+    }
+
+    val path = Path().apply {
+        moveTo(corner(-halfW, -halfH))
+        lineTo(corner(halfW, -halfH))
+        lineTo(corner(halfW, halfH))
+        lineTo(corner(-halfW, halfH))
+        close()
+    }
+
+    drawPath(path, fillColor)
+
+    if (strokeWidth > 0f) {
+        drawPath(
+            path = path,
+            color = strokeColor,
+            style = Stroke(strokeWidth)
+        )
+    }
+}
+
 @Composable
 private fun MiniMapContainer(
     modifier: Modifier,
@@ -1517,90 +1592,187 @@ private fun MiniMapContainer(
     draggingNoteId: Long?,
     draggingImageId: Long?,
     isPhoneSize: Boolean,
-    boardPxW: Int,
-    boardPxH: Int,
-    vpW: Int,
-    vpH: Int,
+    hasBoardSize: Boolean,
+    boardWidthDp: Float,
+    boardHeightDp: Float,
+    viewportWidthDp: Float,
+    viewportHeightDp: Float,
     scrollStateH: ScrollState,
     scrollStateV: ScrollState,
-    fingerState: State<Offset?>,
     pxPerDp: Float,
-    markers: List<MiniMarker>
+    fingerState: State<Offset?>,
+    liveDragState: State<LiveDrag?>,
+    visibleItems: List<BoardItem>,
+    images: List<BoardImage>,
+    notes: List<Note>,
+    noteSizes: State<Map<String, Pair<Int, Int>>>,
+    imageSizes: State<Map<Long, Pair<Int, Int>>>
 ) {
-    val isTouchActive = touchActive.value
+    val active = touchActive.value
 
     if (
         !isPhoneSize &&
-        (isTouchActive || draggingNoteId != null || draggingImageId != null) &&
-        boardPxW > 0 && boardPxH > 0 && vpW > 0 && vpH > 0
+        hasBoardSize &&
+        (active || draggingNoteId != null || draggingImageId != null)
     ) {
         MiniMap(
-            paperW = boardPxW.toFloat(),
-            paperH = boardPxH.toFloat(),
-            viewW = vpW.toFloat(),
-            viewH = vpH.toFloat(),
+            modifier = modifier,
+            boardWidthDp = boardWidthDp,
+            boardHeightDp = boardHeightDp,
+            viewportWidthDp = viewportWidthDp,
+            viewportHeightDp = viewportHeightDp,
             scrollStateH = scrollStateH,
             scrollStateV = scrollStateV,
-            fingerState = fingerState,
             pxPerDp = pxPerDp,
-            markers = markers,
-            modifier = modifier
+            fingerState = fingerState,
+            liveDragState = liveDragState,
+            visibleItems = visibleItems,
+            images = images,
+            notes = notes,
+            noteSizes = noteSizes,
+            imageSizes = imageSizes
         )
     }
 }
 
 @Composable
 private fun MiniMap(
-    paperW: Float,
-    paperH: Float,
-    viewW: Float,
-    viewH: Float,
+    modifier: Modifier,
+    boardWidthDp: Float,
+    boardHeightDp: Float,
+    viewportWidthDp: Float,
+    viewportHeightDp: Float,
     scrollStateH: ScrollState,
     scrollStateV: ScrollState,
-    fingerState: State<Offset?>,
     pxPerDp: Float,
-    markers: List<MiniMarker>,
-    modifier: Modifier
+    fingerState: State<Offset?>,
+    liveDragState: State<LiveDrag?>,
+    visibleItems: List<BoardItem>,
+    images: List<BoardImage>,
+    notes: List<Note>,
+    noteSizes: State<Map<String, Pair<Int, Int>>>,
+    imageSizes: State<Map<Long, Pair<Int, Int>>>
 ) {
     val finger = fingerState.value
-    val scrollX = scrollStateH.value.toFloat()
-    val scrollY = scrollStateV.value.toFloat()
+    val live = liveDragState.value
+
+    val noteSizeMap = noteSizes.value
+    val imageSizeMap = imageSizes.value
+    val dp = pxPerDp.coerceAtLeast(1f)
+
+    val scrollXDp = scrollStateH.value / dp
+    val scrollYDp = scrollStateV.value / dp
+
+    val baseMarkers = mutableListOf<MiniMarker>()
+
+    visibleItems.forEach { item ->
+        val n = notes.firstOrNull { it.id == item.noteId } ?: return@forEach
+        val key = "${item.noteId}:${item.boardId}"
+        val measured = noteSizeMap[key]
+
+        val wDp = measured?.first?.toFloat()?.let { it / dp }
+            ?: (BASE_NOTE_WIDTH * item.scale)
+        val hDp = measured?.second?.toFloat()?.let { it / dp }
+            ?: (140f * item.scale)
+
+        baseMarkers.add(
+            MiniMarker(
+                id = item.noteId,
+                isImage = false,
+                x = item.x,
+                y = item.y,
+                w = wDp,
+                h = hDp,
+                rotation = item.rotation,
+                color = stickyBody(n.color)
+            )
+        )
+    }
+
+    images.forEach { img ->
+        val measured = imageSizeMap[img.id]
+
+        val wDp = measured?.first?.toFloat()?.let { it / dp }
+            ?: (BASE_IMAGE_WIDTH * img.scale)
+        val hDp = measured?.second?.toFloat()?.let { it / dp }
+            ?: (BASE_IMAGE_WIDTH * img.scale)
+
+        baseMarkers.add(
+            MiniMarker(
+                id = img.id,
+                isImage = true,
+                x = img.x,
+                y = img.y,
+                w = wDp,
+                h = hDp,
+                rotation = img.rotation,
+                color = Color.White
+            )
+        )
+    }
+
+    val displayMarkers: List<MiniMarker> = if (live == null) {
+        baseMarkers
+    } else {
+        baseMarkers.filterNot { it.id == live.id && it.isImage == live.isImage } +
+                MiniMarker(
+                    id = live.id,
+                    isImage = live.isImage,
+                    x = live.x,
+                    y = live.y,
+                    w = live.w,
+                    h = live.h,
+                    rotation = live.rotation,
+                    color = live.color
+                )
+    }
 
     ComposeCanvas(
         modifier
-            .background(Color.Black.copy(alpha = 0.68f), RoundedCornerShape(8.dp))
-            .border(1.dp, Color.White.copy(alpha = 0.82f), RoundedCornerShape(8.dp))
+            .background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(8.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.86f), RoundedCornerShape(8.dp))
     ) {
-        val sx = size.width / paperW.coerceAtLeast(1f)
-        val sy = size.height / paperH.coerceAtLeast(1f)
+        val bw = boardWidthDp.coerceAtLeast(1f)
+        val bh = boardHeightDp.coerceAtLeast(1f)
 
-        markers.forEach { m ->
-            val mx = m.x * pxPerDp * sx
-            val my = m.y * pxPerDp * sy
-            val mw = (m.w * pxPerDp * sx).coerceAtLeast(3f)
-            val mh = (m.h * pxPerDp * sy).coerceAtLeast(3f)
+        val scaleX = size.width / bw
+        val scaleY = size.height / bh
+        val scale = minOf(scaleX, scaleY)
 
-            drawRect(
-                color = m.color.copy(alpha = 0.92f),
-                topLeft = Offset(mx, my),
-                size = Size(mw, mh)
-            )
+        val offsetX = (size.width - bw * scale) / 2f
+        val offsetY = (size.height - bh * scale) / 2f
 
-            drawRect(
-                color = Color.White.copy(alpha = 0.65f),
-                topLeft = Offset(mx, my),
-                size = Size(mw, mh),
-                style = Stroke(1f)
+        drawRect(
+            color = Color.White.copy(alpha = 0.08f),
+            topLeft = Offset(offsetX, offsetY),
+            size = Size(bw * scale, bh * scale)
+        )
+
+        displayMarkers.forEach { m ->
+            val cx = (m.x + m.w / 2f) * scale + offsetX
+            val cy = (m.y + m.h / 2f) * scale + offsetY
+            val hw = (m.w * scale / 2f).coerceAtLeast(1.5f)
+            val hh = (m.h * scale / 2f).coerceAtLeast(1.5f)
+
+            drawRotatedRect(
+                center = Offset(cx, cy),
+                halfW = hw,
+                halfH = hh,
+                rotation = m.rotation,
+                fillColor = m.color.copy(alpha = 0.94f),
+                strokeColor = Color.White.copy(alpha = 0.72f),
+                strokeWidth = 1f
             )
         }
 
-        val vw = (viewW * sx).coerceAtMost(size.width)
-        val vh = (viewH * sy).coerceAtMost(size.height)
-        val vx = (scrollX * sx).coerceIn(0f, (size.width - vw).coerceAtLeast(0f))
-        val vy = (scrollY * sy).coerceIn(0f, (size.height - vh).coerceAtLeast(0f))
+        val vw = (viewportWidthDp.coerceAtLeast(1f) * scale).coerceAtMost(size.width)
+        val vh = (viewportHeightDp.coerceAtLeast(1f) * scale).coerceAtMost(size.height)
+
+        val vx = (scrollXDp * scale + offsetX).coerceIn(0f, (size.width - vw).coerceAtLeast(0f))
+        val vy = (scrollYDp * scale + offsetY).coerceIn(0f, (size.height - vh).coerceAtLeast(0f))
 
         drawRect(
-            color = Color.White.copy(alpha = 0.16f),
+            color = Color.White.copy(alpha = 0.18f),
             topLeft = Offset(vx, vy),
             size = Size(vw, vh)
         )
@@ -1613,8 +1785,8 @@ private fun MiniMap(
         )
 
         finger?.let { f ->
-            val fx = (f.x * pxPerDp * sx).coerceIn(0f, size.width)
-            val fy = (f.y * pxPerDp * sy).coerceIn(0f, size.height)
+            val fx = (f.x * scale + offsetX).coerceIn(0f, size.width)
+            val fy = (f.y * scale + offsetY).coerceIn(0f, size.height)
 
             drawCircle(
                 color = Color(0xFFFFB74D),
@@ -1645,10 +1817,21 @@ private fun BoardImageItem(
     onScaleChanged: (Float) -> Unit,
     onMeasured: (Int, Int) -> Unit,
     onDragStart: () -> Unit,
-    onDragUpdate: (Float, Float) -> Unit,
+    onDragUpdate: (Float, Float, Float, Float) -> Unit,
     onDragEnd: () -> Unit
 ) {
     val density = LocalDensity.current
+    val densityF = density.density
+
+    val currentClampX by rememberUpdatedState(clampX)
+    val currentClampY by rememberUpdatedState(clampY)
+
+    val currentOnDragStart by rememberUpdatedState(onDragStart)
+    val currentOnDragUpdate by rememberUpdatedState(onDragUpdate)
+    val currentOnDragEnd by rememberUpdatedState(onDragEnd)
+    val currentOnMoved by rememberUpdatedState(onMoved)
+    val currentOnRotated by rememberUpdatedState(onRotated)
+    val currentOnScaleChanged by rememberUpdatedState(onScaleChanged)
 
     var pos by remember(image.id, image.boardId, image.x, image.y) {
         mutableStateOf(Offset(image.x.coerceIn(0f, clampX), image.y.coerceIn(0f, clampY)))
@@ -1658,17 +1841,6 @@ private fun BoardImageItem(
     }
     var scale by remember(image.id, image.boardId, image.scale) {
         mutableStateOf(image.scale)
-    }
-    var lastInteraction by remember { mutableStateOf(0L) }
-    var gestureActive by remember { mutableStateOf(false) }
-
-    LaunchedEffect(lastInteraction) {
-        if (lastInteraction > 0 && !gestureActive) {
-            delay(500)
-            onMoved(pos.x, pos.y)
-            onRotated(rotation)
-            onScaleChanged(scale)
-        }
     }
 
     val widthDp = (BASE_IMAGE_WIDTH * scale).dp
@@ -1684,66 +1856,56 @@ private fun BoardImageItem(
             .onSizeChanged { s -> onMeasured(s.width, s.height) }
             .graphicsLayer { rotationZ = rotation }
             .pointerInput(image.id, image.boardId) {
+                val slopPx = 12f * densityF
+
                 awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
+                    awaitFirstDown(
+                        requireUnconsumed = false,
+                        pass = PointerEventPass.Initial
+                    )
+
                     var moved = false
-                    var canceled = false
+                    var continueGesture = true
 
                     do {
-                        val event = awaitPointerEvent()
-                        canceled = event.changes.any { it.isConsumed }
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val consumedByOther = event.changes.any { it.isConsumed }
 
-                        if (!canceled) {
-                            val pointerCount = event.changes.count { it.pressed }
+                        if (!moved && consumedByOther) {
+                            continueGesture = false
+                        } else {
                             val panChange = event.calculatePan()
 
-                            if (pointerCount >= 2) {
-                                val zoomChange = event.calculateZoom()
-                                val rotationChange = event.calculateRotation()
+                            if (!moved && panChange.getDistance() > slopPx) {
+                                moved = true
+                                currentOnDragStart()
+                            }
 
-                                if (!moved && (zoomChange != 1f || rotationChange != 0f || panChange.getDistance() > 8f)) {
-                                    moved = true
-                                    gestureActive = true
+                            if (moved) {
+                                pos = Offset(
+                                    (pos.x + panChange.x / densityF).coerceIn(0f, currentClampX),
+                                    (pos.y + panChange.y / densityF).coerceIn(0f, currentClampY)
+                                )
+
+                                val pointerCount = event.changes.count { it.pressed }
+                                if (pointerCount >= 2) {
+                                    rotation += event.calculateRotation()
+                                    scale = (scale * event.calculateZoom()).coerceIn(0.3f, 3.0f)
                                 }
 
-                                if (moved) {
-                                    pos = Offset(
-                                        (pos.x + panChange.x / density.density).coerceIn(0f, clampX),
-                                        (pos.y + panChange.y / density.density).coerceIn(0f, clampY)
-                                    )
-                                    rotation += rotationChange
-                                    scale = (scale * zoomChange).coerceIn(0.3f, 3.0f)
-                                    onDragUpdate(pos.x, pos.y)
-                                    lastInteraction = System.currentTimeMillis()
-                                }
-
+                                currentOnDragUpdate(pos.x, pos.y, rotation, scale)
                                 event.changes.forEach { it.consume() }
-                            } else {
-                                if (panChange.getDistance() > 0f) {
-                                    if (!moved && panChange.getDistance() > 4f) {
-                                        moved = true
-                                        gestureActive = true
-                                        onDragStart()
-                                    }
-
-                                    if (moved) {
-                                        pos = Offset(
-                                            (pos.x + panChange.x / density.density).coerceIn(0f, clampX),
-                                            (pos.y + panChange.y / density.density).coerceIn(0f, clampY)
-                                        )
-                                        onDragUpdate(pos.x, pos.y)
-                                        lastInteraction = System.currentTimeMillis()
-                                    }
-
-                                    event.changes.forEach { it.consume() }
-                                }
                             }
                         }
-                    } while (!canceled && event.changes.any { it.pressed })
+
+                        continueGesture = continueGesture && event.changes.any { it.pressed }
+                    } while (continueGesture)
 
                     if (moved) {
-                        gestureActive = false
-                        onDragEnd()
+                        currentOnMoved(pos.x, pos.y)
+                        currentOnRotated(rotation)
+                        currentOnScaleChanged(scale)
+                        currentOnDragEnd()
                     }
                 }
             }
@@ -1818,10 +1980,21 @@ private fun StickyNote(
     onScaleChanged: (Float) -> Unit,
     onMeasured: (Int, Int) -> Unit,
     onDragStart: () -> Unit,
-    onDragUpdate: (Float, Float) -> Unit,
+    onDragUpdate: (Float, Float, Float, Float) -> Unit,
     onDragEnd: () -> Unit
 ) {
     val density = LocalDensity.current
+    val densityF = density.density
+
+    val currentClampX by rememberUpdatedState(clampX)
+    val currentClampY by rememberUpdatedState(clampY)
+
+    val currentOnDragStart by rememberUpdatedState(onDragStart)
+    val currentOnDragUpdate by rememberUpdatedState(onDragUpdate)
+    val currentOnDragEnd by rememberUpdatedState(onDragEnd)
+    val currentOnMoved by rememberUpdatedState(onMoved)
+    val currentOnRotated by rememberUpdatedState(onRotated)
+    val currentOnScaleChanged by rememberUpdatedState(onScaleChanged)
 
     var pos by remember(item.noteId, item.boardId, item.x, item.y) {
         mutableStateOf(Offset(item.x.coerceIn(0f, clampX), item.y.coerceIn(0f, clampY)))
@@ -1831,17 +2004,6 @@ private fun StickyNote(
     }
     var scale by remember(item.noteId, item.boardId, item.scale) {
         mutableStateOf(item.scale)
-    }
-    var lastInteraction by remember { mutableStateOf(0L) }
-    var gestureActive by remember { mutableStateOf(false) }
-
-    LaunchedEffect(lastInteraction) {
-        if (lastInteraction > 0 && !gestureActive) {
-            delay(500)
-            onMoved(pos.x, pos.y)
-            onRotated(rotation)
-            onScaleChanged(scale)
-        }
     }
 
     val widthDp = (BASE_NOTE_WIDTH * scale).dp
@@ -1859,66 +2021,56 @@ private fun StickyNote(
             .onSizeChanged { s -> onMeasured(s.width, s.height) }
             .graphicsLayer { rotationZ = rotation }
             .pointerInput(item.noteId, item.boardId) {
+                val slopPx = 12f * densityF
+
                 awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
+                    awaitFirstDown(
+                        requireUnconsumed = false,
+                        pass = PointerEventPass.Initial
+                    )
+
                     var moved = false
-                    var canceled = false
+                    var continueGesture = true
 
                     do {
-                        val event = awaitPointerEvent()
-                        canceled = event.changes.any { it.isConsumed }
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val consumedByOther = event.changes.any { it.isConsumed }
 
-                        if (!canceled) {
-                            val pointerCount = event.changes.count { it.pressed }
+                        if (!moved && consumedByOther) {
+                            continueGesture = false
+                        } else {
                             val panChange = event.calculatePan()
 
-                            if (pointerCount >= 2) {
-                                val zoomChange = event.calculateZoom()
-                                val rotationChange = event.calculateRotation()
+                            if (!moved && panChange.getDistance() > slopPx) {
+                                moved = true
+                                currentOnDragStart()
+                            }
 
-                                if (!moved && (zoomChange != 1f || rotationChange != 0f || panChange.getDistance() > 8f)) {
-                                    moved = true
-                                    gestureActive = true
+                            if (moved) {
+                                pos = Offset(
+                                    (pos.x + panChange.x / densityF).coerceIn(0f, currentClampX),
+                                    (pos.y + panChange.y / densityF).coerceIn(0f, currentClampY)
+                                )
+
+                                val pointerCount = event.changes.count { it.pressed }
+                                if (pointerCount >= 2) {
+                                    rotation += event.calculateRotation()
+                                    scale = (scale * event.calculateZoom()).coerceIn(0.3f, 3.0f)
                                 }
 
-                                if (moved) {
-                                    pos = Offset(
-                                        (pos.x + panChange.x / density.density).coerceIn(0f, clampX),
-                                        (pos.y + panChange.y / density.density).coerceIn(0f, clampY)
-                                    )
-                                    rotation += rotationChange
-                                    scale = (scale * zoomChange).coerceIn(0.3f, 3.0f)
-                                    onDragUpdate(pos.x, pos.y)
-                                    lastInteraction = System.currentTimeMillis()
-                                }
-
+                                currentOnDragUpdate(pos.x, pos.y, rotation, scale)
                                 event.changes.forEach { it.consume() }
-                            } else {
-                                if (panChange.getDistance() > 0f) {
-                                    if (!moved && panChange.getDistance() > 4f) {
-                                        moved = true
-                                        gestureActive = true
-                                        onDragStart()
-                                    }
-
-                                    if (moved) {
-                                        pos = Offset(
-                                            (pos.x + panChange.x / density.density).coerceIn(0f, clampX),
-                                            (pos.y + panChange.y / density.density).coerceIn(0f, clampY)
-                                        )
-                                        onDragUpdate(pos.x, pos.y)
-                                        lastInteraction = System.currentTimeMillis()
-                                    }
-
-                                    event.changes.forEach { it.consume() }
-                                }
                             }
                         }
-                    } while (!canceled && event.changes.any { it.pressed })
+
+                        continueGesture = continueGesture && event.changes.any { it.pressed }
+                    } while (continueGesture)
 
                     if (moved) {
-                        gestureActive = false
-                        onDragEnd()
+                        currentOnMoved(pos.x, pos.y)
+                        currentOnRotated(rotation)
+                        currentOnScaleChanged(scale)
+                        currentOnDragEnd()
                     }
                 }
             }
