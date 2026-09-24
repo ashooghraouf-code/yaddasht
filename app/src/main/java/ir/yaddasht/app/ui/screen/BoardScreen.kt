@@ -51,8 +51,7 @@ import androidx.compose.ui.draw.*
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.*
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -85,7 +84,7 @@ private val BOARD_SIZE_DESC = listOf(
     "اندازهٔ صفحهٔ گوشی",
     "۲۱۰×۲۹۷ میلی‌متر",
     "۲۹۷×۴۲۰ میلی‌متر",
-    "۴۲×۵۹۴ میلی‌متر"
+    "۴۲۰×۵۹۴ میلی‌متر"
 )
 
 private val BOARD_SIZES_PT = listOf(
@@ -1008,8 +1007,6 @@ fun BoardScreen(
                                     StickyNote(
                                         note = note,
                                         item = item,
-                                        variant = idx,
-                                        stagger = idx,
                                         clampX = clampX,
                                         clampY = clampY,
                                         isDraggingThis = draggingNoteId == note.id,
@@ -1087,7 +1084,6 @@ fun BoardScreen(
                             images.forEachIndexed { idx, img ->
                                 BoardImageItem(
                                     image = img,
-                                    stagger = visibleItems.size + idx,
                                     clampX = clampX,
                                     clampY = clampY,
                                     isDraggingThis = draggingImageId == img.id,
@@ -1566,11 +1562,16 @@ private fun DrawScope.drawRotatedRect(
         )
     }
 
+    val p0 = corner(-halfW, -halfH)
+    val p1 = corner(halfW, -halfH)
+    val p2 = corner(halfW, halfH)
+    val p3 = corner(-halfW, halfH)
+
     val path = Path().apply {
-        moveTo(corner(-halfW, -halfH))
-        lineTo(corner(halfW, -halfH))
-        lineTo(corner(halfW, halfH))
-        lineTo(corner(-halfW, halfH))
+        moveTo(p0.x, p0.y)
+        lineTo(p1.x, p1.y)
+        lineTo(p2.x, p2.y)
+        lineTo(p3.x, p3.y)
         close()
     }
 
@@ -1807,7 +1808,6 @@ private fun MiniMap(
 @Composable
 private fun BoardImageItem(
     image: BoardImage,
-    stagger: Int,
     clampX: Float,
     clampY: Float,
     isDraggingThis: Boolean,
@@ -1968,8 +1968,6 @@ private fun Vignette(bgIndex: Int) {
 private fun StickyNote(
     note: Note,
     item: BoardItem,
-    variant: Int,
-    stagger: Int,
     clampX: Float,
     clampY: Float,
     isDraggingThis: Boolean,
