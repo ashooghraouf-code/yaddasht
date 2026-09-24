@@ -131,7 +131,7 @@ private val BOARD_SIZE_LABELS = listOf("📱 گوشی", "📄 A4", "📐 A3", "�
 private val BOARD_SIZE_DESC = listOf(
     "اندازهٔ صفحهٔ گوشی",
     "۲۱۰×۲۹۷ میلی‌متر",
-    "۲۹۷×۴۲۰ میلی‌متر",
+    "۲۹×۴۲۰ میلی‌متر",
     "۴۲۰×۵۹۴ میلی‌متر"
 )
 
@@ -797,15 +797,25 @@ fun BoardScreen(
                         onClick = {
                             val newIdx = (boardSizeIndex + 1) % 4
 
-                            if (boardSizeIndex != 0 && newIdx != 0) {
-                                val oldW = BOARD_SIZES_DP[boardSizeIndex].first.coerceAtLeast(1f)
-                                val oldH = BOARD_SIZES_DP[boardSizeIndex].second.coerceAtLeast(1f)
-                                val newW = BOARD_SIZES_DP[newIdx].first.coerceAtLeast(1f)
-                                val newH = BOARD_SIZES_DP[newIdx].second.coerceAtLeast(1f)
+                            val oldWDp = boardWidthDp.coerceAtLeast(1f)
+                            val oldHDp = boardHeightDpActual.coerceAtLeast(1f)
 
-                                val ratioX = newW / oldW
-                                val ratioY = newH / oldH
+                            val newWDp = if (newIdx == 0) {
+                                if (vpW > 0) with(density) { vpW.toDp().value } else oldWDp
+                            } else {
+                                BOARD_SIZES_DP[newIdx].first
+                            }.coerceAtLeast(1f)
 
+                            val newHDp = if (newIdx == 0) {
+                                if (vpH > 0) with(density) { vpH.toDp().value } else oldHDp
+                            } else {
+                                BOARD_SIZES_DP[newIdx].second
+                            }.coerceAtLeast(1f)
+
+                            val ratioX = newWDp / oldWDp
+                            val ratioY = newHDp / oldHDp
+
+                            if (kotlin.math.abs(ratioX - 1f) > 0.001f || kotlin.math.abs(ratioY - 1f) > 0.001f) {
                                 items.forEach { item ->
                                     BoardStore.move(
                                         context,
@@ -910,10 +920,10 @@ fun BoardScreen(
             }
 
             Box(Modifier.fillMaxSize()) {
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                    val scrollStateV = rememberScrollState()
-                    val scrollStateH = rememberScrollState()
+                val scrollStateV = rememberScrollState()
+                val scrollStateH = rememberScrollState()
 
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                     Box(
                         Modifier
                             .fillMaxSize()
@@ -1107,23 +1117,34 @@ fun BoardScreen(
                             }
                         }
                     }
-
-                    MiniMapContainer(
-                        touchActive = boardTouchActive,
-                        draggingNoteId = draggingNoteId,
-                        draggingImageId = draggingImageId,
-                        isPhoneSize = isPhoneSize,
-                        boardPxW = boardPxW,
-                        boardPxH = boardPxH,
-                        vpW = vpW,
-                        vpH = vpH,
-                        scrollStateH = scrollStateH,
-                        scrollStateV = scrollStateV,
-                        fingerState = fingerState,
-                        pxPerDp = density.density,
-                        markers = miniMarkers
-                    )
                 }
+
+                val miniHeightDp = if (boardPxW > 0) {
+                    120f * boardPxH / boardPxW
+                } else {
+                    120f
+                }
+
+                MiniMapContainer(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(16.dp)
+                        .width(120.dp)
+                        .height(miniHeightDp.dp),
+                    touchActive = boardTouchActive,
+                    draggingNoteId = draggingNoteId,
+                    draggingImageId = draggingImageId,
+                    isPhoneSize = isPhoneSize,
+                    boardPxW = boardPxW,
+                    boardPxH = boardPxH,
+                    vpW = vpW,
+                    vpH = vpH,
+                    scrollStateH = scrollStateH,
+                    scrollStateV = scrollStateV,
+                    fingerState = fingerState,
+                    pxPerDp = density.density,
+                    markers = miniMarkers
+                )
             }
         }
 
@@ -1491,6 +1512,7 @@ fun BoardScreen(
 
 @Composable
 private fun MiniMapContainer(
+    modifier: Modifier,
     touchActive: State<Boolean>,
     draggingNoteId: Long?,
     draggingImageId: Long?,
@@ -1522,11 +1544,7 @@ private fun MiniMapContainer(
             fingerState = fingerState,
             pxPerDp = pxPerDp,
             markers = markers,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(16.dp)
-                .width(120.dp)
-                .height((120f * boardPxH / boardPxW).dp)
+            modifier = modifier
         )
     }
 }
