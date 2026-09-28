@@ -146,8 +146,8 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
     var webView by remember { mutableStateOf<WebView?>(null) }
     var webReady by remember { mutableStateOf(false) }
     var fullText by remember { mutableStateOf<String?>(null) }
-
-    // ✅ دیالوگ‌های جدید
+    
+    // دیالوگ‌های جدید
     var showCopyDialog by remember { mutableStateOf(false) }
     var showSendToNoteDialog by remember { mutableStateOf(false) }
     var showSendToTaskDialog by remember { mutableStateOf(false) }
@@ -210,7 +210,7 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
     LaunchedEffect(annVersion, themeIndex) { if (!isPdf && webReady && fullText != null) pushContent(currentScroll) }
     LaunchedEffect(currentPage) { if (isPdf) ReaderStore.saveProgress(context, path, currentPage) }
 
-    // ✅ توابع جدید
+    // توابع جدید ارسال
     fun copyTextToClipboard(text: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText("متن از سند", text)
@@ -221,25 +221,18 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
     fun sendToNote(text: String) {
         val dao = AppDatabase.get(context).dao()
         val fileName = File(path).nameWithoutExtension
-        val noteTitle = "از: $fileName"
-        val noteBody = text
         scope.launch(Dispatchers.IO) {
-            dao.insert(Note(title = noteTitle, body = noteBody, createdAt = System.currentTimeMillis(), updatedAt = System.currentTimeMillis()))
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "✅ به یادداشت اضافه شد", Toast.LENGTH_SHORT).show()
-            }
+            dao.insert(Note(title = "از: $fileName", body = text, createdAt = System.currentTimeMillis(), updatedAt = System.currentTimeMillis()))
+            withContext(Dispatchers.Main) { Toast.makeText(context, "✅ به یادداشت اضافه شد", Toast.LENGTH_SHORT).show() }
         }
     }
 
     fun sendToTask(text: String) {
         val taskDao = AppDatabase.get(context).taskDao()
         val fileName = File(path).nameWithoutExtension
-        val taskTitle = "مطالعه: $fileName"
         scope.launch(Dispatchers.IO) {
-            taskDao.insert(Task(title = taskTitle, dueDate = 0, priority = Priority.NORMAL))
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "✅ به وظایف اضافه شد", Toast.LENGTH_SHORT).show()
-            }
+            taskDao.insert(Task(title = "مطالعه: $fileName", dueDate = 0, priority = Priority.NORMAL))
+            withContext(Dispatchers.Main) { Toast.makeText(context, "✅ به وظایف اضافه شد", Toast.LENGTH_SHORT).show() }
         }
     }
 
@@ -249,14 +242,10 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
         if (currentBoard != null) {
             val dao = AppDatabase.get(context).dao()
             val fileName = File(path).nameWithoutExtension
-            val noteTitle = "از: $fileName"
-            val noteBody = text
             scope.launch(Dispatchers.IO) {
-                val noteId = dao.insert(Note(title = noteTitle, body = noteBody, createdAt = System.currentTimeMillis(), updatedAt = System.currentTimeMillis()))
+                val noteId = dao.insert(Note(title = "از: $fileName", body = text, createdAt = System.currentTimeMillis(), updatedAt = System.currentTimeMillis()))
                 BoardStore.addItem(context, noteId, currentBoard.id)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "✅ به تابلو اضافه شد", Toast.LENGTH_SHORT).show()
-                }
+                withContext(Dispatchers.Main) { Toast.makeText(context, "✅ به تابلو اضافه شد", Toast.LENGTH_SHORT).show() }
             }
         } else {
             Toast.makeText(context, "❌ تابلویی وجود ندارد", Toast.LENGTH_SHORT).show()
@@ -307,34 +296,32 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
             Modifier.fillMaxWidth().background(themeBg).padding(horizontal = 4.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically
         ) {
-            // ✅ دکمه کپی
+            // دکمه‌های جدید
             IconButton(onClick = { showCopyDialog = true }) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Filled.ContentCopy, "کپی", tint = themeFg)
                     Text("کپی", fontSize = 9.sp, color = themeFg)
                 }
             }
-            // ✅ دکمه ارسال به یادداشت
             IconButton(onClick = { showSendToNoteDialog = true }) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Filled.Edit, "یادداشت", tint = themeFg)
                     Text("یادداشت", fontSize = 9.sp, color = themeFg)
                 }
             }
-            // ✅ دکمه ارسال به وظیفه
             IconButton(onClick = { showSendToTaskDialog = true }) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Filled.Add, "وظیفه", tint = themeFg)
                     Text("وظیفه", fontSize = 9.sp, color = themeFg)
                 }
             }
-            // ✅ دکمه ارسال به تابلو
             IconButton(onClick = { showSendToBoardDialog = true }) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Filled.Bookmark, "تابلو", tint = themeFg)
                     Text("تابلو", fontSize = 9.sp, color = themeFg)
                 }
             }
+            // دکمه‌های قبلی
             IconButton(onClick = {
                 if (isPdf) Toast.makeText(context, "📍 روی محل دلخواه ضربه بزن", Toast.LENGTH_SHORT).show()
                 else webView?.evaluateJavascript("getSelectionData()") { result ->
@@ -384,69 +371,43 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
         }
     }
 
-    // ✅ دیالوگ کپی متن
+    // دیالوگ‌های جدید
     if (showCopyDialog) {
         AlertDialog(
             onDismissRequest = { showCopyDialog = false },
-            title = { Text(" کپی متن", fontFamily = LalezarFont, fontSize = 18.sp) },
+            title = { Text("📋 کپی متن", fontFamily = LalezarFont, fontSize = 18.sp) },
             text = {
                 Column {
                     Text("کل متن یا متن انتخابی؟", fontSize = 13.sp)
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = {
-                            fullText?.let { copyTextToClipboard(it) }
-                            showCopyDialog = false
-                        }) {
-                            Text("کل متن", color = Color(0xFFFFB74D))
-                        }
-                        TextButton(onClick = {
-                            pendingSelection?.let { copyTextToClipboard(it.first) }
-                            showCopyDialog = false
-                        }) {
-                            Text("متن انتخابی", color = Color(0xFFFFB74D))
-                        }
+                        TextButton(onClick = { fullText?.let { copyTextToClipboard(it) }; showCopyDialog = false }) { Text("کل متن", color = Color(0xFFFFB74D)) }
+                        TextButton(onClick = { pendingSelection?.let { copyTextToClipboard(it.first) }; showCopyDialog = false }) { Text("متن انتخابی", color = Color(0xFFFFB74D)) }
                     }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { showCopyDialog = false }) { Text("بستن") }
-            }
+            confirmButton = { TextButton(onClick = { showCopyDialog = false }) { Text("بستن") } }
         )
     }
 
-    // ✅ دیالوگ ارسال به یادداشت
     if (showSendToNoteDialog) {
         AlertDialog(
             onDismissRequest = { showSendToNoteDialog = false },
-            title = { Text("📝 ارسال به یادداشت", fontFamily = LalezarFont, fontSize = 18.sp) },
+            title = { Text(" ارسال به یادداشت", fontFamily = LalezarFont, fontSize = 18.sp) },
             text = {
                 Column {
                     Text("کل متن یا متن انتخابی؟", fontSize = 13.sp)
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = {
-                            fullText?.let { sendToNote(it) }
-                            showSendToNoteDialog = false
-                        }) {
-                            Text("کل متن", color = Color(0xFFFFB74D))
-                        }
-                        TextButton(onClick = {
-                            pendingSelection?.let { sendToNote(it.first) }
-                            showSendToNoteDialog = false
-                        }) {
-                            Text("متن انتخابی", color = Color(0xFFFFB74D))
-                        }
+                        TextButton(onClick = { fullText?.let { sendToNote(it) }; showSendToNoteDialog = false }) { Text("کل متن", color = Color(0xFFFFB74D)) }
+                        TextButton(onClick = { pendingSelection?.let { sendToNote(it.first) }; showSendToNoteDialog = false }) { Text("متن انتخابی", color = Color(0xFFFFB74D)) }
                     }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { showSendToNoteDialog = false }) { Text("بستن") }
-            }
+            confirmButton = { TextButton(onClick = { showSendToNoteDialog = false }) { Text("بستن") } }
         )
     }
 
-    // ✅ دیالوگ ارسال به وظیفه
     if (showSendToTaskDialog) {
         AlertDialog(
             onDismissRequest = { showSendToTaskDialog = false },
@@ -456,22 +417,14 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
                     Text("یک وظیفه جدید با عنوان «مطالعه: [نام فایل]» ساخته می‌شود.", fontSize = 13.sp)
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = {
-                            fullText?.let { sendToTask(it) }
-                            showSendToTaskDialog = false
-                        }) {
-                            Text("تأیید", color = Color(0xFFFFB74D))
-                        }
+                        TextButton(onClick = { fullText?.let { sendToTask(it) }; showSendToTaskDialog = false }) { Text("تأیید", color = Color(0xFFFFB74D)) }
                     }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { showSendToTaskDialog = false }) { Text("بستن") }
-            }
+            confirmButton = { TextButton(onClick = { showSendToTaskDialog = false }) { Text("بستن") } }
         )
     }
 
-    // ✅ دیالوگ ارسال به تابلو
     if (showSendToBoardDialog) {
         AlertDialog(
             onDismissRequest = { showSendToBoardDialog = false },
@@ -481,21 +434,15 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
                     Text("یک یادداشت جدید ساخته و به تابلو اضافه می‌شود.", fontSize = 13.sp)
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = {
-                            fullText?.let { sendToBoard(it) }
-                            showSendToBoardDialog = false
-                        }) {
-                            Text("تأیید", color = Color(0xFFFFB74D))
-                        }
+                        TextButton(onClick = { fullText?.let { sendToBoard(it) }; showSendToBoardDialog = false }) { Text("تأیید", color = Color(0xFFFFB74D)) }
                     }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { showSendToBoardDialog = false }) { Text("بستن") }
-            }
+            confirmButton = { TextButton(onClick = { showSendToBoardDialog = false }) { Text("بستن") } }
         )
     }
 
+    // دیالوگ‌های قبلی
     pendingSelection?.let { sel ->
         AnnotationPickerDialog(
             types = AnnotationType.values().toList(), selectedText = sel.first,
@@ -550,6 +497,7 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
     }
 }
 
+// توابع کمکی (Dialogs) - همان کدهای قبلی شما
 @Composable
 private fun AnnotationsListDialog(
     annotations: List<Annotation>, themeMuted: Color,
@@ -559,7 +507,7 @@ private fun AnnotationsListDialog(
         onDismissRequest = onDismiss, containerColor = Color(0xFF202020),
         title = { Text("📑 همهٔ یادداشت‌ها", color = Color.White, fontFamily = LalezarFont, fontSize = 18.sp) },
         text = {
-            if (annotations.isEmpty()) Text("هنوز یادداشتی نیست ", color = themeMuted, fontSize = 13.sp)
+            if (annotations.isEmpty()) Text("هنوز یادداشتی نیست 📝", color = themeMuted, fontSize = 13.sp)
             else LazyColumn {
                 items(annotations.sortedByDescending { it.updatedAt }) { ann ->
                     val color = AnnotationPalette.find(ann.colorKey)
@@ -658,7 +606,7 @@ private fun PdfAnnotationDialog(
     var note by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss, containerColor = Color(0xFF202020),
-        title = { Text(" صفحهٔ ${pageIndex + 1}", color = Color.White, fontFamily = LalezarFont, fontSize = 18.sp) },
+        title = { Text("📍 صفحهٔ ${pageIndex + 1}", color = Color.White, fontFamily = LalezarFont, fontSize = 18.sp) },
         text = {
             Column {
                 Text("PDF لایهٔ متن ندارد؛ می‌توانی روی این نقطه یادداشت یا نشانک بگذاری:", color = Color(0xFF999999), fontFamily = VazirFont, fontSize = 12.sp)
@@ -744,7 +692,7 @@ private fun ReaderSettingsDialog(
                     listOf(
                         Triple(0, "روشن ☀️", Color(0xFFFFF8E1)),
                         Triple(1, "سپیا 📜", Color(0xFFF4ECD8)),
-                        Triple(2, "شب ", Color(0xFF1A1A1A))
+                        Triple(2, "شب 🌙", Color(0xFF1A1A1A))
                     ).forEach { (i, name, color) ->
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Box(
