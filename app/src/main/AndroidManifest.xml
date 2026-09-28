@@ -36,16 +36,6 @@
         </activity>
 
         <activity
-            android:name=".ui.screen.FilePickerActivity"
-            android:exported="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
-
-        <activity
-            android:name=".ui.screen.ReaderActivity"
-            android:exported="false"
-            android:theme="@android:style/Theme.Material.NoActionBar" />
-
-        <activity
             android:name=".widget.WidgetConfigActivity"
             android:exported="true"
             android:theme="@android:style/Theme.Material.NoActionBar">
@@ -115,8 +105,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/task_widget_info" />
         </receiver>
-
-        <!-- ❌ JournalistWidget حذف شد -->
 
         <provider
             android:name="androidx.core.content.FileProvider"
