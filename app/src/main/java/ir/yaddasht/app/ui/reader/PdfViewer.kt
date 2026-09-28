@@ -146,7 +146,7 @@ private fun PdfPageImage(
     val screenWidthPx = remember { context.resources.displayMetrics.widthPixels }
     val targetWidth = (screenWidthPx * zoom).toInt().coerceAtLeast(1)
     var bitmap by remember(index, targetWidth) { mutableStateOf<Bitmap?>(null) }
-    var containerSize by remember { mutableStateOf(IntSize.Zero) }
+    var imageSize by remember { mutableStateOf(IntSize.Zero) }
 
     LaunchedEffect(index, targetWidth) {
         bitmap = withContext(Dispatchers.Default) { session.renderPage(index, targetWidth) }
@@ -159,18 +159,13 @@ private fun PdfPageImage(
         contentAlignment = Alignment.Center
     ) {
         bitmap?.let { bmp ->
-            val bmpW = bmp.width
-            val bmpH = bmp.height
-            val aspect = bmpH.toFloat() / bmpW.toFloat()
-            
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .onSizeChanged { containerSize = it }
-                    .pointerInput(index, containerSize) {
+                    .pointerInput(index, imageSize) {
                         detectTapGestures { offset ->
-                            if (containerSize.width > 0 && containerSize.height > 0) {
-                                onPageTap(offset.x / containerSize.width, offset.y / containerSize.height)
+                            if (imageSize.width > 0 && imageSize.height > 0) {
+                                onPageTap(offset.x / imageSize.width, offset.y / imageSize.height)
                             }
                         }
                     }
@@ -179,13 +174,15 @@ private fun PdfPageImage(
                     bitmap = bmp.asImageBitmap(),
                     contentDescription = "صفحه ${index + 1}",
                     contentScale = ContentScale.FillWidth,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onSizeChanged { imageSize = it }
                 )
                 
-                // لایه هایلایت‌ها با ابعاد دقیق
-                if (containerSize.width > 0 && containerSize.height > 0) {
-                    val wDp = with(density) { containerSize.width.toDp() }
-                    val hDp = with(density) { containerSize.height.toDp() }
+                // لایه هایلایت‌ها با ابعاد دقیق تصویر
+                if (imageSize.width > 0 && imageSize.height > 0) {
+                    val wDp = with(density) { imageSize.width.toDp() }
+                    val hDp = with(density) { imageSize.height.toDp() }
                     
                     Box(Modifier.matchParentSize()) {
                         pageAnnotations.forEach { ann ->
@@ -223,7 +220,7 @@ private fun PdfPageImage(
                                             .clip(CircleShape)
                                             .background(ac.color),
                                         contentAlignment = Alignment.Center
-                                    ) { Text("📝", fontSize = 14.sp) }
+                                    ) { Text("", fontSize = 14.sp) }
                                 }
                                 AnnotationType.BOOKMARK -> {
                                     Text(
