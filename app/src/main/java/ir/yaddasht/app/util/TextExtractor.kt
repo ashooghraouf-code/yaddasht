@@ -78,7 +78,7 @@ object TextExtractor {
                     while (entry != null) {
                         if (entry.name == "word/document.xml") {
                             found = true
-                            parseDocxXml(z, paragraphs)
+                            parseDocxXml(z, paragraphs)  // ✅ استفاده از XmlPullParser
                             break
                         }
                         entry = z.nextEntry
