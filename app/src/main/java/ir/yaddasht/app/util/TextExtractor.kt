@@ -9,7 +9,7 @@ import org.xmlpull.v1.XmlPullParser
 
 object TextExtractor {
     private const val TAG = "TextExtractor"
-    private const val MAX_FILE_SIZE = 5L * 1024 * 1024 // 5MB
+    private const val MAX_FILE_SIZE = 5L * 1024 * 1024
     private const val MAX_TEXT_LENGTH = 500_000
 
     var lastError: String? = null
@@ -24,7 +24,7 @@ object TextExtractor {
             return ""
         }
         if (file.length() > MAX_FILE_SIZE) {
-            lastError = "فایل بزرگ‌تر از ۵ مگابایت است (${file.length() / 1024 / 1024}MB). لطفاً فایل کوچک‌تر استفاده کنید."
+            lastError = "فایل بزرگ‌تر از ۵ مگابایت است"
             return ""
         }
         if (file.length() == 0L) {
@@ -37,17 +37,17 @@ object TextExtractor {
             when {
                 lower.endsWith(".docx") -> fromDocx(file)
                 lower.endsWith(".doc") -> {
-                    lastError = "فرمت .doc قدیمی پشتیبانی نمی‌شود. فایل را به .docx تبدیل کنید."
+                    lastError = "فرمت .doc قدیمی پشتیبانی نمی‌شود"
                     ""
                 }
                 lower.endsWith(".txt") -> readFile(file)
                 else -> readFile(file)
             }
         } catch (e: OutOfMemoryError) {
-            lastError = "حافظه کافی نیست (فایل خیلی بزرگ است)"
+            lastError = "حافظه کافی نیست"
             ""
         } catch (e: Exception) {
-            lastError = "خطا: ${e.javaClass.simpleName} - ${e.message}"
+            lastError = "خطا: ${e.message}"
             Log.e(TAG, "extract", e)
             ""
         }
@@ -56,13 +56,10 @@ object TextExtractor {
     private fun readFile(file: File): String {
         return try {
             val text = file.readText(Charsets.UTF_8)
-            if (text.length > MAX_TEXT_LENGTH) {
-                text.take(MAX_TEXT_LENGTH) + "\n\n[... ادامه حذف شد - فایل خیلی بزرگ است]"
-            } else {
-                text
-            }
+            if (text.length > MAX_TEXT_LENGTH) text.take(MAX_TEXT_LENGTH) + "\n\n[... ادامه حذف شد]"
+            else text
         } catch (e: Exception) {
-            lastError = "خطا در خواندن فایل: ${e.message}"
+            lastError = "خطا در خواندن فایل"
             ""
         }
     }
@@ -78,7 +75,6 @@ object TextExtractor {
                     while (entry != null) {
                         if (entry.name == "word/document.xml") {
                             found = true
-                            // استفاده از XmlPullParser به جای Regex
                             parseDocxXml(z, paragraphs)
                             break
                         }
@@ -87,20 +83,20 @@ object TextExtractor {
                 }
             }
         } catch (e: OutOfMemoryError) {
-            lastError = "فایل Word خیلی بزرگ است و حافظه کافی نیست"
+            lastError = "فایل Word خیلی بزرگ است"
             return ""
         } catch (e: Exception) {
-            lastError = "خطا در پردازش Word: ${e.javaClass.simpleName}"
+            lastError = "خطا در پردازش Word: ${e.message}"
             Log.e(TAG, "fromDocx", e)
             return ""
         }
 
         if (!found) {
-            lastError = "فایل Word معتبر نیست یا ساختار آن خراب است"
+            lastError = "فایل Word معتبر نیست"
             return ""
         }
         if (paragraphs.isEmpty()) {
-            lastError = "فایل Word خالی است یا متنی برای استخراج ندارد"
+            lastError = "متنی در فایل یافت نشد"
             return ""
         }
 
@@ -112,7 +108,6 @@ object TextExtractor {
         }
     }
 
-    // تابع جدید و استاندارد برای پارس کردن XML فایل Word
     private fun parseDocxXml(input: InputStream, out: MutableList<String>) {
         val parser = Xml.newPullParser()
         parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
@@ -126,12 +121,9 @@ object TextExtractor {
             when (eventType) {
                 XmlPullParser.START_TAG -> {
                     val name = parser.name ?: ""
-                    // تگ پاراگراف در Word معمولاً w:p است
                     if (name == "w:p" || name == "p") {
                         currentParagraph.setLength(0)
-                    } 
-                    // تگ متن در Word معمولاً w:t است
-                    else if (name == "w:t" || name == "t") {
+                    } else if (name == "w:t" || name == "t") {
                         inTextTag = true
                     }
                 }
