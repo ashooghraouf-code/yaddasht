@@ -147,7 +147,7 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
     var webReady by remember { mutableStateOf(false) }
     var fullText by remember { mutableStateOf<String?>(null) }
     
-    // دیالوگ‌های جدید
+    // دیالوگ‌های جدید برای ارسال
     var showCopyDialog by remember { mutableStateOf(false) }
     var showSendToNoteDialog by remember { mutableStateOf(false) }
     var showSendToTaskDialog by remember { mutableStateOf(false) }
@@ -346,7 +346,7 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
                         pageIndex = currentPage, relX = 0.02f, relY = 0.02f, relW = 0.06f, relH = 0.06f,
                         selectedText = "صفحهٔ ${currentPage + 1}"
                     )); annVersion++
-                    Toast.makeText(context, "🔖 نشانک صفحه ثبت شد", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, " نشانک صفحه ثبت شد", Toast.LENGTH_SHORT).show()
                 } else Toast.makeText(context, "برای متن، اول انتخاب کن ✋", Toast.LENGTH_SHORT).show()
             }) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -393,7 +393,7 @@ private fun ReaderScreen(path: String, isPdf: Boolean, onBack: () -> Unit) {
     if (showSendToNoteDialog) {
         AlertDialog(
             onDismissRequest = { showSendToNoteDialog = false },
-            title = { Text(" ارسال به یادداشت", fontFamily = LalezarFont, fontSize = 18.sp) },
+            title = { Text("📝 ارسال به یادداشت", fontFamily = LalezarFont, fontSize = 18.sp) },
             text = {
                 Column {
                     Text("کل متن یا متن انتخابی؟", fontSize = 13.sp)
