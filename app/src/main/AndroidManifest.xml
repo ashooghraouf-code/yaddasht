@@ -2,7 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- ===== مجوزهای اصلی ===== -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -13,17 +12,16 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- ===== مجوزهای جعبه‌ابزار (قبله‌نما) ===== -->
+    <!-- جعبه‌ابزار: قبله‌نما -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- ===== حذف مجوزهای بیومتریک قدیمی ===== -->
-    <uses-permission android:name="android.permission.USE_BIOMETRIC" tools:node="remove" />
-    <uses-permission android:name="android.permission.USE_FINGERPRINT" tools:node="remove" />
-
-    <uses-feature
-        android:name="android.hardware.fingerprint"
-        android:required="false" />
+    <!-- دیکتهٔ مداوم -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="true"
@@ -33,7 +31,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Yaddasht">
 
-        <!-- ===== صفحه اصلی ===== -->
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation"
@@ -45,14 +42,13 @@
             </intent-filter>
         </activity>
 
-        <!-- ===== جعبه‌ابزار (جدید) ===== -->
+        <!-- جعبه‌ابزار -->
         <activity
             android:name=".tools.ToolboxActivity"
             android:exported="false"
             android:label="جعبه‌ابزار"
             android:theme="@android:style/Theme.Material.NoActionBar" />
 
-        <!-- ===== ویجت‌ها ===== -->
         <activity
             android:name=".widget.WidgetConfigActivity"
             android:exported="true"
@@ -76,7 +72,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- ===== یادآور ===== -->
         <receiver
             android:name=".reminder.ReminderReceiver"
             android:exported="false" />
@@ -99,7 +94,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- ===== ویجت یادداشت ===== -->
         <receiver
             android:name=".widget.NoteWidget"
             android:exported="true">
@@ -113,7 +107,6 @@
                 android:resource="@xml/note_widget_info" />
         </receiver>
 
-        <!-- ===== ویجت وظیفه ===== -->
         <receiver
             android:name=".widget.TaskWidget"
             android:exported="true">
@@ -127,7 +120,6 @@
                 android:resource="@xml/task_widget_info" />
         </receiver>
 
-        <!-- ===== FileProvider (برای پشتیبان/ضمیمه) ===== -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
