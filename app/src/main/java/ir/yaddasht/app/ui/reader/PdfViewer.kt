@@ -46,7 +46,6 @@ import java.io.File
 
 class PdfSession(private val renderer: PdfRenderer, private val pfd: ParcelFileDescriptor) {
     val pageCount: Int get() = try { renderer.pageCount } catch (_: Exception) { 0 }
-
     fun renderPage(index: Int, targetWidth: Int): Bitmap? {
         return try {
             synchronized(renderer) {
@@ -62,7 +61,6 @@ class PdfSession(private val renderer: PdfRenderer, private val pfd: ParcelFileD
             }
         } catch (_: Exception) { null }
     }
-
     fun close() {
         try { renderer.close() } catch (_: Exception) {}
         try { pfd.close() } catch (_: Exception) {}
@@ -89,18 +87,15 @@ fun PdfViewer(
     modifier: Modifier = Modifier
 ) {
     val total = session.pageCount.coerceAtLeast(1)
-
     key(twoPage) {
         val spreadCount = if (twoPage) (total + 1) / 2 else total
         val initial = (if (twoPage) initialPage / 2 else initialPage).coerceIn(0, spreadCount - 1)
         val pagerState = rememberPagerState(initialPage = initial) { spreadCount }
-
         LaunchedEffect(pagerState) {
             snapshotFlow { pagerState.currentPage }.collect { s ->
                 onPageChanged(if (twoPage) (s * 2).coerceAtMost(total - 1) else s)
             }
         }
-
         HorizontalPager(
             state = pagerState,
             modifier = modifier.fillMaxSize(),
@@ -109,7 +104,6 @@ fun PdfViewer(
         ) { spread ->
             val firstIdx = spread * (if (twoPage) 2 else 1)
             val secondIdx = if (twoPage) spread * 2 + 1 else -1
-
             androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
                 Box(Modifier.weight(1f)) {
                     PdfPageImage(
@@ -150,11 +144,9 @@ private fun PdfPageImage(
     val context = LocalContext.current
     val density = LocalDensity.current
     val screenWidthPx = remember { context.resources.displayMetrics.widthPixels }
-    val screenWidthDp = with(density) { screenWidthPx.toDp() }
     val targetWidth = (screenWidthPx * zoom).toInt().coerceAtLeast(1)
-
     var bitmap by remember(index, targetWidth) { mutableStateOf<Bitmap?>(null) }
-    var imageSize by remember { mutableStateOf(IntSize.Zero) }
+    var containerSize by remember { mutableStateOf(IntSize.Zero) }
 
     LaunchedEffect(index, targetWidth) {
         bitmap = withContext(Dispatchers.Default) { session.renderPage(index, targetWidth) }
@@ -170,14 +162,15 @@ private fun PdfPageImage(
             val bmpW = bmp.width
             val bmpH = bmp.height
             val aspect = bmpH.toFloat() / bmpW.toFloat()
-
+            
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .pointerInput(index, imageSize) {
+                    .onSizeChanged { containerSize = it }
+                    .pointerInput(index, containerSize) {
                         detectTapGestures { offset ->
-                            if (imageSize.width > 0 && imageSize.height > 0) {
-                                onPageTap(offset.x / imageSize.width, offset.y / imageSize.height)
+                            if (containerSize.width > 0 && containerSize.height > 0) {
+                                onPageTap(offset.x / containerSize.width, offset.y / containerSize.height)
                             }
                         }
                     }
@@ -186,71 +179,61 @@ private fun PdfPageImage(
                     bitmap = bmp.asImageBitmap(),
                     contentDescription = "صفحه ${index + 1}",
                     contentScale = ContentScale.FillWidth,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onSizeChanged { imageSize = it }
+                    modifier = Modifier.fillMaxWidth()
                 )
-
-                // Annotation overlay
-                Box(Modifier.matchParentSize()) {
-                    pageAnnotations.forEach { ann ->
-                        val ac = AnnotationPalette.find(ann.colorKey)
-                        when (ann.type) {
-                            AnnotationType.HIGHLIGHT -> {
-                                Box(
-                                    Modifier
-                                        .align(Alignment.TopStart)
-                                        .offset(
-                                            x = screenWidthDp * ann.relX,
-                                            y = screenWidthDp * ann.relY * aspect
-                                        )
-                                        .size(
-                                            width = (screenWidthDp * ann.relW).coerceAtLeast(8.dp),
-                                            height = (screenWidthDp * ann.relH * aspect).coerceAtLeast(8.dp)
-                                        )
-                                        .background(ac.colorForTheme(themeIndex))
-                                )
-                            }
-                            AnnotationType.UNDERLINE -> {
-                                Box(
-                                    Modifier
-                                        .align(Alignment.TopStart)
-                                        .offset(
-                                            x = screenWidthDp * ann.relX,
-                                            y = screenWidthDp * ann.relY * aspect
-                                        )
-                                        .size(
-                                            width = (screenWidthDp * ann.relW).coerceAtLeast(8.dp),
-                                            height = (screenWidthDp * ann.relH * aspect).coerceAtLeast(2.dp)
-                                        )
-                                        .background(ac.colorForTheme(themeIndex))
-                                )
-                            }
-                            AnnotationType.NOTE -> {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.TopStart)
-                                        .offset(
-                                            x = screenWidthDp * ann.relX - 14.dp,
-                                            y = screenWidthDp * ann.relY * aspect - 14.dp
-                                        )
-                                        .size(28.dp)
-                                        .clip(CircleShape)
-                                        .background(ac.color),
-                                    contentAlignment = Alignment.Center
-                                ) { Text("📝", fontSize = 14.sp) }
-                            }
-                            AnnotationType.BOOKMARK -> {
-                                Text(
-                                    "🔖",
-                                    fontSize = 20.sp,
-                                    modifier = Modifier
-                                        .align(Alignment.TopStart)
-                                        .offset(
-                                            x = screenWidthDp * ann.relX,
-                                            y = screenWidthDp * ann.relY * aspect
-                                        )
-                                )
+                
+                // لایه هایلایت‌ها با ابعاد دقیق
+                if (containerSize.width > 0 && containerSize.height > 0) {
+                    val wDp = with(density) { containerSize.width.toDp() }
+                    val hDp = with(density) { containerSize.height.toDp() }
+                    
+                    Box(Modifier.matchParentSize()) {
+                        pageAnnotations.forEach { ann ->
+                            val ac = AnnotationPalette.find(ann.colorKey)
+                            val x = wDp * ann.relX
+                            val y = hDp * ann.relY
+                            val w = (wDp * ann.relW).coerceAtLeast(8.dp)
+                            val h = (hDp * ann.relH).coerceAtLeast(8.dp)
+                            
+                            when (ann.type) {
+                                AnnotationType.HIGHLIGHT -> {
+                                    Box(
+                                        Modifier
+                                            .align(Alignment.TopStart)
+                                            .offset(x = x, y = y)
+                                            .size(width = w, height = h)
+                                            .background(ac.colorForTheme(themeIndex))
+                                    )
+                                }
+                                AnnotationType.UNDERLINE -> {
+                                    Box(
+                                        Modifier
+                                            .align(Alignment.TopStart)
+                                            .offset(x = x, y = y)
+                                            .size(width = w, height = (hDp * ann.relH).coerceAtLeast(2.dp))
+                                            .background(ac.colorForTheme(themeIndex))
+                                    )
+                                }
+                                AnnotationType.NOTE -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopStart)
+                                            .offset(x = x - 14.dp, y = y - 14.dp)
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(ac.color),
+                                        contentAlignment = Alignment.Center
+                                    ) { Text("📝", fontSize = 14.sp) }
+                                }
+                                AnnotationType.BOOKMARK -> {
+                                    Text(
+                                        "🔖",
+                                        fontSize = 20.sp,
+                                        modifier = Modifier
+                                            .align(Alignment.TopStart)
+                                            .offset(x = x, y = y)
+                                    )
+                                }
                             }
                         }
                     }
