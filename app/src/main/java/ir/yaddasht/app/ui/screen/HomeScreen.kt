@@ -181,13 +181,13 @@ private fun gregorianFullFa(millis: Long): String {
     val c = Calendar.getInstance(); c.timeInMillis = millis
     val d = c.get(Calendar.DAY_OF_MONTH); val m = c.get(Calendar.MONTH) + 1; val y = c.get(Calendar.YEAR)
     val names = arrayOf("ژانویه", "فوریه", "مارس", "آوریل", "مه", "ژوئن", "ژوئیه", "اوت", "سپتامبر", "اکتبر", "نوامبر", "دسامبر")
-    return "${weekdayFa(millis)}، ${d.fa()} ${names.getOrElse(m - 1) { "" }} ${y.fa()}"
+    return "${weekdayFa(millis)}، ${d.fa()} ${names.getOrElse(m - 1) { " " }} ${y.fa()}"
 }
 
 private fun hijriFullFa(millis: Long): String {
     val (m, d, y) = iranHijri(millis)
     val names = arrayOf("محرم", "صفر", "ربیع‌الاول", "ربیع‌الثانی", "جمادی‌الاول", "جمادی‌الثانی", "رجب", "شعبان", "رمضان", "شوال", "ذی‌القعده", "ذی‌الحجه")
-    return "${d.fa()} ${names.getOrElse(m - 1) { "" }} ${y.fa()}"
+    return "${d.fa()} ${names.getOrElse(m - 1) { " " }} ${y.fa()}"
 }
 
 private fun fullDateTime(millis: Long): String {
@@ -235,7 +235,6 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
     val counts by dao.observeAttachmentCounts().collectAsState(initial = emptyList())
     val countMap = counts.associate { it.noteId to it.count }
     val tasks by taskDao.getAllTasks().collectAsState(initial = emptyList())
-
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var query by rememberSaveable { mutableStateOf("") }
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
@@ -246,7 +245,6 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
     var newTaskOnDate by remember { mutableLongStateOf(0L) }
     var showThemePicker by remember { mutableStateOf(false) }
     var boardFullscreen by rememberSaveable { mutableStateOf(false) }
-
     val (tjy, tjm, tjd) = FaDate.jalali(System.currentTimeMillis())
     var calJy by remember { mutableIntStateOf(tjy) }
     var calJm by remember { mutableIntStateOf(tjm) }
@@ -271,7 +269,6 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
     val others = filteredNotes.filterNot { it.pinned }
     val filteredTasks = tasks.filter { query.isBlank() || it.title.contains(query, true) }
     val memory = remember(notes) { pickMemory(notes) }
-
     val itemsByDay = remember(tasks, notes, calJy, calJm) {
         val list = mutableListOf<Triple<String, Long, Boolean>>()
         tasks.filter { it.dueDate > 0 }.forEach { list.add(Triple("task:${it.id}", it.dueDate, it.isCompleted)) }
@@ -324,7 +321,6 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                         Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("📅 تقویم", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
                         Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("📌 تابلو", fontFamily = LalezarFont, fontSize = 13.sp) }, selectedContentColor = Saffron, unselectedContentColor = MutedGreenText)
                     }
-
                     if (tab == 0 && !hideMemory && memory != null && query.isBlank()) {
                         Surface(onClick = { onOpenNote(memory.id) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
                             shape = RoundedCornerShape(16.dp), color = Saffron.copy(alpha = .14f), border = androidx.compose.foundation.BorderStroke(1.dp, Saffron.copy(alpha = .4f))) {
@@ -381,8 +377,8 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text("${FaDate.monthName(calJm)} ${calJy.fa()}", fontFamily = LalezarFont, fontSize = 20.sp, color = PaperWhite)
                                         val infoMillis = jalaliMillis(calJy, calJm, calDay, 12)
-                                        Text("🌙 قمری: " + hijriFullFa(infoMillis), fontSize = 10.sp, color = MutedGreenText)
-                                        Text("🌍 میلادی: " + gregorianFullFa(infoMillis), fontSize = 10.sp, color = MutedGreenText)
+                                        Text(" قمری: " + hijriFullFa(infoMillis), fontSize = 10.sp, color = MutedGreenText)
+                                        Text(" میلادی: " + gregorianFullFa(infoMillis), fontSize = 10.sp, color = MutedGreenText)
                                     }
                                     IconButton(onClick = { if (calJm < 12) calJm++ else { calJm = 1; calJy++ } }) { Icon(Icons.Filled.ChevronLeft, "بعد", tint = Saffron) }
                                 }
@@ -475,9 +471,7 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
             }
         }
     }
-
     if (showStats) StatsDialog(notes, counts.sumOf { it.count }) { showStats = false }
-
     if (showAddTask) AddTaskDialog(initialDate = newTaskOnDate, onDismiss = { showAddTask = false; newTaskOnDate = 0L },
         onSave = { title, due, pr, leads ->
             scope.launch(Dispatchers.IO) {
@@ -488,7 +482,6 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
             newTaskOnDate = 0L
             Toast.makeText(context, "وظیفه اضافه شد ✅", Toast.LENGTH_SHORT).show()
         })
-
     editTask?.let { task ->
         AddTaskDialog(initialDate = 0L, initialTask = task, onDismiss = { editTask = null },
             onSave = { title, due, pr, leads ->
@@ -501,7 +494,6 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                 Toast.makeText(context, "وظیفه به‌روز شد ✅", Toast.LENGTH_SHORT).show()
             })
     }
-
     noteToDelete?.let { note ->
         AlertDialog(onDismissRequest = { noteToDelete = null },
             title = { Text("حذف یادداشت؟", fontFamily = LalezarFont, fontSize = 20.sp) },
@@ -509,7 +501,6 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
             confirmButton = { TextButton(onClick = { noteToDelete = null; scope.launch(Dispatchers.IO) { val atts = dao.attachmentsByNote(note.id); dao.deleteById(note.id); atts.forEach { File(it.filePath).delete() } } }) { Text("حذف", color = Brick, fontWeight = FontWeight.Bold) } },
             dismissButton = { TextButton(onClick = { noteToDelete = null }) { Text("انصراف") } })
     }
-
     if (showThemePicker) {
         AlertDialog(
             onDismissRequest = { showThemePicker = false },
@@ -569,7 +560,7 @@ fun HomeScreen(dao: NoteDao, taskDao: TaskDao, onOpenNote: (Long) -> Unit, onNew
                 Text(task.title, fontFamily = VazirFont, fontWeight = FontWeight.Bold, fontSize = 14.sp,
                     color = if (task.isCompleted) MutedGreenText else PaperWhite,
                     textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null)
-                if (task.dueDate > 0) { Spacer(Modifier.height(2.dp)); Text("📅 " + fullDateTime(task.dueDate), fontSize = 11.sp, color = tint, fontWeight = FontWeight.Bold) }
+                if (task.dueDate > 0) { Spacer(Modifier.height(2.dp)); Text(" " + fullDateTime(task.dueDate), fontSize = 11.sp, color = tint, fontWeight = FontWeight.Bold) }
                 Text("✏️ برای ویرایش ضربه بزن", fontSize = 9.sp, color = MutedGreenText.copy(alpha = .7f))
             }
             if (task.priority == Priority.HIGH && !task.isCompleted) Text("🔴", fontSize = 12.sp)
@@ -691,10 +682,7 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
             Spacer(Modifier.width(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
                 IconButton(onClick = onThemePicker, modifier = Modifier.size(36.dp)) { Text("🎨", fontSize = 18.sp) }
-                IconButton(onClick = {
-                    val intent = android.content.Intent(context, FilePickerActivity::class.java)
-                    context.startActivity(intent)
-                }, modifier = Modifier.size(36.dp)) { Text("📚", fontSize = 18.sp) }
+                // 📚 آیکون کتاب حذف شد
                 IconButton(onClick = onBackup, modifier = Modifier.size(36.dp)) { Icon(Icons.Filled.FileUpload, "پشتیبان", tint = MutedGreenText, modifier = Modifier.size(20.dp)) }
                 IconButton(onClick = onRestore, modifier = Modifier.size(36.dp)) { Icon(Icons.Filled.FileDownload, "بازیابی", tint = MutedGreenText, modifier = Modifier.size(20.dp)) }
                 IconButton(onClick = onStats, modifier = Modifier.size(36.dp)) { Icon(Icons.Filled.BarChart, "آمار", tint = MutedGreenText, modifier = Modifier.size(20.dp)) }
@@ -710,7 +698,7 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
     val totalWords = unlocked.sumOf { it.body.split(Regex("\\s+")).count(String::isNotBlank) }
     val thisWeek = notes.count { System.currentTimeMillis() - it.updatedAt < 7L * 24 * 3600 * 1000 }
     AlertDialog(onDismissRequest = onDismiss,
-        title = { Text("📊 آمار دفترچه", fontFamily = LalezarFont, fontSize = 20.sp) },
+        title = { Text(" آمار دفترچه", fontFamily = LalezarFont, fontSize = 20.sp) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 StatRow("کل یادداشت‌ها", notes.size.fa()); StatRow("کلمه‌های نوشته‌شده", totalWords.fa())
@@ -795,7 +783,7 @@ private fun togglePin(scope: CoroutineScope, dao: NoteDao, note: Note) {
     Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Box(Modifier.size(110.dp).clip(CircleShape).border(2.dp, Saffron.copy(alpha = .5f), CircleShape), contentAlignment = Alignment.Center) { Text("✍️", fontSize = 46.sp) }
         Spacer(Modifier.height(20.dp)); Text("دفترچه‌ات خالی است", fontFamily = LalezarFont, fontSize = 26.sp, color = PaperWhite)
-        Spacer(Modifier.height(8.dp)); Text("یادداشت بنویس، صدا ضبط کن، نقاشی بکش، چک‌لیست بساز و رویشان قفل بگذار ✨", fontSize = 13.sp, color = MutedGreenText, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(8.dp)); Text("یادداشت بنویس، صدا ضبط کن، نقاشی بکش، چک‌لیست بساز و رویشان قفل بگذار ", fontSize = 13.sp, color = MutedGreenText, textAlign = TextAlign.Center)
     }
 }
 
