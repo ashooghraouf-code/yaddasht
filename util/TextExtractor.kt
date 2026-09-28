@@ -10,7 +10,7 @@ import org.xmlpull.v1.XmlPullParser
 object TextExtractor {
     private const val TAG = "TextExtractor"
     private const val MAX_FILE_SIZE = 5L * 1024 * 1024 // 5MB
-    private const val MAX_TEXT_LENGTH = 500_000 // 500K کاراکتر
+    private const val MAX_TEXT_LENGTH = 500_000
 
     var lastError: String? = null
         private set
@@ -78,7 +78,7 @@ object TextExtractor {
                     while (entry != null) {
                         if (entry.name == "word/document.xml") {
                             found = true
-                            // استفاده از XmlPullParser به جای Regex برای پایداری ۱۰۰٪
+                            // استفاده از XmlPullParser به جای Regex
                             parseDocxXml(z, paragraphs)
                             break
                         }
@@ -112,6 +112,7 @@ object TextExtractor {
         }
     }
 
+    // تابع جدید و استاندارد برای پارس کردن XML فایل Word
     private fun parseDocxXml(input: InputStream, out: MutableList<String>) {
         val parser = Xml.newPullParser()
         parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
@@ -125,9 +126,12 @@ object TextExtractor {
             when (eventType) {
                 XmlPullParser.START_TAG -> {
                     val name = parser.name ?: ""
-                    if (name == "p") {
+                    // تگ پاراگراف در Word معمولاً w:p است
+                    if (name == "w:p" || name == "p") {
                         currentParagraph.setLength(0)
-                    } else if (name == "t") {
+                    } 
+                    // تگ متن در Word معمولاً w:t است
+                    else if (name == "w:t" || name == "t") {
                         inTextTag = true
                     }
                 }
@@ -140,9 +144,9 @@ object TextExtractor {
 
                 XmlPullParser.END_TAG -> {
                     val name = parser.name ?: ""
-                    if (name == "t") {
+                    if (name == "w:t" || name == "t") {
                         inTextTag = false
-                    } else if (name == "p") {
+                    } else if (name == "w:p" || name == "p") {
                         val paragraphText = currentParagraph.toString().trim()
                         if (paragraphText.isNotEmpty()) {
                             out.add(paragraphText)
