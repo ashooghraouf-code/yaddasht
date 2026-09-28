@@ -1,9 +1,11 @@
 package ir.yaddasht.app.util
 
 import android.util.Log
+import android.util.Xml
 import java.io.File
 import java.io.InputStream
 import java.util.zip.ZipInputStream
+import org.xmlpull.v1.XmlPullParser
 
 object TextExtractor {
     private const val TAG = "TextExtractor"
@@ -16,22 +18,20 @@ object TextExtractor {
     fun extract(path: String): String {
         lastError = null
         val file = File(path)
-
+        
         if (!file.exists()) {
             lastError = "فایل وجود ندارد"
             return ""
         }
-
         if (file.length() > MAX_FILE_SIZE) {
             lastError = "فایل بزرگ‌تر از ۵ مگابایت است (${file.length() / 1024 / 1024}MB). لطفاً فایل کوچک‌تر استفاده کنید."
             return ""
         }
-
         if (file.length() == 0L) {
             lastError = "فایل خالی است"
             return ""
         }
-
+        
         val lower = path.lowercase()
         return try {
             when {
@@ -56,10 +56,13 @@ object TextExtractor {
     private fun readFile(file: File): String {
         return try {
             val text = file.readText(Charsets.UTF_8)
-            if (text.length > MAX_TEXT_LENGTH) text.take(MAX_TEXT_LENGTH) + "\n\n[... ادامه حذف شد - فایل خیلی بزرگ است]"
-            else text
+            if (text.length > MAX_TEXT_LENGTH) {
+                text.take(MAX_TEXT_LENGTH) + "\n\n[... ادامه حذف شد - فایل خیلی بزرگ است]"
+            } else {
+                text
+            }
         } catch (e: Exception) {
-            lastError = "خطا: ${e.message}"
+            lastError = "خطا در خواندن فایل: ${e.message}"
             ""
         }
     }
@@ -67,7 +70,6 @@ object TextExtractor {
     private fun fromDocx(file: File): String {
         val paragraphs = mutableListOf<String>()
         var found = false
-        var bytesRead = 0L
 
         try {
             file.inputStream().use { fis ->
@@ -76,13 +78,7 @@ object TextExtractor {
                     while (entry != null) {
                         if (entry.name == "word/document.xml") {
                             found = true
-                            val bytes = z.readBytes()
-                            bytesRead = bytes.size.toLong()
-                            if (bytesRead > MAX_FILE_SIZE) {
-                                lastError = "محتوای Word بیش از حد بزرگ است"
-                                return ""
-                            }
-                            parse(bytes.toString(Charsets.UTF_8), paragraphs)
+                            parseDocxXml(z, paragraphs)
                             break
                         }
                         entry = z.nextEntry
@@ -90,27 +86,71 @@ object TextExtractor {
                 }
             }
         } catch (e: OutOfMemoryError) {
-            lastError = "فایل Word خیلی بزرگ است"
+            lastError = "فایل Word خیلی بزرگ است و حافظه کافی نیست"
             return ""
         } catch (e: Exception) {
-            lastError = "خطا در Word: ${e.javaClass.simpleName}"
+            lastError = "خطا در پردازش Word: ${e.javaClass.simpleName}"
+            Log.e(TAG, "fromDocx", e)
             return ""
         }
 
-        if (!found) { lastError = "فایل Word معتبر نیست"; return "" }
-        if (paragraphs.isEmpty()) { lastError = "فایل Word خالی است"; return "" }
+        if (!found) {
+            lastError = "فایل Word معتبر نیست یا ساختار آن خراب است"
+            return ""
+        }
+        if (paragraphs.isEmpty()) {
+            lastError = "فایل Word خالی است یا متنی برای استخراج ندارد"
+            return ""
+        }
 
         val result = paragraphs.joinToString("\n\n")
-        return if (result.length > MAX_TEXT_LENGTH) result.take(MAX_TEXT_LENGTH) + "\n\n[... ادامه حذف شد]"
-        else result
+        return if (result.length > MAX_TEXT_LENGTH) {
+            result.take(MAX_TEXT_LENGTH) + "\n\n[... ادامه حذف شد]"
+        } else {
+            result
+        }
     }
 
-    private fun parse(content: String, out: MutableList<String>) {
-        val paraRegex = Regex("<w:p[ >].*?</w:p>", RegexOption.DOT_MATCHES_ALL)
-        val textRegex = Regex("<w:t[^>]*>([^<]*)</w:t>")
-        for (para in paraRegex.findAll(content)) {
-            val t = textRegex.findAll(para.value).map { it.groupValues[1] }.joinToString("")
-            if (t.isNotBlank()) out.add(t)
+    private fun parseDocxXml(input: InputStream, out: MutableList<String>) {
+        val parser = Xml.newPullParser()
+        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+        parser.setInput(input, Charsets.UTF_8.name())
+
+        var eventType = parser.eventType
+        val currentParagraph = StringBuilder()
+        var inTextTag = false
+
+        while (eventType != XmlPullParser.END_DOCUMENT) {
+            when (eventType) {
+                XmlPullParser.START_TAG -> {
+                    val name = parser.name ?: ""
+                    if (name == "p") {
+                        currentParagraph.setLength(0)
+                    } else if (name == "t") {
+                        inTextTag = true
+                    }
+                }
+
+                XmlPullParser.TEXT -> {
+                    if (inTextTag) {
+                        parser.text?.let { currentParagraph.append(it) }
+                    }
+                }
+
+                XmlPullParser.END_TAG -> {
+                    val name = parser.name ?: ""
+                    if (name == "t") {
+                        inTextTag = false
+                    } else if (name == "p") {
+                        val paragraphText = currentParagraph.toString().trim()
+                        if (paragraphText.isNotEmpty()) {
+                            out.add(paragraphText)
+                        }
+                        currentParagraph.setLength(0)
+                    }
+                }
+            }
+            eventType = parser.next()
         }
     }
 }
