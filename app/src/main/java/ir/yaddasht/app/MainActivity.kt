@@ -46,13 +46,13 @@ import ir.yaddasht.app.ui.screen.DrawScreen
 import ir.yaddasht.app.ui.screen.EditorScreen
 import ir.yaddasht.app.ui.screen.HomeScreen
 import ir.yaddasht.app.ui.screen.TaskEditorScreen
+import ir.yaddasht.app.ui.screen.homeThemePrimary
 import ir.yaddasht.app.ui.theme.DeepGreen
 import ir.yaddasht.app.ui.theme.LalezarFont
 import ir.yaddasht.app.ui.theme.MutedGreenText
 import ir.yaddasht.app.ui.theme.PaperWhite
 import ir.yaddasht.app.ui.theme.Saffron
 import ir.yaddasht.app.ui.theme.YaddashtTheme
-import ir.yaddasht.app.util.AppThemePreferences
 import ir.yaddasht.app.util.NoteLock
 import ir.yaddasht.app.widget.NoteWidget
 import ir.yaddasht.app.widget.TaskWidget
@@ -67,6 +67,7 @@ sealed class Screen {
     data class Editor(val noteId: Long) : Screen()
     data class Draw(val noteId: Long, val isTask: Boolean = false) : Screen()
     data class TaskEditor(val taskId: Long) : Screen()
+
     companion object {
         val SAVER: Saver<Screen, String> = Saver(
             save = { s ->
@@ -101,22 +102,32 @@ class MainActivity : FragmentActivity() {
 
     private val shakeListener = object : SensorEventListener {
         override fun onSensorChanged(e: SensorEvent) {
-            val x = e.values[0]; val y = e.values[1]; val z = e.values[2]
+            val x = e.values[0]
+            val y = e.values[1]
+            val z = e.values[2]
             val g = kotlin.math.sqrt(x * x + y * y + z * z)
             val now = System.currentTimeMillis()
+
             if (g > 22) {
                 if (now - lastHitTime > 700) shakeHits = 0
                 lastHitTime = now
                 shakeHits++
+
                 if (shakeHits >= 4 && now - lastTrigger > 3000) {
-                    lastTrigger = now; shakeHits = 0
+                    lastTrigger = now
+                    shakeHits = 0
+
                     (getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator)?.let {
-                        if (Build.VERSION.SDK_INT >= 26) it.vibrate(VibrationEffect.createOneShot(70, VibrationEffect.DEFAULT_AMPLITUDE))
+                        if (Build.VERSION.SDK_INT >= 26) {
+                            it.vibrate(VibrationEffect.createOneShot(70, VibrationEffect.DEFAULT_AMPLITUDE))
+                        }
                     }
+
                     onShake?.invoke()
                 }
             }
         }
+
         override fun onAccuracyChanged(s: Sensor?, a: Int) {}
     }
 
@@ -126,49 +137,68 @@ class MainActivity : FragmentActivity() {
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
 
         setContent {
-            // ✅ state برای trigger recomposition هنگام تغییر رنگ
             var themeVersion by remember { mutableIntStateOf(0) }
-
-            // ✅ خواندن رنگ از SharedPreferences با کلید themeVersion
             val appContext = LocalContext.current.applicationContext
+
             val bgColor = remember(themeVersion) {
-                AppThemePreferences.getBgColor(appContext)
+                homeThemePrimary(appContext)
             }
 
-            // ✅ پاس دادن bgColor به تم
             YaddashtTheme(bgColor = bgColor) {
                 val context = LocalContext.current
                 val dao = remember { AppDatabase.get(context.applicationContext).dao() }
                 val taskDao = remember { AppDatabase.get(context.applicationContext).taskDao() }
+
                 var authRequired by remember { mutableStateOf(false) }
                 var authChecked by remember { mutableStateOf(false) }
                 var authPassed by remember { mutableStateOf(false) }
 
-                val keyguardLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-                    if (result.resultCode == Activity.RESULT_OK) { authPassed = true; authRequired = false }
+                val keyguardLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.StartActivityForResult()
+                ) { result ->
+                    if (result.resultCode == Activity.RESULT_OK) {
+                        authPassed = true
+                        authRequired = false
+                    }
                 }
 
                 LaunchedEffect(Unit) {
-                    val hasLocked = withContext(Dispatchers.IO) { dao.allNotesSync().any { NoteLock.isLocked(it.body) } }
+                    val hasLocked = withContext(Dispatchers.IO) {
+                        dao.allNotesSync().any { NoteLock.isLocked(it.body) }
+                    }
+
                     if (hasLocked) {
                         val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
                         if (keyguardManager.isDeviceSecure) authRequired = true
                     }
+
                     authChecked = true
                 }
 
                 LaunchedEffect(authRequired) {
                     if (authRequired && !authPassed) {
                         val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-                        val intent = keyguardManager.createConfirmDeviceCredentialIntent("قفل چراغ راه 🔒", "با اثر انگشت یا رمز باز کن")
-                        if (intent != null) keyguardLauncher.launch(intent) else { authRequired = false; authPassed = true }
+                        val intent = keyguardManager.createConfirmDeviceCredentialIntent(
+                            "قفل چراغ راه 🔒",
+                            "با اثر انگشت یا رمز باز کن"
+                        )
+
+                        if (intent != null) keyguardLauncher.launch(intent)
+                        else {
+                            authRequired = false
+                            authPassed = true
+                        }
                     }
                 }
 
                 if (authRequired && !authPassed) {
                     LockScreen {
                         val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-                        val intent = keyguardManager.createConfirmDeviceCredentialIntent("قفل چراغ راه 🔒", "با اثر انگشت یا رمز باز کن")
+                        val intent = keyguardManager.createConfirmDeviceCredentialIntent(
+                            "قفل چراغ راه 🔒",
+                            "با اثر انگشت یا رمز باز کن"
+                        )
+
                         if (intent != null) keyguardLauncher.launch(intent)
                     }
                 } else if (authChecked) {
@@ -179,30 +209,58 @@ class MainActivity : FragmentActivity() {
 
                     val openNoteId = remember { intent.getLongExtra("note_id", 0L) }
                     val isTaskExtra = remember { intent.getBooleanExtra("is_task", false) }
+
                     var screen by rememberSaveable(stateSaver = Screen.SAVER) {
-                        mutableStateOf<Screen>(when {
-                            isTaskExtra && openNoteId > 0 -> Screen.TaskEditor(openNoteId)
-                            openNoteId == NEW_NOTE_ID -> Screen.Editor(NEW_NOTE_ID)
-                            openNoteId > 0 -> Screen.Editor(openNoteId)
-                            else -> Screen.Home
-                        })
+                        mutableStateOf<Screen>(
+                            when {
+                                isTaskExtra && openNoteId > 0 -> Screen.TaskEditor(openNoteId)
+                                openNoteId == NEW_NOTE_ID -> Screen.Editor(NEW_NOTE_ID)
+                                openNoteId > 0 -> Screen.Editor(openNoteId)
+                                else -> Screen.Home
+                            }
+                        )
                     }
-                    LaunchedEffect(screen) { if (screen is Screen.Home) NoteWidget.forceUpdate(this@MainActivity) }
+
+                    LaunchedEffect(screen) {
+                        if (screen is Screen.Home) NoteWidget.forceUpdate(this@MainActivity)
+                    }
+
                     DisposableEffect(Unit) {
                         onShake = { screen = Screen.Editor(NEW_NOTE_ID) }
                         onDispose { onShake = null }
                     }
+
                     when (val s = screen) {
                         is Screen.Home -> HomeScreen(
-                            dao = dao, taskDao = taskDao,
+                            dao = dao,
+                            taskDao = taskDao,
                             onOpenNote = { screen = Screen.Editor(it) },
                             onNewNote = { screen = Screen.Editor(NEW_NOTE_ID) },
                             onOpenTask = { screen = Screen.TaskEditor(it) },
                             onThemeChanged = { themeVersion++ }
                         )
-                        is Screen.Editor -> EditorScreen(dao = dao, noteId = s.noteId, onBack = { screen = Screen.Home }, onOpenDraw = { screen = Screen.Draw(it, false) })
-                        is Screen.Draw -> DrawScreen(dao = dao, noteId = s.noteId, isTask = s.isTask, taskDao = taskDao, onBack = { screen = if (s.isTask) Screen.TaskEditor(s.noteId) else Screen.Editor(s.noteId) })
-                        is Screen.TaskEditor -> TaskEditorScreen(taskDao = taskDao, taskId = s.taskId, onBack = { screen = Screen.Home }, onOpenDraw = { screen = Screen.Draw(it, true) })
+
+                        is Screen.Editor -> EditorScreen(
+                            dao = dao,
+                            noteId = s.noteId,
+                            onBack = { screen = Screen.Home },
+                            onOpenDraw = { screen = Screen.Draw(it, false) }
+                        )
+
+                        is Screen.Draw -> DrawScreen(
+                            dao = dao,
+                            noteId = s.noteId,
+                            isTask = s.isTask,
+                            taskDao = taskDao,
+                            onBack = { screen = if (s.isTask) Screen.TaskEditor(s.noteId) else Screen.Editor(s.noteId) }
+                        )
+
+                        is Screen.TaskEditor -> TaskEditorScreen(
+                            taskDao = taskDao,
+                            taskId = s.taskId,
+                            onBack = { screen = Screen.Home },
+                            onOpenDraw = { screen = Screen.Draw(it, true) }
+                        )
                     }
                 }
             }
@@ -234,7 +292,10 @@ private fun LockScreen(onUnlock: () -> Unit) {
             Spacer(Modifier.height(6.dp))
             Text("یادداشت محرمانه داری؛ اول خودت را ثابت کن!", fontSize = 12.sp, color = MutedGreenText)
             Spacer(Modifier.height(20.dp))
-            Button(onClick = onUnlock, colors = ButtonDefaults.buttonColors(containerColor = Saffron, contentColor = DeepGreen)) {
+            Button(
+                onClick = onUnlock,
+                colors = ButtonDefaults.buttonColors(containerColor = Saffron, contentColor = DeepGreen)
+            ) {
                 Text("باز کردن 🔓", fontFamily = LalezarFont, fontSize = 16.sp)
             }
         }
