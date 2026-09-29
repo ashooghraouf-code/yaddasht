@@ -256,6 +256,7 @@ private fun homeThemeGet(context: Context): HomeThemeConfig {
     if (!stored.isNullOrBlank()) {
         homeThemeDecode(stored)?.let { return it }
     }
+
     return HomeThemeConfig(
         kind = HomeThemeKind.Solid,
         primary = HOME_DEFAULT_PRIMARY
@@ -310,11 +311,11 @@ private fun Color.luminance(): Float {
     return 0.2126f * r + 0.7152f * g + 0.0722f * b
 }
 
-private fun autoAccent(base: Color): Color {
+private fun autoAccent(base: Color): Int {
     return if (base.luminance() > 0.55f) {
-        Color(0xFF1A1A1A)
+        0xFF1A1A1A.toInt()
     } else {
-        Color(0xFFFFFFFF)
+        0xFFFFFFFF.toInt()
     }
 }
 
@@ -340,6 +341,7 @@ private fun HomeBackground(
             HomeThemeKind.Gradient -> {
                 val c1 = Color(config.primary)
                 val c2 = Color(config.secondary ?: config.primary)
+
                 Box(
                     Modifier
                         .matchParentSize()
@@ -611,6 +613,13 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     var homeTheme by remember { mutableStateOf(homeThemeGet(context)) }
 
+    val baseColor = Color(homeTheme.primary)
+    val isLightBackground = baseColor.luminance() > 0.55f && homeTheme.dim < 0.25f
+
+    val onBg = if (isLightBackground) Color(0xFF17201B) else PaperWhite
+    val onBgMuted = if (isLightBackground) Color(0xFF5B665F) else MutedGreenText
+    val onBgAccent = if (isLightBackground) Color(0xFF8A5A00) else Saffron
+
     val notes by dao.observeNotes().collectAsState(initial = emptyList())
     val counts by dao.observeAttachmentCounts().collectAsState(initial = emptyList())
     val countMap = counts.associate { it.noteId to it.count }
@@ -732,7 +741,10 @@ fun HomeScreen(
                             onStats = { showStats = true },
                             onBackup = { doBackup() },
                             onRestore = { restoreLauncher.launch(arrayOf("*/*")) },
-                            onThemePicker = { showThemePicker = true }
+                            onThemePicker = { showThemePicker = true },
+                            onBg = onBg,
+                            onBgMuted = onBgMuted,
+                            onBgAccent = onBgAccent
                         )
 
                         TabRow(
@@ -744,29 +756,29 @@ fun HomeScreen(
                                 selected = tab == 0,
                                 onClick = { tab = 0 },
                                 text = { Text("📝 یادداشت", fontFamily = LalezarFont, fontSize = 13.sp) },
-                                selectedContentColor = Saffron,
-                                unselectedContentColor = MutedGreenText
+                                selectedContentColor = onBgAccent,
+                                unselectedContentColor = onBgMuted
                             )
                             Tab(
                                 selected = tab == 1,
                                 onClick = { tab = 1 },
                                 text = { Text("✅ وظیفه", fontFamily = LalezarFont, fontSize = 13.sp) },
-                                selectedContentColor = Saffron,
-                                unselectedContentColor = MutedGreenText
+                                selectedContentColor = onBgAccent,
+                                unselectedContentColor = onBgMuted
                             )
                             Tab(
                                 selected = tab == 2,
                                 onClick = { tab = 2 },
                                 text = { Text("📅 تقویم", fontFamily = LalezarFont, fontSize = 13.sp) },
-                                selectedContentColor = Saffron,
-                                unselectedContentColor = MutedGreenText
+                                selectedContentColor = onBgAccent,
+                                unselectedContentColor = onBgMuted
                             )
                             Tab(
                                 selected = tab == 3,
                                 onClick = { tab = 3 },
                                 text = { Text("📌 تابلو", fontFamily = LalezarFont, fontSize = 13.sp) },
-                                selectedContentColor = Saffron,
-                                unselectedContentColor = MutedGreenText
+                                selectedContentColor = onBgAccent,
+                                unselectedContentColor = onBgMuted
                             )
                         }
 
@@ -785,7 +797,10 @@ fun HomeScreen(
                         onStats = { showStats = true },
                         onBackup = { doBackup() },
                         onRestore = { restoreLauncher.launch(arrayOf("*/*")) },
-                        onThemePicker = { showThemePicker = true }
+                        onThemePicker = { showThemePicker = true },
+                        onBg = onBg,
+                        onBgMuted = onBgMuted,
+                        onBgAccent = onBgAccent
                     )
 
                     TabRow(
@@ -797,55 +812,62 @@ fun HomeScreen(
                             selected = tab == 0,
                             onClick = { tab = 0 },
                             text = { Text("📝 یادداشت", fontFamily = LalezarFont, fontSize = 13.sp) },
-                            selectedContentColor = Saffron,
-                            unselectedContentColor = MutedGreenText
+                            selectedContentColor = onBgAccent,
+                            unselectedContentColor = onBgMuted
                         )
                         Tab(
                             selected = tab == 1,
                             onClick = { tab = 1 },
                             text = { Text("✅ وظیفه", fontFamily = LalezarFont, fontSize = 13.sp) },
-                            selectedContentColor = Saffron,
-                            unselectedContentColor = MutedGreenText
+                            selectedContentColor = onBgAccent,
+                            unselectedContentColor = onBgMuted
                         )
                         Tab(
                             selected = tab == 2,
                             onClick = { tab = 2 },
                             text = { Text("📅 تقویم", fontFamily = LalezarFont, fontSize = 13.sp) },
-                            selectedContentColor = Saffron,
-                            unselectedContentColor = MutedGreenText
+                            selectedContentColor = onBgAccent,
+                            unselectedContentColor = onBgMuted
                         )
                         Tab(
                             selected = tab == 3,
                             onClick = { tab = 3 },
                             text = { Text("📌 تابلو", fontFamily = LalezarFont, fontSize = 13.sp) },
-                            selectedContentColor = Saffron,
-                            unselectedContentColor = MutedGreenText
+                            selectedContentColor = onBgAccent,
+                            unselectedContentColor = onBgMuted
                         )
                     }
 
                     if (tab == 0 && !hideMemory && memory != null && query.isBlank()) {
                         Surface(
                             onClick = { onOpenNote(memory.id) },
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 6.dp),
                             shape = RoundedCornerShape(16.dp),
-                            color = Saffron.copy(alpha = .14f),
-                            border = BorderStroke(1.dp, Saffron.copy(alpha = .4f))
+                            color = onBgAccent.copy(alpha = .14f),
+                            border = BorderStroke(1.dp, onBgAccent.copy(alpha = .4f))
                         ) {
                             Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text("⏳", fontSize = 22.sp)
                                 Spacer(Modifier.width(10.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text("خاطره‌ای از گذشته", fontFamily = LalezarFont, fontSize = 14.sp, color = Saffron)
+                                    Text(
+                                        "خاطره‌ای از گذشته",
+                                        fontFamily = LalezarFont,
+                                        fontSize = 14.sp,
+                                        color = onBgAccent
+                                    )
                                     Text(
                                         memory.title.ifBlank { "بدون عنوان" },
                                         fontSize = 12.sp,
-                                        color = PaperWhite,
+                                        color = onBg,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                 }
                                 IconButton(onClick = { hideMemory = true }, modifier = Modifier.size(28.dp)) {
-                                    Icon(Icons.Filled.Close, null, tint = MutedGreenText, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Filled.Close, null, tint = onBgMuted, modifier = Modifier.size(16.dp))
                                 }
                             }
                         }
@@ -855,8 +877,8 @@ fun HomeScreen(
 
                     when (tab) {
                         0 -> when {
-                            notes.isEmpty() -> EmptyState()
-                            filteredNotes.isEmpty() -> CenterMessage("چیزی پیدا نشد 🔍")
+                            notes.isEmpty() -> EmptyState(onBg, onBgMuted, onBgAccent)
+                            filteredNotes.isEmpty() -> CenterMessage("چیزی پیدا نشد 🔍", onBgMuted)
                             else -> LazyVerticalGrid(
                                 columns = GridCells.Adaptive(168.dp),
                                 contentPadding = PaddingValues(14.dp, 16.dp, 14.dp, 120.dp),
@@ -864,7 +886,7 @@ fun HomeScreen(
                             ) {
                                 if (pinned.isNotEmpty()) {
                                     item(span = { GridItemSpan(maxLineSpan) }) {
-                                        SectionLabel("📌 سنجاق‌شده")
+                                        SectionLabel("📌 سنجاق‌شده", onBgAccent)
                                     }
                                     items(pinned, key = { "p${it.id}" }) { note ->
                                         NoteCard(
@@ -880,7 +902,7 @@ fun HomeScreen(
                                 if (others.isNotEmpty()) {
                                     if (pinned.isNotEmpty()) {
                                         item(span = { GridItemSpan(maxLineSpan) }) {
-                                            SectionLabel("🗒️ یادداشت‌ها")
+                                            SectionLabel("🗒️ یادداشت‌ها", onBgAccent)
                                         }
                                     }
                                     items(others, key = { "n${it.id}" }) { note ->
@@ -897,8 +919,8 @@ fun HomeScreen(
                         }
 
                         1 -> when {
-                            tasks.isEmpty() -> EmptyTasksState()
-                            filteredTasks.isEmpty() -> CenterMessage("وظیفه‌ای پیدا نشد 🔍")
+                            tasks.isEmpty() -> EmptyTasksState(onBg, onBgMuted, onBgAccent)
+                            filteredTasks.isEmpty() -> CenterMessage("وظیفه‌ای پیدا نشد 🔍", onBgMuted)
                             else -> LazyColumn(
                                 contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 120.dp),
                                 modifier = Modifier.fillMaxSize()
@@ -944,7 +966,7 @@ fun HomeScreen(
                                             calJy--
                                         }
                                     }) {
-                                        Icon(Icons.Filled.ChevronRight, "قبل", tint = Saffron)
+                                        Icon(Icons.Filled.ChevronRight, "قبل", tint = onBgAccent)
                                     }
 
                                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -952,12 +974,12 @@ fun HomeScreen(
                                             "${FaDate.monthName(calJm)} ${calJy.fa()}",
                                             fontFamily = LalezarFont,
                                             fontSize = 20.sp,
-                                            color = PaperWhite
+                                            color = onBg
                                         )
 
                                         val infoMillis = jalaliMillis(calJy, calJm, calDay, 12)
-                                        Text("🌙 قمری: " + hijriFullFa(infoMillis), fontSize = 10.sp, color = MutedGreenText)
-                                        Text("🌍 میلادی: " + gregorianFullFa(infoMillis), fontSize = 10.sp, color = MutedGreenText)
+                                        Text("🌙 قمری: " + hijriFullFa(infoMillis), fontSize = 10.sp, color = onBgMuted)
+                                        Text("🌍 میلادی: " + gregorianFullFa(infoMillis), fontSize = 10.sp, color = onBgMuted)
                                     }
 
                                     IconButton(onClick = {
@@ -966,16 +988,16 @@ fun HomeScreen(
                                             calJy++
                                         }
                                     }) {
-                                        Icon(Icons.Filled.ChevronLeft, "بعد", tint = Saffron)
+                                        Icon(Icons.Filled.ChevronLeft, "بعد", tint = onBgAccent)
                                     }
                                 }
 
                                 Spacer(Modifier.height(6.dp))
 
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                    LegendItem(HOLIDAY_RED, "تعطیل رسمی")
-                                    LegendItem(Color(0xFF46A758), "وظیفه دور")
-                                    LegendItem(Saffron, "یادآور یادداشت")
+                                    LegendItem(HOLIDAY_RED, "تعطیل رسمی", onBgMuted)
+                                    LegendItem(Color(0xFF46A758), "وظیفه دور", onBgMuted)
+                                    LegendItem(onBgAccent, "یادآور یادداشت", onBgMuted)
                                 }
 
                                 Spacer(Modifier.height(4.dp))
@@ -986,7 +1008,7 @@ fun HomeScreen(
                                             w,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Saffron,
+                                            color = onBgAccent,
                                             modifier = Modifier.weight(1f),
                                             textAlign = TextAlign.Center
                                         )
@@ -1016,7 +1038,7 @@ fun HomeScreen(
                                                         .background(if (isSel) DeepGreenSoft else Color.Transparent)
                                                         .border(
                                                             if (isHoliday) 2.dp else if (isToday) 1.5.dp else 0.dp,
-                                                            if (isHoliday) HOLIDAY_RED else Saffron,
+                                                            if (isHoliday) HOLIDAY_RED else onBgAccent,
                                                             RoundedCornerShape(12.dp)
                                                         )
                                                         .combinedClickable(
@@ -1034,10 +1056,17 @@ fun HomeScreen(
                                                         .padding(3.dp)
                                                 ) {
                                                     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                                                        val dayTextColor = when {
+                                                            isHoliday -> HOLIDAY_RED
+                                                            isSel -> PaperWhite
+                                                            isToday -> onBgAccent
+                                                            else -> onBg
+                                                        }
+
                                                         Text(
                                                             d.fa(),
                                                             fontSize = 12.sp,
-                                                            color = if (isHoliday) HOLIDAY_RED else if (isToday) Saffron else PaperWhite,
+                                                            color = dayTextColor,
                                                             fontWeight = if (isToday || isSel || isHoliday) FontWeight.Bold else FontWeight.Normal
                                                         )
 
@@ -1067,7 +1096,11 @@ fun HomeScreen(
                                                         }
 
                                                         if (dayItems.size > 2) {
-                                                            Text("+${(dayItems.size - 2).fa()}", fontSize = 8.sp, color = MutedGreenText)
+                                                            Text(
+                                                                "+${(dayItems.size - 2).fa()}",
+                                                                fontSize = 8.sp,
+                                                                color = if (isSel) PaperWhite.copy(alpha = .7f) else onBgMuted
+                                                            )
                                                         }
                                                     }
                                                 }
@@ -1086,7 +1119,7 @@ fun HomeScreen(
                                         "📍 ${calDay.fa()} ${FaDate.monthName(calJm)}",
                                         fontFamily = LalezarFont,
                                         fontSize = 16.sp,
-                                        color = Saffron,
+                                        color = onBgAccent,
                                         modifier = Modifier.weight(1f)
                                     )
 
@@ -1113,7 +1146,7 @@ fun HomeScreen(
 
                                 val selItems = itemsByDay[Triple(calJy, calJm, calDay)].orEmpty()
                                 if (selItems.isEmpty()) {
-                                    Text("برای این روز یادآور یا وظیفه‌ای نیست 🌤️", fontSize = 12.sp, color = MutedGreenText)
+                                    Text("برای این روز یادآور یا وظیفه‌ای نیست 🌤️", fontSize = 12.sp, color = onBgMuted)
                                 }
 
                                 selItems.forEach { item ->
@@ -1562,10 +1595,7 @@ private fun HomeSwatchGrid(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         presets.chunked(5).forEach { row ->
-            Row(
-                Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { swatch ->
                     Box(
                         Modifier
@@ -1676,11 +1706,11 @@ private fun HomeSliderRow(
 }
 
 @Composable
-private fun LegendItem(color: Color, label: String) {
+private fun LegendItem(color: Color, label: String, textColor: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(10.dp).clip(RoundedCornerShape(2.dp)).background(color))
         Spacer(Modifier.width(4.dp))
-        Text(label, fontSize = 9.sp, color = MutedGreenText)
+        Text(label, fontSize = 9.sp, color = textColor)
     }
 }
 
@@ -1922,7 +1952,7 @@ private fun DueChip(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun EmptyTasksState() {
+private fun EmptyTasksState(onBg: Color, onBgMuted: Color, accent: Color) {
     Column(
         Modifier.fillMaxSize().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1932,19 +1962,19 @@ private fun EmptyTasksState() {
             Modifier
                 .size(110.dp)
                 .clip(CircleShape)
-                .border(2.dp, Saffron.copy(alpha = .5f), CircleShape),
+                .border(2.dp, accent.copy(alpha = .5f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Text("✅", fontSize = 46.sp)
         }
 
         Spacer(Modifier.height(20.dp))
-        Text("لیست وظایفت خالی است", fontFamily = LalezarFont, fontSize = 26.sp, color = PaperWhite)
+        Text("لیست وظایفت خالی است", fontFamily = LalezarFont, fontSize = 26.sp, color = onBg)
         Spacer(Modifier.height(8.dp))
         Text(
             "با دکمه «وظیفه جدید» اولین کار را اضافه کن 🎯",
             fontSize = 13.sp,
-            color = MutedGreenText,
+            color = onBgMuted,
             textAlign = TextAlign.Center
         )
     }
@@ -1980,7 +2010,10 @@ private fun HomeHeader(
     onStats: () -> Unit,
     onBackup: () -> Unit,
     onRestore: () -> Unit,
-    onThemePicker: () -> Unit
+    onThemePicker: () -> Unit,
+    onBg: Color,
+    onBgMuted: Color,
+    onBgAccent: Color
 ) {
     Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2006,7 +2039,7 @@ private fun HomeHeader(
                     text = "چراغ راه",
                     fontFamily = LalezarFont,
                     fontSize = 26.sp,
-                    color = PaperWhite,
+                    color = onBg,
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis
@@ -2021,15 +2054,15 @@ private fun HomeHeader(
                 }
 
                 IconButton(onClick = onBackup, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Filled.FileUpload, "پشتیبان", tint = MutedGreenText, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Filled.FileUpload, "پشتیبان", tint = onBgMuted, modifier = Modifier.size(20.dp))
                 }
 
                 IconButton(onClick = onRestore, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Filled.FileDownload, "بازیابی", tint = MutedGreenText, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Filled.FileDownload, "بازیابی", tint = onBgMuted, modifier = Modifier.size(20.dp))
                 }
 
                 IconButton(onClick = onStats, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Filled.BarChart, "آمار", tint = MutedGreenText, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Filled.BarChart, "آمار", tint = onBgMuted, modifier = Modifier.size(20.dp))
                 }
             }
         }
@@ -2038,7 +2071,7 @@ private fun HomeHeader(
         Text(
             FaDate.full(System.currentTimeMillis()),
             fontSize = 13.sp,
-            color = MutedGreenText,
+            color = onBgMuted,
             modifier = Modifier.padding(start = 2.dp)
         )
     }
@@ -2052,7 +2085,8 @@ private fun StatsDialog(notes: List<Note>, attachTotal: Int, onDismiss: () -> Un
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("📊 آمار دفترچه", fontFamily = LalezarFont, fontSize = 20.sp) },
+        containerColor = Color(0xFF151A20),
+        title = { Text("📊 آمار دفترچه", fontFamily = LalezarFont, fontSize = 20.sp, color = Color(0xFFFFB74D)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 StatRow("کل یادداشت‌ها", notes.size.fa())
@@ -2065,7 +2099,7 @@ private fun StatsDialog(notes: List<Note>, attachTotal: Int, onDismiss: () -> Un
             }
         },
         confirmButton = {
-            TextButton(onDismiss) { Text("بستن", color = Saffron, fontWeight = FontWeight.Bold) }
+            TextButton(onDismiss) { Text("بستن", color = Color(0xFFFFB74D), fontWeight = FontWeight.Bold) }
         }
     )
 }
@@ -2073,8 +2107,8 @@ private fun StatsDialog(notes: List<Note>, attachTotal: Int, onDismiss: () -> Un
 @Composable
 private fun StatRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, fontSize = 13.sp, color = MutedGreenText, modifier = Modifier.weight(1f))
-        Text(value, fontFamily = LalezarFont, fontSize = 18.sp, color = Saffron)
+        Text(label, fontSize = 13.sp, color = Color(0xFFBFC9C3), modifier = Modifier.weight(1f))
+        Text(value, fontFamily = LalezarFont, fontSize = 18.sp, color = Color(0xFFFFB74D))
     }
 }
 
@@ -2219,12 +2253,12 @@ private fun NoteCard(
 }
 
 @Composable
-private fun SectionLabel(text: String) {
+private fun SectionLabel(text: String, color: Color) {
     Text(
         text,
         fontFamily = LalezarFont,
         fontSize = 16.sp,
-        color = Saffron,
+        color = color,
         modifier = Modifier.padding(start = 6.dp, top = 8.dp, bottom = 2.dp)
     )
 }
@@ -2243,7 +2277,7 @@ private fun NewNoteFab(onNewNote: () -> Unit) {
 }
 
 @Composable
-private fun EmptyState() {
+private fun EmptyState(onBg: Color, onBgMuted: Color, accent: Color) {
     Column(
         Modifier.fillMaxSize().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -2253,28 +2287,28 @@ private fun EmptyState() {
             Modifier
                 .size(110.dp)
                 .clip(CircleShape)
-                .border(2.dp, Saffron.copy(alpha = .5f), CircleShape),
+                .border(2.dp, accent.copy(alpha = .5f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Text("✍️", fontSize = 46.sp)
         }
 
         Spacer(Modifier.height(20.dp))
-        Text("دفترچه‌ات خالی است", fontFamily = LalezarFont, fontSize = 26.sp, color = PaperWhite)
+        Text("دفترچه‌ات خالی است", fontFamily = LalezarFont, fontSize = 26.sp, color = onBg)
         Spacer(Modifier.height(8.dp))
         Text(
             "یادداشت بنویس، صدا ضبط کن، نقاشی بکش، چک‌لیست بساز و رویشان قفل بگذار ✨",
             fontSize = 13.sp,
-            color = MutedGreenText,
+            color = onBgMuted,
             textAlign = TextAlign.Center
         )
     }
 }
 
 @Composable
-private fun CenterMessage(text: String) {
+private fun CenterMessage(text: String, color: Color) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text, fontSize = 15.sp, color = MutedGreenText)
+        Text(text, fontSize = 15.sp, color = color)
     }
 }
 
