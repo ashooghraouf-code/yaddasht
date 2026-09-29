@@ -77,7 +77,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Stroke
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
@@ -108,7 +108,6 @@ import ir.yaddasht.app.ui.theme.PaperWhite
 import ir.yaddasht.app.ui.theme.Saffron
 import ir.yaddasht.app.ui.theme.VazirFont
 import ir.yaddasht.app.ui.theme.paperColor
-import ir.yaddasht.app.util.AppThemePreferences
 import ir.yaddasht.app.util.Checklist
 import ir.yaddasht.app.util.FaDate
 import ir.yaddasht.app.util.FullBackup
@@ -131,6 +130,10 @@ private val HOLIDAY_RED = Color(0xFFE5484D)
 private val WEEK_FA = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
 private const val DAY_MS = 86_400_000L
 
+private const val HOME_THEME_PREFS = "home_theme_prefs"
+private const val HOME_THEME_KEY = "home_theme_config"
+private const val HOME_DEFAULT_PRIMARY = 0xFF0F3D2E.toInt()
+
 private enum class HomeThemeKind {
     Solid,
     Gradient,
@@ -152,7 +155,7 @@ private enum class HomePatternKind {
 
 private data class HomeThemeConfig(
     val kind: HomeThemeKind = HomeThemeKind.Solid,
-    val primary: Int = 0xFF0F3D2E.toInt(),
+    val primary: Int = HOME_DEFAULT_PRIMARY,
     val secondary: Int? = null,
     val pattern: HomePatternKind = HomePatternKind.None,
     val textureAlpha: Float = 0.10f,
@@ -219,13 +222,13 @@ private val HomeSolidPresets: List<HomeSwatch> = listOf(
 private val HomeGradientPresets: List<HomeGradient> = listOf(
     HomeGradient("سپیده‌دم", "🌅", 0xFF0F2027.toInt(), 0xFF2C5364.toInt()),
     HomeGradient("جنگل مه‌آلود", "🌫️", 0xFF134E5E.toInt(), 0xFF0F2027.toInt()),
-    HomeGradient("شب تار پریسا", "🌑", 0xFF090909.toInt(), 0xFF1F1F1F.toInt()),
+    HomeGradient("شب تار", "🌑", 0xFF090909.toInt(), 0xFF1F1F1F.toInt()),
     HomeGradient("باغ سبز", "🌿", 0xFF0F3D2E.toInt(), 0xFF1B5E20.toInt()),
-    HomeGradient("آسمان نیلی محمد حسین", "🔵", 0xFF1A237E.toInt(), 0xFF0D47A1.toInt()),
+    HomeGradient("آسمان نیلی", "🔵", 0xFF1A237E.toInt(), 0xFF0D47A1.toInt()),
     HomeGradient("غروب کویر", "🏜️", 0xFF8D6E63.toInt(), 0xFFBF360C.toInt()),
     HomeGradient("زعفران", "🌼", 0xFFFFB74D.toInt(), 0xFFE65100.toInt()),
-    HomeGradient("یاقوت یاسمین زهرا", "❤️‍🔥", 0xFF880E4F.toInt(), 0xFF4A148C.toInt()),
-    HomeGradient("فیروزه فاطمه حسنا", "🧿", 0xFF00838F.toInt(), 0xFF006064.toInt()),
+    HomeGradient("یاقوت", "❤️‍🔥", 0xFF880E4F.toInt(), 0xFF4A148C.toInt()),
+    HomeGradient("فیروزه", "🧿", 0xFF00838F.toInt(), 0xFF006064.toInt()),
     HomeGradient("کاغذ و چای", "🍵", 0xFFFFF8E1.toInt(), 0xFFE0D3B8.toInt())
 )
 
@@ -242,76 +245,62 @@ private val HomePatternLabels: List<Pair<HomePatternKind, String>> = listOf(
     HomePatternKind.Diamonds to "الماس"
 )
 
-private object HomeThemePrefs {
-    private const val PREFS = "home_theme_prefs"
-    private const val KEY = "home_theme_config"
+private fun homeThemePrefs(context: Context) =
+    context.getSharedPreferences(HOME_THEME_PREFS, Context.MODE_PRIVATE)
 
-    private fun prefs(context: Context) =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+fun homeThemePrimary(context: Context): Int =
+    homeThemeGet(context).primary
 
-    fun get(context: Context): HomeThemeConfig {
-        val stored = prefs(context).getString(KEY, null)
-        if (!stored.isNullOrBlank()) {
-            decode(stored)?.let { return it }
-        }
+private fun homeThemeGet(context: Context): HomeThemeConfig {
+    val stored = homeThemePrefs(context).getString(HOME_THEME_KEY, null)
+    if (!stored.isNullOrBlank()) {
+        homeThemeDecode(stored)?.let { return it }
+    }
+    return HomeThemeConfig(
+        kind = HomeThemeKind.Solid,
+        primary = HOME_DEFAULT_PRIMARY
+    )
+}
 
-        val old = try {
-            AppThemePreferences.getBgColor(context)
-        } catch (_: Exception) {
-            0xFF0F3D2E.toInt()
-        }
+private fun homeThemeSet(context: Context, config: HomeThemeConfig) {
+    homeThemePrefs(context).edit()
+        .putString(HOME_THEME_KEY, homeThemeEncode(config))
+        .apply()
+}
 
-        return HomeThemeConfig(
-            kind = HomeThemeKind.Solid,
-            primary = old
-        )
+private fun homeThemeEncode(config: HomeThemeConfig): String =
+    buildString {
+        append(config.kind.name).append('|')
+        append(config.primary).append('|')
+        append(config.secondary?.toString() ?: "n").append('|')
+        append(config.pattern.name).append('|')
+        append(config.textureAlpha).append('|')
+        append(config.dim)
     }
 
-    fun set(context: Context, config: HomeThemeConfig) {
-        prefs(context).edit()
-            .putString(KEY, encode(config))
-            .apply()
+private fun homeThemeDecode(raw: String): HomeThemeConfig? {
+    val parts = raw.split("|")
+    if (parts.size < 6) return null
 
-        try {
-            AppThemePreferences.setBgColor(context, config.primary)
-        } catch (_: Exception) {
-        }
-    }
+    val kind = runCatching { HomeThemeKind.valueOf(parts[0]) }
+        .getOrDefault(HomeThemeKind.Solid)
 
-    private fun encode(config: HomeThemeConfig): String =
-        buildString {
-            append(config.kind.name).append('|')
-            append(config.primary).append('|')
-            append(config.secondary?.toString() ?: "n").append('|')
-            append(config.pattern.name).append('|')
-            append(config.textureAlpha).append('|')
-            append(config.dim)
-        }
+    val pattern = runCatching { HomePatternKind.valueOf(parts[3]) }
+        .getOrDefault(HomePatternKind.None)
 
-    private fun decode(raw: String): HomeThemeConfig? {
-        val parts = raw.split("|")
-        if (parts.size < 6) return null
+    val primary = parts[1].toIntOrNull() ?: HOME_DEFAULT_PRIMARY
+    val secondary = if (parts[2] == "n") null else parts[2].toIntOrNull()
+    val textureAlpha = parts[4].toFloatOrNull() ?: 0.10f
+    val dim = parts[5].toFloatOrNull() ?: 0f
 
-        val kind = runCatching { HomeThemeKind.valueOf(parts[0]) }
-            .getOrDefault(HomeThemeKind.Solid)
-
-        val pattern = runCatching { HomePatternKind.valueOf(parts[3]) }
-            .getOrDefault(HomePatternKind.None)
-
-        val primary = parts[1].toIntOrNull() ?: 0xFF0F3D2E.toInt()
-        val secondary = if (parts[2] == "n") null else parts[2].toIntOrNull()
-        val textureAlpha = parts[4].toFloatOrNull() ?: 0.10f
-        val dim = parts[5].toFloatOrNull() ?: 0f
-
-        return HomeThemeConfig(
-            kind = kind,
-            primary = primary,
-            secondary = secondary,
-            pattern = pattern,
-            textureAlpha = textureAlpha,
-            dim = dim
-        )
-    }
+    return HomeThemeConfig(
+        kind = kind,
+        primary = primary,
+        secondary = secondary,
+        pattern = pattern,
+        textureAlpha = textureAlpha,
+        dim = dim
+    )
 }
 
 private fun Color.luminance(): Float {
@@ -620,7 +609,7 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var homeTheme by remember { mutableStateOf(HomeThemePrefs.get(context)) }
+    var homeTheme by remember { mutableStateOf(homeThemeGet(context)) }
 
     val notes by dao.observeNotes().collectAsState(initial = emptyList())
     val counts by dao.observeAttachmentCounts().collectAsState(initial = emptyList())
@@ -1261,7 +1250,7 @@ fun HomeScreen(
             onDismiss = { showThemePicker = false },
             onApply = { newConfig ->
                 homeTheme = newConfig
-                HomeThemePrefs.set(context, newConfig)
+                homeThemeSet(context, newConfig)
                 onThemeChanged()
                 showThemePicker = false
             }
@@ -1309,8 +1298,7 @@ private fun HomeThemeStudioDialog(
                 HomeStyleChips(
                     selected = draft.kind,
                     gold = gold,
-                    text = text,
-                    muted = muted
+                    text = text
                 ) { kind ->
                     draft = when (kind) {
                         HomeThemeKind.Solid -> draft.copy(
@@ -1353,8 +1341,7 @@ private fun HomeThemeStudioDialog(
                     HomePatternChips(
                         selected = draft.pattern,
                         gold = gold,
-                        text = text,
-                        muted = muted
+                        text = text
                     ) { pattern ->
                         draft = draft.copy(pattern = pattern)
                     }
@@ -1490,7 +1477,6 @@ private fun HomeStyleChips(
     selected: HomeThemeKind,
     gold: Color,
     text: Color,
-    muted: Color,
     onSelect: (HomeThemeKind) -> Unit
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1506,7 +1492,6 @@ private fun HomeStyleChips(
                 selected = selected == kind,
                 gold = gold,
                 text = text,
-                muted = muted,
                 onClick = { onSelect(kind) }
             )
         }
@@ -1518,7 +1503,6 @@ private fun HomePatternChips(
     selected: HomePatternKind,
     gold: Color,
     text: Color,
-    muted: Color,
     onSelect: (HomePatternKind) -> Unit
 ) {
     Row(
@@ -1533,7 +1517,6 @@ private fun HomePatternChips(
                 selected = selected == kind,
                 gold = gold,
                 text = text,
-                muted = muted,
                 onClick = { onSelect(kind) }
             )
         }
@@ -1546,7 +1529,6 @@ private fun HomeChip(
     selected: Boolean,
     gold: Color,
     text: Color,
-    muted: Color,
     onClick: () -> Unit
 ) {
     Box(
@@ -1657,6 +1639,7 @@ private fun HomeGradientStrip(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeSliderRow(
     label: String,
@@ -1999,8 +1982,6 @@ private fun HomeHeader(
     onRestore: () -> Unit,
     onThemePicker: () -> Unit
 ) {
-    val context = LocalContext.current
-
     Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -2037,16 +2018,6 @@ private fun HomeHeader(
             Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
                 IconButton(onClick = onThemePicker, modifier = Modifier.size(36.dp)) {
                     Text("🎨", fontSize = 18.sp)
-                }
-
-                IconButton(
-                    onClick = {
-                        val intent = android.content.Intent(context, FilePickerActivity::class.java)
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Text("📚", fontSize = 18.sp)
                 }
 
                 IconButton(onClick = onBackup, modifier = Modifier.size(36.dp)) {
