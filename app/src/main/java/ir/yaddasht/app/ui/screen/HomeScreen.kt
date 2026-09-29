@@ -1,9 +1,10 @@
 package ir.yaddasht.app.ui.screen
 
-import android.content.Intent
+import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -44,11 +45,13 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -70,7 +73,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
@@ -89,7 +96,6 @@ import ir.yaddasht.app.data.Task
 import ir.yaddasht.app.data.TaskDao
 import ir.yaddasht.app.reminder.LeadTime
 import ir.yaddasht.app.reminder.ReminderScheduler
-import ir.yaddasht.app.tools.ToolboxActivity
 import ir.yaddasht.app.ui.theme.Brick
 import ir.yaddasht.app.ui.theme.DeepGreen
 import ir.yaddasht.app.ui.theme.DeepGreenSoft
@@ -117,172 +123,489 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Calendar
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.sin
 
 private val HOLIDAY_RED = Color(0xFFE5484D)
 private val WEEK_FA = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
 private const val DAY_MS = 86_400_000L
 
-private fun jalaliMillis(jy: Int, jm: Int, jd: Int, hour: Int = 12): Long {
-    var est = 1617220800000L + (jy - 1400).toLong() * 365L * DAY_MS + (jm - 1).toLong() * 30L * DAY_MS + (jd - 1).toLong() * DAY_MS
-    for (i in 0 until 700) {
-        val (y, m, d) = FaDate.jalali(est)
-        if (y == jy && m == jm && d == jd) {
-            val c = Calendar.getInstance()
-            c.timeInMillis = est
-            c.set(Calendar.HOUR_OF_DAY, hour)
-            c.set(Calendar.MINUTE, 0)
-            c.set(Calendar.SECOND, 0)
-            c.set(Calendar.MILLISECOND, 0)
-            return c.timeInMillis
+private enum class HomeThemeKind {
+    Solid,
+    Gradient,
+    Pattern
+}
+
+private enum class HomePatternKind {
+    None,
+    Dots,
+    Lines,
+    Grid,
+    Diagonal,
+    Linen,
+    Waves,
+    Stars,
+    Bokeh,
+    Diamonds
+}
+
+private data class HomeThemeConfig(
+    val kind: HomeThemeKind = HomeThemeKind.Solid,
+    val primary: Int = 0xFF0F3D2E.toInt(),
+    val secondary: Int? = null,
+    val pattern: HomePatternKind = HomePatternKind.None,
+    val textureAlpha: Float = 0.10f,
+    val dim: Float = 0f
+)
+
+private data class HomeSwatch(
+    val name: String,
+    val emoji: String,
+    val color: Int
+)
+
+private data class HomeGradient(
+    val name: String,
+    val emoji: String,
+    val from: Int,
+    val to: Int
+)
+
+private val HomeSolidPresets: List<HomeSwatch> = listOf(
+    HomeSwatch("کاغذ کرم", "📜", 0xFFFFF8E1.toInt()),
+    HomeSwatch("سپیا", "🧻", 0xFFF4ECD8.toInt()),
+    HomeSwatch("چای نبات", "🍵", 0xFFE8DCC4.toInt()),
+    HomeSwatch("ابریشم", "🤍", 0xFFFFFBF0.toInt()),
+    HomeSwatch("کاغذ پوستی", "📃", 0xFFEFE6D3.toInt()),
+    HomeSwatch("مومیایی", "🏺", 0xFFE0D3B8.toInt()),
+
+    HomeSwatch("شب", "🌙", 0xFF121212.toInt()),
+    HomeSwatch("نفتی", "🛢️", 0xFF0E1116.toInt()),
+    HomeSwatch("جنگلان", "🌲", 0xFF102018.toInt()),
+    HomeSwatch("زغالی", "🪨", 0xFF1A1A1A.toInt()),
+    HomeSwatch("نیمه‌شب", "🌌", 0xFF0B1026.toInt()),
+    HomeSwatch("دود", "🌫️", 0xFF20232A.toInt()),
+
+    HomeSwatch("سبز چراغ", "🏮", 0xFF0F3D2E.toInt()),
+    HomeSwatch("باغ", "🌿", 0xFF1B5E20.toInt()),
+    HomeSwatch("زیتون", "🫒", 0xFF33691E.toInt()),
+    HomeSwatch("کاج", "🌲", 0xFF0B3D2C.toInt()),
+    HomeSwatch("یشم", "💎", 0xFF2E7D52.toInt()),
+    HomeSwatch("جنگل بارانی", "🌧️", 0xFF143D2B.toInt()),
+
+    HomeSwatch("آسمان", "☁️", 0xFFE3F2FD.toInt()),
+    HomeSwatch("دریا", "🌊", 0xFF01579B.toInt()),
+    HomeSwatch("فیروزه", "🧿", 0xFF00838F.toInt()),
+    HomeSwatch("نیلی", "🔵", 0xFF1A237E.toInt()),
+    HomeSwatch("اقیانوس", "🐋", 0xFF023E5C.toInt()),
+    HomeSwatch("مه", "🌫️", 0xFFCFD8DC.toInt()),
+
+    HomeSwatch("آفتاب", "☀️", 0xFFFFF3E0.toInt()),
+    HomeSwatch("نارنج", "🍊", 0xFFE65100.toInt()),
+    HomeSwatch("گل‌گون", "🌸", 0xFFF8BBD0.toInt()),
+    HomeSwatch("عنابی", "🍇", 0xFF880E4F.toInt()),
+    HomeSwatch("زعفران", "🌼", 0xFFFFB74D.toInt()),
+    HomeSwatch("آجر", "🧱", 0xFFB71C1C.toInt()),
+
+    HomeSwatch("فیروزه ایرانی", "🕌", 0xFF00A6A6.toInt()),
+    HomeSwatch("لاجورد", "🔷", 0xFF283593.toInt()),
+    HomeSwatch("زرشک", "🍒", 0xFF8E1B3A.toInt()),
+    HomeSwatch("کویر", "🏜️", 0xFF8D6E63.toInt()),
+    HomeSwatch("مس", "🥉", 0xFFB87333.toInt()),
+    HomeSwatch("زیتون ایرانی", "🌿", 0xFF6B8E23.toInt())
+)
+
+private val HomeGradientPresets: List<HomeGradient> = listOf(
+    HomeGradient("سپیده‌دم", "🌅", 0xFF0F2027.toInt(), 0xFF2C5364.toInt()),
+    HomeGradient("جنگل مه‌آلود", "🌫️", 0xFF134E5E.toInt(), 0xFF0F2027.toInt()),
+    HomeGradient("شب تار پریسا", "🌑", 0xFF090909.toInt(), 0xFF1F1F1F.toInt()),
+    HomeGradient("باغ سبز", "🌿", 0xFF0F3D2E.toInt(), 0xFF1B5E20.toInt()),
+    HomeGradient("آسمان نیلی محمد حسین", "🔵", 0xFF1A237E.toInt(), 0xFF0D47A1.toInt()),
+    HomeGradient("غروب کویر", "🏜️", 0xFF8D6E63.toInt(), 0xFFBF360C.toInt()),
+    HomeGradient("زعفران", "🌼", 0xFFFFB74D.toInt(), 0xFFE65100.toInt()),
+    HomeGradient("یاقوت یاسمین زهرا", "❤️‍🔥", 0xFF880E4F.toInt(), 0xFF4A148C.toInt()),
+    HomeGradient("فیروزه فاطمه حسنا", "🧿", 0xFF00838F.toInt(), 0xFF006064.toInt()),
+    HomeGradient("کاغذ و چای", "🍵", 0xFFFFF8E1.toInt(), 0xFFE0D3B8.toInt())
+)
+
+private val HomePatternLabels: List<Pair<HomePatternKind, String>> = listOf(
+    HomePatternKind.None to "بدون طرح",
+    HomePatternKind.Dots to "نقاط",
+    HomePatternKind.Lines to "خط‌دار",
+    HomePatternKind.Grid to "شطرنجی",
+    HomePatternKind.Diagonal to "مورب",
+    HomePatternKind.Linen to "کتان",
+    HomePatternKind.Waves to "موج",
+    HomePatternKind.Stars to "ستاره",
+    HomePatternKind.Bokeh to "بوکه",
+    HomePatternKind.Diamonds to "الماس"
+)
+
+private object HomeThemePrefs {
+    private const val PREFS = "home_theme_prefs"
+    private const val KEY = "home_theme_config"
+
+    private fun prefs(context: Context) =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    fun get(context: Context): HomeThemeConfig {
+        val stored = prefs(context).getString(KEY, null)
+        if (!stored.isNullOrBlank()) {
+            decode(stored)?.let { return it }
         }
-        val dir = when {
-            y < jy -> 1
-            y > jy -> -1
-            m < jm -> 1
-            m > jm -> -1
-            d < jd -> 1
-            else -> -1
+
+        val old = try {
+            AppThemePreferences.getBgColor(context)
+        } catch (_: Exception) {
+            0xFF0F3D2E.toInt()
         }
-        est += dir * DAY_MS
-    }
-    return est
-}
 
-private fun leadingBlanks(jy: Int, jm: Int): Int {
-    val c = Calendar.getInstance()
-    c.timeInMillis = jalaliMillis(jy, jm, 1, 12)
-    return when (c.get(Calendar.DAY_OF_WEEK)) {
-        Calendar.SATURDAY -> 0
-        Calendar.SUNDAY -> 1
-        Calendar.MONDAY -> 2
-        Calendar.TUESDAY -> 3
-        Calendar.WEDNESDAY -> 4
-        Calendar.THURSDAY -> 5
-        else -> 6
-    }
-}
-
-private fun monthLen(jy: Int, jm: Int): Int {
-    val (ny, nm) = if (jm == 12) jy + 1 to 1 else jy to jm + 1
-    return ((jalaliMillis(ny, nm, 1, 12) - jalaliMillis(jy, jm, 1, 12)) / DAY_MS).toInt()
-}
-
-private fun iranHijri(millis: Long): Triple<Int, Int, Int> {
-    val cal = android.icu.util.IslamicCalendar()
-    cal.timeInMillis = millis + DAY_MS
-    return Triple(
-        cal.get(android.icu.util.Calendar.MONTH) + 1,
-        cal.get(android.icu.util.Calendar.DAY_OF_MONTH),
-        cal.get(android.icu.util.Calendar.YEAR)
-    )
-}
-
-private fun weekdayFa(millis: Long): String {
-    val c = Calendar.getInstance()
-    c.timeInMillis = millis
-    return when (c.get(Calendar.DAY_OF_WEEK)) {
-        Calendar.SATURDAY -> "شنبه"
-        Calendar.SUNDAY -> "یکشنبه"
-        Calendar.MONDAY -> "دوشنبه"
-        Calendar.TUESDAY -> "سه‌شنبه"
-        Calendar.WEDNESDAY -> "چهارشنبه"
-        Calendar.THURSDAY -> "پنجشنبه"
-        else -> "جمعه"
-    }
-}
-
-private fun taskTint(due: Long, completed: Boolean): Color {
-    if (completed) return Color(0xFF5E8077)
-    if (due <= 0L) return Color(0xFF888888)
-
-    val days = (due - System.currentTimeMillis()).toFloat() / DAY_MS
-    val t = days.coerceIn(0f, 7f) / 7f
-
-    val red = Color(0xFFE5484D)
-    val amber = Color(0xFFF5A524)
-    val green = Color(0xFF46A758)
-
-    return if (t < .5f) lerp(red, amber, t / .5f) else lerp(amber, green, (t - .5f) / .5f)
-}
-
-private fun gregorianFullFa(millis: Long): String {
-    val c = Calendar.getInstance()
-    c.timeInMillis = millis
-
-    val d = c.get(Calendar.DAY_OF_MONTH)
-    val m = c.get(Calendar.MONTH) + 1
-    val y = c.get(Calendar.YEAR)
-
-    val names = arrayOf(
-        "ژانویه", "فوریه", "مارس", "آوریل", "مه", "ژوئن",
-        "ژوئیه", "اوت", "سپتامبر", "اکتبر", "نوامبر", "دسامبر"
-    )
-
-    return "${weekdayFa(millis)}، ${d.fa()} ${names.getOrElse(m - 1) { " " }} ${y.fa()}"
-}
-
-private fun hijriFullFa(millis: Long): String {
-    val (m, d, y) = iranHijri(millis)
-    val names = arrayOf(
-        "محرم", "صفر", "ربیع‌الاول", "ربیع‌الثانی", "جمادی‌الاول", "جمادی‌الثانی",
-        "رجب", "شعبان", "رمضان", "شوال", "ذی‌القعده", "ذی‌الحجه"
-    )
-    return "${d.fa()} ${names.getOrElse(m - 1) { " " }} ${y.fa()}"
-}
-
-private fun fullDateTime(millis: Long): String {
-    val (jy, jm, jd) = FaDate.jalali(millis)
-    val c = Calendar.getInstance()
-    c.timeInMillis = millis
-
-    val h = c.get(Calendar.HOUR_OF_DAY).toString().padStart(2, '0').faDigits()
-    val m = c.get(Calendar.MINUTE).toString().padStart(2, '0').faDigits()
-
-    return "${weekdayFa(millis)}، ${jd.fa()} ${FaDate.monthName(jm)} ${jy.fa()}، ساعت $h:$m"
-}
-
-private fun isIranHoliday(jy: Int, jm: Int, jd: Int): Boolean {
-    val millis = jalaliMillis(jy, jm, jd, 12)
-    val c = Calendar.getInstance()
-    c.timeInMillis = millis
-
-    if (c.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY) return true
-
-    when {
-        jm == 1 && jd in 1..4 -> return true
-        jm == 1 && jd == 12 -> return true
-        jm == 1 && jd == 13 -> return true
-        jm == 3 && jd == 14 -> return true
-        jm == 3 && jd == 15 -> return true
-        jm == 11 && jd == 22 -> return true
+        return HomeThemeConfig(
+            kind = HomeThemeKind.Solid,
+            primary = old
+        )
     }
 
-    val (hm, hd) = iranHijri(millis)
-    if (hm == 2 && hd == 29 && iranHijri(millis + DAY_MS).first == 3) return true
+    fun set(context: Context, config: HomeThemeConfig) {
+        prefs(context).edit()
+            .putString(KEY, encode(config))
+            .apply()
 
-    return when {
-        hm == 1 && hd == 10 -> true
-        hm == 2 && hd == 20 -> true
-        hm == 2 && hd == 28 -> true
-        hm == 2 && hd == 30 -> true
-        hm == 3 && hd == 17 -> true
-        hm == 7 && hd == 13 -> true
-        hm == 7 && hd == 27 -> true
-        hm == 8 && hd == 15 -> true
-        hm == 9 && hd == 21 -> true
-        hm == 10 && hd == 1 -> true
-        hm == 10 && hd == 10 -> true
-        hm == 12 && hd == 18 -> true
-        else -> false
+        try {
+            AppThemePreferences.setBgColor(context, config.primary)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun encode(config: HomeThemeConfig): String =
+        buildString {
+            append(config.kind.name).append('|')
+            append(config.primary).append('|')
+            append(config.secondary?.toString() ?: "n").append('|')
+            append(config.pattern.name).append('|')
+            append(config.textureAlpha).append('|')
+            append(config.dim)
+        }
+
+    private fun decode(raw: String): HomeThemeConfig? {
+        val parts = raw.split("|")
+        if (parts.size < 6) return null
+
+        val kind = runCatching { HomeThemeKind.valueOf(parts[0]) }
+            .getOrDefault(HomeThemeKind.Solid)
+
+        val pattern = runCatching { HomePatternKind.valueOf(parts[3]) }
+            .getOrDefault(HomePatternKind.None)
+
+        val primary = parts[1].toIntOrNull() ?: 0xFF0F3D2E.toInt()
+        val secondary = if (parts[2] == "n") null else parts[2].toIntOrNull()
+        val textureAlpha = parts[4].toFloatOrNull() ?: 0.10f
+        val dim = parts[5].toFloatOrNull() ?: 0f
+
+        return HomeThemeConfig(
+            kind = kind,
+            primary = primary,
+            secondary = secondary,
+            pattern = pattern,
+            textureAlpha = textureAlpha,
+            dim = dim
+        )
     }
 }
 
-private fun computeHolidayDays(jy: Int, jm: Int): Set<Int> {
-    val set = mutableSetOf<Int>()
-    for (d in 1..monthLen(jy, jm)) {
-        if (isIranHoliday(jy, jm, d)) set.add(d)
+private fun Color.luminance(): Float {
+    val r = red.coerceIn(0f, 1f)
+    val g = green.coerceIn(0f, 1f)
+    val b = blue.coerceIn(0f, 1f)
+    return 0.2126f * r + 0.7152f * g + 0.0722f * b
+}
+
+private fun autoAccent(base: Color): Color {
+    return if (base.luminance() > 0.55f) {
+        Color(0xFF1A1A1A)
+    } else {
+        Color(0xFFFFFFFF)
     }
-    return set
+}
+
+private fun homePatternLabel(kind: HomePatternKind): String {
+    return HomePatternLabels.firstOrNull { it.first == kind }?.second ?: kind.name
+}
+
+@Composable
+private fun HomeBackground(
+    config: HomeThemeConfig,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier) {
+        when (config.kind) {
+            HomeThemeKind.Solid -> {
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .background(Color(config.primary))
+                )
+            }
+
+            HomeThemeKind.Gradient -> {
+                val c1 = Color(config.primary)
+                val c2 = Color(config.secondary ?: config.primary)
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .background(Brush.linearGradient(listOf(c1, c2)))
+                )
+            }
+
+            HomeThemeKind.Pattern -> {
+                if (config.pattern == HomePatternKind.None) {
+                    Box(
+                        Modifier
+                            .matchParentSize()
+                            .background(Color(config.primary))
+                    )
+                } else {
+                    HomePatternCanvas(
+                        base = Color(config.primary),
+                        accent = Color(config.secondary ?: autoAccent(Color(config.primary))),
+                        alpha = config.textureAlpha,
+                        kind = config.pattern,
+                        modifier = Modifier.matchParentSize()
+                    )
+                }
+            }
+        }
+
+        if (config.dim > 0f) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(Color.Black.copy(alpha = config.dim.coerceIn(0f, 0.85f)))
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomePatternCanvas(
+    base: Color,
+    accent: Color,
+    alpha: Float,
+    kind: HomePatternKind,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier) {
+        drawRect(base)
+
+        val a = alpha.coerceIn(0.02f, 0.35f)
+        val col = accent.copy(alpha = a)
+
+        when (kind) {
+            HomePatternKind.None -> Unit
+
+            HomePatternKind.Dots -> {
+                val step = 28.dp.toPx()
+                val radius = 1.1.dp.toPx()
+                var y = step / 2f
+                var row = 0
+
+                while (y < size.height) {
+                    var x = if (row % 2 == 0) step / 2f else step
+
+                    while (x < size.width) {
+                        drawCircle(
+                            color = col,
+                            radius = radius,
+                            center = Offset(x, y)
+                        )
+                        x += step
+                    }
+
+                    y += step
+                    row++
+                }
+            }
+
+            HomePatternKind.Lines -> {
+                val spacing = 30.dp.toPx()
+                var y = spacing
+
+                while (y < size.height) {
+                    drawLine(
+                        color = col,
+                        start = Offset(0f, y),
+                        end = Offset(size.width, y),
+                        strokeWidth = 1f
+                    )
+                    y += spacing
+                }
+            }
+
+            HomePatternKind.Grid -> {
+                val cell = 34.dp.toPx()
+
+                var x = cell
+                while (x < size.width) {
+                    drawLine(
+                        color = col,
+                        start = Offset(x, 0f),
+                        end = Offset(x, size.height),
+                        strokeWidth = 1f
+                    )
+                    x += cell
+                }
+
+                var y = cell
+                while (y < size.height) {
+                    drawLine(
+                        color = col,
+                        start = Offset(0f, y),
+                        end = Offset(size.width, y),
+                        strokeWidth = 1f
+                    )
+                    y += cell
+                }
+            }
+
+            HomePatternKind.Diagonal -> {
+                val spacing = 22.dp.toPx()
+                var x = -size.height
+
+                while (x < size.width) {
+                    drawLine(
+                        color = col,
+                        start = Offset(x, 0f),
+                        end = Offset(x + size.height, size.height),
+                        strokeWidth = 1f
+                    )
+                    x += spacing
+                }
+            }
+
+            HomePatternKind.Linen -> {
+                val spacing = 9.dp.toPx()
+                val thin = col.copy(alpha = col.alpha * 0.55f)
+
+                var x = 0f
+                while (x < size.width) {
+                    drawLine(
+                        color = thin,
+                        start = Offset(x, 0f),
+                        end = Offset(x, size.height),
+                        strokeWidth = 1f
+                    )
+                    x += spacing
+                }
+
+                var y = 0f
+                while (y < size.height) {
+                    drawLine(
+                        color = thin,
+                        start = Offset(0f, y),
+                        end = Offset(size.width, y),
+                        strokeWidth = 1f
+                    )
+                    y += spacing
+                }
+            }
+
+            HomePatternKind.Waves -> {
+                val amplitude = 14.dp.toPx()
+                val wavelength = 150.dp.toPx()
+                val stepY = 38.dp.toPx()
+
+                var y = stepY
+                while (y < size.height + amplitude) {
+                    val path = Path()
+                    path.moveTo(0f, y)
+
+                    var x = 0f
+                    while (x <= size.width) {
+                        val yy = y + sin((x / wavelength) * 2f * PI.toFloat()) * amplitude
+                        path.lineTo(x, yy)
+                        x += 8f
+                    }
+
+                    drawPath(
+                        path = path,
+                        color = col,
+                        style = Stroke(width = 1.4f)
+                    )
+
+                    y += stepY
+                }
+            }
+
+            HomePatternKind.Stars -> {
+                val count = 110
+                val baseR = 1.2.dp.toPx()
+
+                for (i in 0 until count) {
+                    val fx = homeHash01(i, 1)
+                    val fy = homeHash01(i, 2)
+
+                    val x = fx * size.width
+                    val y = fy * size.height
+                    val r = if (i % 9 == 0) baseR * 1.7f else baseR
+                    val starAlpha = if (i % 5 == 0) 0.9f else 0.55f
+
+                    drawCircle(
+                        color = col.copy(alpha = col.alpha * starAlpha),
+                        radius = r,
+                        center = Offset(x, y)
+                    )
+                }
+            }
+
+            HomePatternKind.Bokeh -> {
+                val count = 18
+
+                for (i in 0 until count) {
+                    val fx = homeHash01(i, 3)
+                    val fy = homeHash01(i, 4)
+
+                    val x = fx * size.width
+                    val y = fy * size.height
+                    val r = (18f + (i % 5) * 14f).dp.toPx()
+
+                    drawCircle(
+                        color = col.copy(alpha = col.alpha * 0.22f),
+                        radius = r,
+                        center = Offset(x, y)
+                    )
+                }
+            }
+
+            HomePatternKind.Diamonds -> {
+                val spacing = 42.dp.toPx()
+                var x = -size.height
+
+                while (x < size.width) {
+                    drawLine(
+                        color = col,
+                        start = Offset(x, 0f),
+                        end = Offset(x + size.height, size.height),
+                        strokeWidth = 1f
+                    )
+
+                    drawLine(
+                        color = col,
+                        start = Offset(x + size.height, 0f),
+                        end = Offset(x, size.height),
+                        strokeWidth = 1f
+                    )
+
+                    x += spacing
+                }
+            }
+        }
+    }
+}
+
+private fun homeHash01(i: Int, salt: Int): Float {
+    val v = abs(sin(i * 12.9898f + salt * 78.233f) * 43758.5453f)
+    return v % 1f
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -297,6 +620,7 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var homeTheme by remember { mutableStateOf(HomeThemePrefs.get(context)) }
 
     val notes by dao.observeNotes().collectAsState(initial = emptyList())
     val counts by dao.observeAttachmentCounts().collectAsState(initial = emptyList())
@@ -399,7 +723,10 @@ fun HomeScreen(
         }
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            PaperDots()
+            HomeBackground(
+                config = homeTheme,
+                modifier = Modifier.fillMaxSize()
+            )
 
             Column(Modifier.fillMaxSize()) {
                 if (tab == 3) {
@@ -513,7 +840,7 @@ fun HomeScreen(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
                             shape = RoundedCornerShape(16.dp),
                             color = Saffron.copy(alpha = .14f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Saffron.copy(alpha = .4f))
+                            border = BorderStroke(1.dp, Saffron.copy(alpha = .4f))
                         ) {
                             Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text("⏳", fontSize = 22.sp)
@@ -929,43 +1256,438 @@ fun HomeScreen(
     }
 
     if (showThemePicker) {
-        AlertDialog(
-            onDismissRequest = { showThemePicker = false },
-            title = { Text("🎨 رنگ دفترچه", fontFamily = LalezarFont, fontSize = 20.sp, color = Saffron) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    AppThemePreferences.themeColors.forEach { pair ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    AppThemePreferences.setBgColor(context, pair.colorValue)
-                                    onThemeChanged()
-                                    showThemePicker = false
-                                }
-                                .padding(vertical = 4.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(Color(pair.colorValue), RoundedCornerShape(10.dp))
-                                    .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
-                            )
+        HomeThemeStudioDialog(
+            config = homeTheme,
+            onDismiss = { showThemePicker = false },
+            onApply = { newConfig ->
+                homeTheme = newConfig
+                HomeThemePrefs.set(context, newConfig)
+                onThemeChanged()
+                showThemePicker = false
+            }
+        )
+    }
+}
 
-                            Spacer(Modifier.width(12.dp))
-                            Text(pair.emoji, fontSize = 18.sp)
-                            Spacer(Modifier.width(8.dp))
-                            Text(pair.name, color = PaperWhite, fontSize = 15.sp, fontFamily = VazirFont)
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeThemeStudioDialog(
+    config: HomeThemeConfig,
+    onDismiss: () -> Unit,
+    onApply: (HomeThemeConfig) -> Unit
+) {
+    val gold = Color(0xFFFFB74D)
+    val muted = Color(0xFF8B949E)
+    val text = Color(0xFFE6EDF3)
+
+    var draft by remember(config) { mutableStateOf(config) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF151A20),
+        title = {
+            Text(
+                "🎨 استودیوی تم",
+                color = gold,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                HomePreviewCard(
+                    config = draft,
+                    dark = Color(0xFF1A1A1A),
+                    light = Color(0xFFF7F7F7)
+                )
+
+                HomeStyleChips(
+                    selected = draft.kind,
+                    gold = gold,
+                    text = text,
+                    muted = muted
+                ) { kind ->
+                    draft = when (kind) {
+                        HomeThemeKind.Solid -> draft.copy(
+                            kind = HomeThemeKind.Solid,
+                            pattern = HomePatternKind.None,
+                            secondary = null
+                        )
+
+                        HomeThemeKind.Gradient -> {
+                            if (draft.secondary == null) {
+                                val g = HomeGradientPresets.first()
+                                draft.copy(
+                                    kind = HomeThemeKind.Gradient,
+                                    primary = g.from,
+                                    secondary = g.to,
+                                    pattern = HomePatternKind.None
+                                )
+                            } else {
+                                draft.copy(
+                                    kind = HomeThemeKind.Gradient,
+                                    pattern = HomePatternKind.None
+                                )
+                            }
                         }
+
+                        HomeThemeKind.Pattern -> draft.copy(
+                            kind = HomeThemeKind.Pattern,
+                            pattern = if (draft.pattern == HomePatternKind.None) {
+                                HomePatternKind.Dots
+                            } else {
+                                draft.pattern
+                            },
+                            secondary = null
+                        )
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { showThemePicker = false }) {
-                    Text("بستن", color = Saffron, fontWeight = FontWeight.Bold)
+
+                if (draft.kind == HomeThemeKind.Pattern) {
+                    HomeSectionLabel("طرح زمینه", muted)
+                    HomePatternChips(
+                        selected = draft.pattern,
+                        gold = gold,
+                        text = text,
+                        muted = muted
+                    ) { pattern ->
+                        draft = draft.copy(pattern = pattern)
+                    }
+
+                    HomeSectionLabel("شدت طرح", muted)
+                    HomeSliderRow(
+                        label = "شدت",
+                        value = draft.textureAlpha,
+                        min = 0.03f,
+                        max = 0.30f,
+                        text = text,
+                        muted = muted
+                    ) { v ->
+                        draft = draft.copy(textureAlpha = v)
+                    }
+                }
+
+                HomeSectionLabel("رنگ پایه", muted)
+                HomeSwatchGrid(
+                    presets = HomeSolidPresets,
+                    selected = draft.primary,
+                    gold = gold,
+                    muted = muted
+                ) { color ->
+                    draft = draft.copy(primary = color)
+                }
+
+                if (draft.kind == HomeThemeKind.Gradient) {
+                    HomeSectionLabel("گرادیان آماده", muted)
+                    HomeGradientStrip(
+                        presets = HomeGradientPresets,
+                        selectedFrom = draft.primary,
+                        selectedTo = draft.secondary ?: 0,
+                        muted = muted
+                    ) { g ->
+                        draft = draft.copy(
+                            kind = HomeThemeKind.Gradient,
+                            primary = g.from,
+                            secondary = g.to,
+                            pattern = HomePatternKind.None
+                        )
+                    }
+                }
+
+                HomeSectionLabel("تیرگی", muted)
+                HomeSliderRow(
+                    label = "تیرگی",
+                    value = draft.dim,
+                    min = 0f,
+                    max = 0.55f,
+                    text = text,
+                    muted = muted
+                ) { v ->
+                    draft = draft.copy(dim = v)
                 }
             }
+        },
+        confirmButton = {
+            TextButton(onClick = { onApply(draft) }) {
+                Text(
+                    "اعمال",
+                    color = gold,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                TextButton(onClick = { draft = HomeThemeConfig() }) {
+                    Text("پیش‌فرض", color = muted)
+                }
+                TextButton(onClick = onDismiss) {
+                    Text(
+                        "انصراف",
+                        color = muted
+                    )
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun HomePreviewCard(
+    config: HomeThemeConfig,
+    dark: Color,
+    light: Color
+) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(130.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, Color.White.copy(alpha = .12f), RoundedCornerShape(18.dp))
+    ) {
+        HomeBackground(
+            config = config,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        val useDark = Color(config.primary).luminance() > 0.55f && config.dim < 0.25f
+        val fg = if (useDark) dark else light
+
+        Column(Modifier.padding(14.dp)) {
+            Text(
+                "پیش‌نمایش",
+                color = fg,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "چراغ راه 🏮",
+                color = fg.copy(alpha = .75f),
+                fontSize = 12.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeSectionLabel(text: String, color: Color) {
+    Text(
+        text,
+        color = color,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold
+    )
+}
+
+@Composable
+private fun HomeStyleChips(
+    selected: HomeThemeKind,
+    gold: Color,
+    text: Color,
+    muted: Color,
+    onSelect: (HomeThemeKind) -> Unit
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        HomeThemeKind.values().forEach { kind ->
+            val label = when (kind) {
+                HomeThemeKind.Solid -> "ساده"
+                HomeThemeKind.Gradient -> "گرادیان"
+                HomeThemeKind.Pattern -> "طرح"
+            }
+
+            HomeChip(
+                label = label,
+                selected = selected == kind,
+                gold = gold,
+                text = text,
+                muted = muted,
+                onClick = { onSelect(kind) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomePatternChips(
+    selected: HomePatternKind,
+    gold: Color,
+    text: Color,
+    muted: Color,
+    onSelect: (HomePatternKind) -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        HomePatternKind.values().forEach { kind ->
+            HomeChip(
+                label = homePatternLabel(kind),
+                selected = selected == kind,
+                gold = gold,
+                text = text,
+                muted = muted,
+                onClick = { onSelect(kind) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeChip(
+    label: String,
+    selected: Boolean,
+    gold: Color,
+    text: Color,
+    muted: Color,
+    onClick: () -> Unit
+) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (selected) gold else Color.White.copy(alpha = .08f))
+            .border(
+                1.dp,
+                if (selected) gold else Color.White.copy(alpha = .14f),
+                RoundedCornerShape(10.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp)
+    ) {
+        Text(
+            label,
+            color = if (selected) Color(0xFF111111) else text,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun HomeSwatchGrid(
+    presets: List<HomeSwatch>,
+    selected: Int,
+    gold: Color,
+    muted: Color,
+    onSelect: (Int) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        presets.chunked(5).forEach { row ->
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                row.forEach { swatch ->
+                    Box(
+                        Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(Color(swatch.color))
+                            .border(
+                                if (selected == swatch.color) 2.dp else 1.dp,
+                                if (selected == swatch.color) gold else Color.White.copy(alpha = .18f),
+                                CircleShape
+                            )
+                            .clickable { onSelect(swatch.color) }
+                    )
+                }
+            }
+        }
+
+        val selectedName = presets.firstOrNull { it.color == selected }?.name ?: "دلخواه"
+        Text(
+            selectedName,
+            color = muted,
+            fontSize = 11.sp
+        )
+    }
+}
+
+@Composable
+private fun HomeGradientStrip(
+    presets: List<HomeGradient>,
+    selectedFrom: Int,
+    selectedTo: Int,
+    muted: Color,
+    onSelect: (HomeGradient) -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        presets.forEach { g ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier
+                        .width(92.dp)
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Brush.linearGradient(listOf(Color(g.from), Color(g.to))))
+                        .border(
+                            if (selectedFrom == g.from && selectedTo == g.to) 2.dp else 1.dp,
+                            if (selectedFrom == g.from && selectedTo == g.to) {
+                                Color(0xFFFFB74D)
+                            } else {
+                                Color.White.copy(alpha = .16f)
+                            },
+                            RoundedCornerShape(12.dp)
+                        )
+                        .clickable { onSelect(g) }
+                )
+
+                Spacer(Modifier.height(4.dp))
+
+                Text(
+                    g.name,
+                    color = muted,
+                    fontSize = 10.sp,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeSliderRow(
+    label: String,
+    value: Float,
+    min: Float,
+    max: Float,
+    text: Color,
+    muted: Color,
+    onChange: (Float) -> Unit
+) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                label,
+                color = text,
+                fontSize = 12.sp,
+                modifier = Modifier.weight(1f)
+            )
+
+            Text(
+                "${(value * 100).toInt()}٪",
+                color = muted,
+                fontSize = 11.sp
+            )
+        }
+
+        Slider(
+            value = value,
+            onValueChange = onChange,
+            valueRange = min..max,
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }
@@ -1076,7 +1798,7 @@ private fun AddTaskDialog(
                     onClick = { showCalendar = true },
                     shape = RoundedCornerShape(12.dp),
                     color = DeepGreenSoft,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, LineGreen)
+                    border = BorderStroke(1.dp, LineGreen)
                 ) {
                     Row(
                         Modifier.fillMaxWidth().padding(12.dp),
@@ -1193,7 +1915,7 @@ private fun QuickDateChip(label: String, onClick: () -> Unit) {
         onClick = onClick,
         shape = RoundedCornerShape(10.dp),
         color = DeepGreenSoft,
-        border = androidx.compose.foundation.BorderStroke(1.dp, LineGreen)
+        border = BorderStroke(1.dp, LineGreen)
     ) {
         Text(label, Modifier.padding(horizontal = 10.dp, vertical = 6.dp), fontSize = 11.sp, color = PaperWhite)
     }
@@ -1205,7 +1927,7 @@ private fun DueChip(label: String, selected: Boolean, onClick: () -> Unit) {
         onClick = onClick,
         shape = RoundedCornerShape(10.dp),
         color = if (selected) Saffron else DeepGreenSoft,
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) Saffron else LineGreen)
+        border = BorderStroke(1.dp, if (selected) Saffron else LineGreen)
     ) {
         Text(
             label,
@@ -1319,11 +2041,12 @@ private fun HomeHeader(
 
                 IconButton(
                     onClick = {
-                        context.startActivity(Intent(context, ToolboxActivity::class.java))
+                        val intent = android.content.Intent(context, FilePickerActivity::class.java)
+                        context.startActivity(intent)
                     },
                     modifier = Modifier.size(36.dp)
                 ) {
-                    Text("🧰", fontSize = 18.sp)
+                    Text("📚", fontSize = 18.sp)
                 }
 
                 IconButton(onClick = onBackup, modifier = Modifier.size(36.dp)) {
@@ -1412,29 +2135,6 @@ private fun SearchBox(query: String, onQueryChange: (String) -> Unit, modifier: 
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
-    }
-}
-
-@Composable
-private fun PaperDots() {
-    Canvas(Modifier.fillMaxSize()) {
-        val step = 30.dp.toPx()
-        var y = step / 2
-        var row = 0
-
-        while (y < size.height) {
-            var x = if (row % 2 == 0) step / 2 else step
-            while (x < size.width) {
-                drawCircle(
-                    Saffron.copy(alpha = 0.07f),
-                    radius = 1.1.dp.toPx(),
-                    center = androidx.compose.ui.geometry.Offset(x, y)
-                )
-                x += step
-            }
-            y += step
-            row++
-        }
     }
 }
 
@@ -1605,4 +2305,167 @@ private fun CenterMessage(text: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(text, fontSize = 15.sp, color = MutedGreenText)
     }
+}
+
+private fun jalaliMillis(jy: Int, jm: Int, jd: Int, hour: Int = 12): Long {
+    var est = 1617220800000L + (jy - 1400).toLong() * 365L * DAY_MS + (jm - 1).toLong() * 30L * DAY_MS + (jd - 1).toLong() * DAY_MS
+    for (i in 0 until 700) {
+        val (y, m, d) = FaDate.jalali(est)
+        if (y == jy && m == jm && d == jd) {
+            val c = Calendar.getInstance()
+            c.timeInMillis = est
+            c.set(Calendar.HOUR_OF_DAY, hour)
+            c.set(Calendar.MINUTE, 0)
+            c.set(Calendar.SECOND, 0)
+            c.set(Calendar.MILLISECOND, 0)
+            return c.timeInMillis
+        }
+        val dir = when {
+            y < jy -> 1
+            y > jy -> -1
+            m < jm -> 1
+            m > jm -> -1
+            d < jd -> 1
+            else -> -1
+        }
+        est += dir * DAY_MS
+    }
+    return est
+}
+
+private fun leadingBlanks(jy: Int, jm: Int): Int {
+    val c = Calendar.getInstance()
+    c.timeInMillis = jalaliMillis(jy, jm, 1, 12)
+    return when (c.get(Calendar.DAY_OF_WEEK)) {
+        Calendar.SATURDAY -> 0
+        Calendar.SUNDAY -> 1
+        Calendar.MONDAY -> 2
+        Calendar.TUESDAY -> 3
+        Calendar.WEDNESDAY -> 4
+        Calendar.THURSDAY -> 5
+        else -> 6
+    }
+}
+
+private fun monthLen(jy: Int, jm: Int): Int {
+    val (ny, nm) = if (jm == 12) jy + 1 to 1 else jy to jm + 1
+    return ((jalaliMillis(ny, nm, 1, 12) - jalaliMillis(jy, jm, 1, 12)) / DAY_MS).toInt()
+}
+
+private fun iranHijri(millis: Long): Triple<Int, Int, Int> {
+    val cal = android.icu.util.IslamicCalendar()
+    cal.timeInMillis = millis + DAY_MS
+    return Triple(
+        cal.get(android.icu.util.Calendar.MONTH) + 1,
+        cal.get(android.icu.util.Calendar.DAY_OF_MONTH),
+        cal.get(android.icu.util.Calendar.YEAR)
+    )
+}
+
+private fun weekdayFa(millis: Long): String {
+    val c = Calendar.getInstance()
+    c.timeInMillis = millis
+    return when (c.get(Calendar.DAY_OF_WEEK)) {
+        Calendar.SATURDAY -> "شنبه"
+        Calendar.SUNDAY -> "یکشنبه"
+        Calendar.MONDAY -> "دوشنبه"
+        Calendar.TUESDAY -> "سه‌شنبه"
+        Calendar.WEDNESDAY -> "چهارشنبه"
+        Calendar.THURSDAY -> "پنجشنبه"
+        else -> "جمعه"
+    }
+}
+
+private fun taskTint(due: Long, completed: Boolean): Color {
+    if (completed) return Color(0xFF5E8077)
+    if (due <= 0L) return Color(0xFF888888)
+
+    val days = (due - System.currentTimeMillis()).toFloat() / DAY_MS
+    val t = days.coerceIn(0f, 7f) / 7f
+
+    val red = Color(0xFFE5484D)
+    val amber = Color(0xFFF5A524)
+    val green = Color(0xFF46A758)
+
+    return if (t < .5f) lerp(red, amber, t / .5f) else lerp(amber, green, (t - .5f) / .5f)
+}
+
+private fun gregorianFullFa(millis: Long): String {
+    val c = Calendar.getInstance()
+    c.timeInMillis = millis
+
+    val d = c.get(Calendar.DAY_OF_MONTH)
+    val m = c.get(Calendar.MONTH) + 1
+    val y = c.get(Calendar.YEAR)
+
+    val names = arrayOf(
+        "ژانویه", "فوریه", "مارس", "آوریل", "مه", "ژوئن",
+        "ژوئیه", "اوت", "سپتامبر", "اکتبر", "نوامبر", "دسامبر"
+    )
+
+    return "${weekdayFa(millis)}، ${d.fa()} ${names.getOrElse(m - 1) { " " }} ${y.fa()}"
+}
+
+private fun hijriFullFa(millis: Long): String {
+    val (m, d, y) = iranHijri(millis)
+    val names = arrayOf(
+        "محرم", "صفر", "ربیع‌الاول", "ربیع‌الثانی", "جمادی‌الاول", "جمادی‌الثانی",
+        "رجب", "شعبان", "رمضان", "شوال", "ذی‌القعده", "ذی‌الحجه"
+    )
+    return "${d.fa()} ${names.getOrElse(m - 1) { " " }} ${y.fa()}"
+}
+
+private fun fullDateTime(millis: Long): String {
+    val (jy, jm, jd) = FaDate.jalali(millis)
+    val c = Calendar.getInstance()
+    c.timeInMillis = millis
+
+    val h = c.get(Calendar.HOUR_OF_DAY).toString().padStart(2, '0').faDigits()
+    val m = c.get(Calendar.MINUTE).toString().padStart(2, '0').faDigits()
+
+    return "${weekdayFa(millis)}، ${jd.fa()} ${FaDate.monthName(jm)} ${jy.fa()}، ساعت $h:$m"
+}
+
+private fun isIranHoliday(jy: Int, jm: Int, jd: Int): Boolean {
+    val millis = jalaliMillis(jy, jm, jd, 12)
+    val c = Calendar.getInstance()
+    c.timeInMillis = millis
+
+    if (c.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY) return true
+
+    when {
+        jm == 1 && jd in 1..4 -> return true
+        jm == 1 && jd == 12 -> return true
+        jm == 1 && jd == 13 -> return true
+        jm == 3 && jd == 14 -> return true
+        jm == 3 && jd == 15 -> return true
+        jm == 11 && jd == 22 -> return true
+    }
+
+    val (hm, hd) = iranHijri(millis)
+    if (hm == 2 && hd == 29 && iranHijri(millis + DAY_MS).first == 3) return true
+
+    return when {
+        hm == 1 && hd == 10 -> true
+        hm == 2 && hd == 20 -> true
+        hm == 2 && hd == 28 -> true
+        hm == 2 && hd == 30 -> true
+        hm == 3 && hd == 17 -> true
+        hm == 7 && hd == 13 -> true
+        hm == 7 && hd == 27 -> true
+        hm == 8 && hd == 15 -> true
+        hm == 9 && hd == 21 -> true
+        hm == 10 && hd == 1 -> true
+        hm == 10 && hd == 10 -> true
+        hm == 12 && hd == 18 -> true
+        else -> false
+    }
+}
+
+private fun computeHolidayDays(jy: Int, jm: Int): Set<Int> {
+    val set = mutableSetOf<Int>()
+    for (d in 1..monthLen(jy, jm)) {
+        if (isIranHoliday(jy, jm, d)) set.add(d)
+    }
+    return set
 }
