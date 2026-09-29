@@ -37,6 +37,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -83,7 +84,10 @@ sealed class Screen {
                     str.startsWith("e:") -> Editor(str.removePrefix("e:").toLongOrNull() ?: NEW_NOTE_ID)
                     str.startsWith("d:") -> {
                         val parts = str.removePrefix("d:").split(":")
-                        Draw(parts.getOrNull(0)?.toLongOrNull() ?: NEW_NOTE_ID, parts.getOrNull(1) == "1")
+                        Draw(
+                            parts.getOrNull(0)?.toLongOrNull() ?: NEW_NOTE_ID,
+                            parts.getOrNull(1) == "1"
+                        )
                     }
                     str.startsWith("t:") -> TaskEditor(str.removePrefix("t:").toLongOrNull() ?: 0L)
                     else -> Home
@@ -140,8 +144,9 @@ class MainActivity : FragmentActivity() {
             var themeVersion by remember { mutableIntStateOf(0) }
             val appContext = LocalContext.current.applicationContext
 
+            // ✅ اصلاح کلیدی: homeThemePrimary Int می‌دهد، YaddashtTheme Color می‌خواهد
             val bgColor = remember(themeVersion) {
-                homeThemePrimary(appContext)
+                Color(homeThemePrimary(appContext))
             }
 
             YaddashtTheme(bgColor = bgColor) {
@@ -168,7 +173,8 @@ class MainActivity : FragmentActivity() {
                     }
 
                     if (hasLocked) {
-                        val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+                        val keyguardManager =
+                            context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
                         if (keyguardManager.isDeviceSecure) authRequired = true
                     }
 
@@ -177,7 +183,8 @@ class MainActivity : FragmentActivity() {
 
                 LaunchedEffect(authRequired) {
                     if (authRequired && !authPassed) {
-                        val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+                        val keyguardManager =
+                            context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
                         val intent = keyguardManager.createConfirmDeviceCredentialIntent(
                             "قفل چراغ راه 🔒",
                             "با اثر انگشت یا رمز باز کن"
@@ -193,7 +200,8 @@ class MainActivity : FragmentActivity() {
 
                 if (authRequired && !authPassed) {
                     LockScreen {
-                        val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+                        val keyguardManager =
+                            context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
                         val intent = keyguardManager.createConfirmDeviceCredentialIntent(
                             "قفل چراغ راه 🔒",
                             "با اثر انگشت یا رمز باز کن"
@@ -252,7 +260,9 @@ class MainActivity : FragmentActivity() {
                             noteId = s.noteId,
                             isTask = s.isTask,
                             taskDao = taskDao,
-                            onBack = { screen = if (s.isTask) Screen.TaskEditor(s.noteId) else Screen.Editor(s.noteId) }
+                            onBack = {
+                                screen = if (s.isTask) Screen.TaskEditor(s.noteId) else Screen.Editor(s.noteId)
+                            }
                         )
 
                         is Screen.TaskEditor -> TaskEditorScreen(
@@ -284,19 +294,40 @@ class MainActivity : FragmentActivity() {
 
 @Composable
 private fun LockScreen(onUnlock: () -> Unit) {
-    Box(Modifier.fillMaxSize().background(DeepGreen), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(DeepGreen),
+        contentAlignment = Alignment.Center
+    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("🏮", fontSize = 60.sp)
             Spacer(Modifier.height(12.dp))
-            Text("چراغ راه قفل است", fontFamily = LalezarFont, fontSize = 26.sp, color = PaperWhite)
+            Text(
+                "چراغ راه قفل است",
+                fontFamily = LalezarFont,
+                fontSize = 26.sp,
+                color = PaperWhite
+            )
             Spacer(Modifier.height(6.dp))
-            Text("یادداشت محرمانه داری؛ اول خودت را ثابت کن!", fontSize = 12.sp, color = MutedGreenText)
+            Text(
+                "یادداشت محرمانه داری؛ اول خودت را ثابت کن!",
+                fontSize = 12.sp,
+                color = MutedGreenText
+            )
             Spacer(Modifier.height(20.dp))
             Button(
                 onClick = onUnlock,
-                colors = ButtonDefaults.buttonColors(containerColor = Saffron, contentColor = DeepGreen)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Saffron,
+                    contentColor = DeepGreen
+                )
             ) {
-                Text("باز کردن 🔓", fontFamily = LalezarFont, fontSize = 16.sp)
+                Text(
+                    "باز کردن 🔓",
+                    fontFamily = LalezarFont,
+                    fontSize = 16.sp
+                )
             }
         }
     }
