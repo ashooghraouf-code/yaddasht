@@ -1,6 +1,7 @@
 package ir.yaddasht.app.ui.screen
 
 import android.content.Context
+import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -321,6 +322,26 @@ private fun autoAccent(base: Color): Int {
 
 private fun homePatternLabel(kind: HomePatternKind): String {
     return HomePatternLabels.firstOrNull { it.first == kind }?.second ?: kind.name
+}
+
+private fun launchHomeToolbox(context: Context) {
+    val classNames = listOf(
+        "ir.yaddasht.app.tools.ToolboxActivity",
+        "ir.yaddasht.app.ui.screen.ToolboxActivity"
+    )
+
+    for (name in classNames) {
+        try {
+            val intent = Intent()
+                .setClassName(context, name)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            return
+        } catch (_: Exception) {
+        }
+    }
+
+    Toast.makeText(context, "جعبه‌ابزار نصب/ثبت نشده است 🧰", Toast.LENGTH_SHORT).show()
 }
 
 @Composable
@@ -2015,6 +2036,8 @@ private fun HomeHeader(
     onBgMuted: Color,
     onBgAccent: Color
 ) {
+    val context = LocalContext.current
+
     Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -2051,6 +2074,10 @@ private fun HomeHeader(
             Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
                 IconButton(onClick = onThemePicker, modifier = Modifier.size(36.dp)) {
                     Text("🎨", fontSize = 18.sp)
+                }
+
+                IconButton(onClick = { launchHomeToolbox(context) }, modifier = Modifier.size(36.dp)) {
+                    Text("🧰", fontSize = 18.sp)
                 }
 
                 IconButton(onClick = onBackup, modifier = Modifier.size(36.dp)) {
