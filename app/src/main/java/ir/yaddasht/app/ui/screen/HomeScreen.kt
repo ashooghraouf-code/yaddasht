@@ -75,7 +75,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -110,13 +109,14 @@ import ir.yaddasht.app.ui.theme.MutedGreenText
 import ir.yaddasht.app.ui.theme.PaperWhite
 import ir.yaddasht.app.ui.theme.Saffron
 import ir.yaddasht.app.ui.theme.VazirFont
-import ir.yaddasht.app.ui.theme.paperColor
 import ir.yaddasht.app.ui.theme.PatternKind as KitPatternKind
+import ir.yaddasht.app.ui.theme.ThemeBackground
 import ir.yaddasht.app.ui.theme.ThemeConfig as KitThemeConfig
 import ir.yaddasht.app.ui.theme.ThemeKind as KitThemeKind
 import ir.yaddasht.app.ui.theme.ThemeKit as KitThemeKit
 import ir.yaddasht.app.ui.theme.ThemeScope as KitThemeScope
 import ir.yaddasht.app.ui.theme.ThemeStudioDialog as KitThemeStudioDialog
+import ir.yaddasht.app.ui.theme.paperConfigForIndex
 import ir.yaddasht.app.util.Checklist
 import ir.yaddasht.app.util.FaDate
 import ir.yaddasht.app.util.FullBackup
@@ -413,8 +413,6 @@ private fun BoardThemeOverlay(
     modifier: Modifier = Modifier
 ) {
     val base = Color(config.primary)
-    val isLight = base.luminance() > 0.55f
-    val blend = if (isLight) BlendMode.SCREEN else BlendMode.MULTIPLY
     val accent = Color(config.secondary ?: autoAccent(base))
 
     Canvas(modifier) {
@@ -423,10 +421,7 @@ private fun BoardThemeOverlay(
 
         when (config.kind) {
             KitThemeKind.Solid -> {
-                drawRect(
-                    color = base.copy(alpha = if (isLight) 0.16f else 0.22f),
-                    blendMode = blend
-                )
+                drawRect(color = base.copy(alpha = 0.55f))
             }
 
             KitThemeKind.Gradient -> {
@@ -434,21 +429,16 @@ private fun BoardThemeOverlay(
                 drawRect(
                     brush = Brush.linearGradient(
                         listOf(
-                            base.copy(alpha = 0.18f),
-                            c2.copy(alpha = 0.18f)
+                            base.copy(alpha = 0.55f),
+                            c2.copy(alpha = 0.55f)
                         )
-                    ),
-                    blendMode = blend
+                    )
                 )
             }
 
             KitThemeKind.Pattern -> {
-                drawRect(
-                    color = base.copy(alpha = 0.12f),
-                    blendMode = blend
-                )
-
-                val patternAlpha = config.textureAlpha.coerceIn(0.04f, 0.25f)
+                drawRect(color = base.copy(alpha = 0.40f))
+                val patternAlpha = config.textureAlpha.coerceIn(0.06f, 0.30f)
                 drawBoardPattern(
                     kind = config.pattern,
                     col = accent.copy(alpha = patternAlpha),
@@ -461,7 +451,7 @@ private fun BoardThemeOverlay(
         if (config.dim > 0f) {
             drawRect(
                 color = Color.Black.copy(
-                    alpha = (config.dim * 0.35f).coerceIn(0f, 0.55f)
+                    alpha = (config.dim * 0.45f).coerceIn(0f, 0.6f)
                 )
             )
         }
@@ -2507,6 +2497,11 @@ private fun NoteCard(
     val checklist = Checklist.isChecklist(note.body)
     val hasReminder = note.reminderAt > System.currentTimeMillis()
 
+    val paperCfg = paperConfigForIndex(note.color)
+    val tone = KitThemeKit.contentColors(paperCfg)
+    val ink = tone.onSurface
+    val inkSoft = tone.muted
+
     Box(
         Modifier
             .padding(5.dp)
@@ -2518,85 +2513,90 @@ private fun NoteCard(
                 clip = true
             }
     ) {
-        Column(
+        Box(
             Modifier
                 .clip(RoundedCornerShape(18.dp))
-                .background(paperColor(note.color))
                 .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-                .padding(12.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    (if (note.pinned) "📌  " else "") + note.title.ifBlank { "بدون عنوان" },
-                    fontFamily = LalezarFont,
-                    fontSize = 17.sp,
-                    color = Ink,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
+            ThemeBackground(
+                config = paperCfg,
+                modifier = Modifier.matchParentSize()
+            )
 
-                Icon(
-                    Icons.Filled.Close,
-                    "حذف",
-                    tint = InkSoft.copy(alpha = .55f),
-                    modifier = Modifier
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .clickable(onClick = onDelete)
-                        .padding(5.dp)
-                )
-            }
-
-            Spacer(Modifier.height(6.dp))
-
-            when {
-                locked -> Text("🔒 محتوای محرمانه", fontSize = 12.sp, color = InkSoft)
-
-                checklist -> {
-                    val (done, total) = Checklist.progress(note.body)
-                    Text("✅ ${done.fa()} از ${total.fa()} انجام شد", fontSize = 12.sp, color = Ink, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(4.dp))
+            Column(Modifier.padding(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        note.body.lines().take(3).joinToString("\n") {
-                            it.removePrefix("☐ ").removePrefix("☑ ")
-                        },
-                        fontSize = 11.5.sp,
-                        color = InkSoft,
-                        maxLines = 3,
-                        lineHeight = 18.sp
-                    )
-                }
-
-                else -> if (note.body.isNotBlank()) {
-                    Text(
-                        note.body,
-                        fontFamily = VazirFont,
-                        fontSize = 12.5.sp,
-                        color = InkSoft,
-                        maxLines = 4,
+                        (if (note.pinned) "📌  " else "") + note.title.ifBlank { "بدون عنوان" },
+                        fontFamily = LalezarFont,
+                        fontSize = 17.sp,
+                        color = ink,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        lineHeight = 20.sp
+                        modifier = Modifier.weight(1f)
                     )
-                }
-            }
 
-            Spacer(Modifier.height(10.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (attachCount > 0) Text("📎 ${attachCount.fa()}", fontSize = 11.sp, color = InkSoft)
-
-                if (hasReminder) {
-                    Text(
-                        "⏰  " + fullDateTime(note.reminderAt),
-                        fontSize = 10.sp,
-                        color = Saffron,
-                        fontWeight = FontWeight.Bold
+                    Icon(
+                        Icons.Filled.Close,
+                        "حذف",
+                        tint = inkSoft.copy(alpha = .55f),
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .clickable(onClick = onDelete)
+                            .padding(5.dp)
                     )
                 }
 
-                Spacer(Modifier.weight(1f))
-                Text(relativeTimeFa(note.updatedAt), fontSize = 10.sp, color = InkSoft.copy(alpha = .8f))
+                Spacer(Modifier.height(6.dp))
+
+                when {
+                    locked -> Text("🔒 محتوای محرمانه", fontSize = 12.sp, color = inkSoft)
+
+                    checklist -> {
+                        val (done, total) = Checklist.progress(note.body)
+                        Text("✅ ${done.fa()} از ${total.fa()} انجام شد", fontSize = 12.sp, color = ink, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            note.body.lines().take(3).joinToString("\n") {
+                                it.removePrefix("☐ ").removePrefix("☑ ")
+                            },
+                            fontSize = 11.5.sp,
+                            color = inkSoft,
+                            maxLines = 3,
+                            lineHeight = 18.sp
+                        )
+                    }
+
+                    else -> if (note.body.isNotBlank()) {
+                        Text(
+                            note.body,
+                            fontFamily = VazirFont,
+                            fontSize = 12.5.sp,
+                            color = inkSoft,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = 20.sp
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (attachCount > 0) Text("📎 ${attachCount.fa()}", fontSize = 11.sp, color = inkSoft)
+
+                    if (hasReminder) {
+                        Text(
+                            "⏰  " + fullDateTime(note.reminderAt),
+                            fontSize = 10.sp,
+                            color = tone.accent,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(Modifier.weight(1f))
+                    Text(relativeTimeFa(note.updatedAt), fontSize = 10.sp, color = inkSoft.copy(alpha = .8f))
+                }
             }
         }
     }
