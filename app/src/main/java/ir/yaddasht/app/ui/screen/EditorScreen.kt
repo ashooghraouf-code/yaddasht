@@ -182,6 +182,11 @@ private fun editorLaunchToolbox(context: Context) {
     Toast.makeText(context, "جعبه‌ابزار نصب/ثبت نشده است 🧰", Toast.LENGTH_SHORT).show()
 }
 
+private fun readableOn(c: Color): Color {
+    val lum = c.red * 0.299f + c.green * 0.587f + c.blue * 0.114f
+    return if (lum > 0.6f) Color.Black else Color.White
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Long) -> Unit) {
@@ -216,7 +221,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     val isLocked = note?.body?.let(NoteLock::isLocked) == true
     val isChecklist = note?.body?.let(Checklist::isChecklist) == true
 
-    // ===== کاغذ: یک منبع حقیقت = note.color =====
+    // ===== کاغذ: یک منبع حقیقت = note.color (sync با Home) =====
     val paperConfig = paperConfigForIndex(note?.color ?: 0)
     val paperTone = ThemeKit.contentColors(paperConfig)
     val paperInk = paperTone.onSurface
@@ -321,7 +326,15 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         val file = pendingCameraFile
         if (ok && file != null && file.length() > 0) {
             scope.launch(Dispatchers.IO) {
-                dao.insertAttachment(Attachment(realId, file.name, file.absolutePath, "image/jpeg", true))
+                dao.insertAttachment(
+                    Attachment(
+                        noteId = realId,
+                        fileName = file.name,
+                        filePath = file.absolutePath,
+                        mimeType = "image/jpeg",
+                        isImage = true
+                    )
+                )
             }
         } else file?.delete()
         pendingCameraFile = null
@@ -349,7 +362,15 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         val f = recordingFile; recordingFile = null
         if (f != null && f.length() > 2000) {
             scope.launch(Dispatchers.IO) {
-                dao.insertAttachment(Attachment(realId, f.name, f.absolutePath, "audio/mp4", false))
+                dao.insertAttachment(
+                    Attachment(
+                        noteId = realId,
+                        fileName = f.name,
+                        filePath = f.absolutePath,
+                        mimeType = "audio/mp4",
+                        isImage = false
+                    )
+                )
             }
         } else {
             f?.delete(); Toast.makeText(context, "ضبط خیلی کوتاه بود", Toast.LENGTH_SHORT).show()
@@ -688,7 +709,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
     Column(Modifier.fillMaxWidth().padding(vertical = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("🔒", fontSize = 42.sp); Spacer(Modifier.height(10.dp))
         Text("این یادداشت قفل است", fontFamily = LalezarFont, fontSize = 19.sp, color = ink); Spacer(Modifier.height(14.dp))
-        Button(onClick = onUnlock, colors = ButtonDefaults.buttonColors(containerColor = ink.copy(alpha = .92f), contentColor = if (ink.red * 0.299f + ink.green * 0.587f + ink.blue * 0.114f > 0.6f) Color.Black else Color.White)) { Text("باز کردن با رمز", fontFamily = VazirFont) }
+        Button(onClick = onUnlock, colors = ButtonDefaults.buttonColors(containerColor = ink.copy(alpha = .92f), contentColor = readableOn(ink))) { Text("باز کردن با رمز", fontFamily = VazirFont) }
     }
 }
 @Composable private fun ChecklistEditor(note: Note, ink: Color, inkSoft: Color, accent: Color, onChange: (Note) -> Unit) {
@@ -705,7 +726,7 @@ fun EditorScreen(dao: NoteDao, noteId: Long, onBack: () -> Unit, onOpenDraw: (Lo
         lines.forEachIndexed { i, line ->
             val checked = line.startsWith("☑ "); val text = line.removePrefix("☐ ").removePrefix("☑ ")
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked, { onChange(note.copy(body = Checklist.toggleLine(note.body, i))) }, colors = CheckboxDefaults.colors(checkedColor = accent, checkmarkColor = if (accent.red * 0.299f + accent.green * 0.587f + accent.blue * 0.114f > 0.6f) Color.Black else Color.White))
+                Checkbox(checked, { onChange(note.copy(body = Checklist.toggleLine(note.body, i))) }, colors = CheckboxDefaults.colors(checkedColor = accent, checkmarkColor = readableOn(accent)))
                 TextField(text, { v -> val mark = if (checked) "☑ " else "☐ "; val list = lines.toMutableList(); list[i] = mark + v; onChange(note.copy(body = list.joinToString("\n"))) }, textStyle = TextStyle(fontFamily = VazirFont, fontSize = 15.sp, color = ink, lineHeight = 26.sp, letterSpacing = 0.2.sp, textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None, textAlign = TextAlign.Start, textDirection = TextDirection.Rtl), colors = transparentFieldColors(), modifier = Modifier.weight(1f))
             }
         }
@@ -790,7 +811,15 @@ private fun importUris(context: Context, scope: CoroutineScope, dao: NoteDao, no
         uris.forEach { uri ->
             val file = AttachmentStore.copyToPrivate(context, uri) ?: return@forEach
             val mime = context.contentResolver.getType(uri) ?: guessMimeType(file.name)
-            dao.insertAttachment(Attachment(noteId, file.name, file.absolutePath, mime, mime.startsWith("image/")))
+            dao.insertAttachment(
+                Attachment(
+                    noteId = noteId,
+                    fileName = file.name,
+                    filePath = file.absolutePath,
+                    mimeType = mime,
+                    isImage = mime.startsWith("image/")
+                )
+            )
         }
         withContext(Dispatchers.Main) { Toast.makeText(context, "ضمیمه اضافه شد ✔", Toast.LENGTH_SHORT).show() }
     }
