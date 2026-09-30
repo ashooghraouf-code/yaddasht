@@ -144,7 +144,6 @@ class MainActivity : FragmentActivity() {
             var themeVersion by remember { mutableIntStateOf(0) }
             val appContext = LocalContext.current.applicationContext
 
-            // ✅ اصلاح کلیدی: homeThemePrimary Int می‌دهد، YaddashtTheme Color می‌خواهد
             val bgColor = remember(themeVersion) {
                 Color(homeThemePrimary(appContext))
             }
