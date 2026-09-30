@@ -75,9 +75,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -109,6 +111,12 @@ import ir.yaddasht.app.ui.theme.PaperWhite
 import ir.yaddasht.app.ui.theme.Saffron
 import ir.yaddasht.app.ui.theme.VazirFont
 import ir.yaddasht.app.ui.theme.paperColor
+import ir.yaddasht.app.ui.theme.PatternKind as KitPatternKind
+import ir.yaddasht.app.ui.theme.ThemeConfig as KitThemeConfig
+import ir.yaddasht.app.ui.theme.ThemeKind as KitThemeKind
+import ir.yaddasht.app.ui.theme.ThemeKit as KitThemeKit
+import ir.yaddasht.app.ui.theme.ThemeScope as KitThemeScope
+import ir.yaddasht.app.ui.theme.ThemeStudioDialog as KitThemeStudioDialog
 import ir.yaddasht.app.util.Checklist
 import ir.yaddasht.app.util.FaDate
 import ir.yaddasht.app.util.FullBackup
@@ -400,6 +408,276 @@ private fun HomeBackground(
 }
 
 @Composable
+private fun BoardThemeOverlay(
+    config: KitThemeConfig,
+    modifier: Modifier = Modifier
+) {
+    val base = Color(config.primary)
+    val isLight = base.luminance() > 0.55f
+    val blend = if (isLight) BlendMode.SCREEN else BlendMode.MULTIPLY
+    val accent = Color(config.secondary ?: autoAccent(base))
+
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+
+        when (config.kind) {
+            KitThemeKind.Solid -> {
+                drawRect(
+                    color = base.copy(alpha = if (isLight) 0.16f else 0.22f),
+                    blendMode = blend
+                )
+            }
+
+            KitThemeKind.Gradient -> {
+                val c2 = Color(config.secondary ?: config.primary)
+                drawRect(
+                    brush = Brush.linearGradient(
+                        listOf(
+                            base.copy(alpha = 0.18f),
+                            c2.copy(alpha = 0.18f)
+                        )
+                    ),
+                    blendMode = blend
+                )
+            }
+
+            KitThemeKind.Pattern -> {
+                drawRect(
+                    color = base.copy(alpha = 0.12f),
+                    blendMode = blend
+                )
+
+                val patternAlpha = config.textureAlpha.coerceIn(0.04f, 0.25f)
+                drawBoardPattern(
+                    kind = config.pattern,
+                    col = accent.copy(alpha = patternAlpha),
+                    w = w,
+                    h = h
+                )
+            }
+        }
+
+        if (config.dim > 0f) {
+            drawRect(
+                color = Color.Black.copy(
+                    alpha = (config.dim * 0.35f).coerceIn(0f, 0.55f)
+                )
+            )
+        }
+    }
+}
+
+private fun DrawScope.drawBoardPattern(
+    kind: KitPatternKind,
+    col: Color,
+    w: Float,
+    h: Float
+) {
+    when (kind) {
+        KitPatternKind.None -> Unit
+
+        KitPatternKind.Dots -> {
+            val step = 28.dp.toPx()
+            val radius = 1.1.dp.toPx()
+            var y = step / 2f
+            var row = 0
+
+            while (y < h) {
+                var x = if (row % 2 == 0) step / 2f else step
+
+                while (x < w) {
+                    drawCircle(
+                        color = col,
+                        radius = radius,
+                        center = Offset(x, y)
+                    )
+                    x += step
+                }
+
+                y += step
+                row++
+            }
+        }
+
+        KitPatternKind.Lines -> {
+            val spacing = 30.dp.toPx()
+            var y = spacing
+
+            while (y < h) {
+                drawLine(
+                    color = col,
+                    start = Offset(0f, y),
+                    end = Offset(w, y),
+                    strokeWidth = 1f
+                )
+                y += spacing
+            }
+        }
+
+        KitPatternKind.Grid -> {
+            val cell = 34.dp.toPx()
+
+            var x = cell
+            while (x < w) {
+                drawLine(
+                    color = col,
+                    start = Offset(x, 0f),
+                    end = Offset(x, h),
+                    strokeWidth = 1f
+                )
+                x += cell
+            }
+
+            var y = cell
+            while (y < h) {
+                drawLine(
+                    color = col,
+                    start = Offset(0f, y),
+                    end = Offset(w, y),
+                    strokeWidth = 1f
+                )
+                y += cell
+            }
+        }
+
+        KitPatternKind.Diagonal -> {
+            val spacing = 22.dp.toPx()
+            var x = -h
+
+            while (x < w) {
+                drawLine(
+                    color = col,
+                    start = Offset(x, 0f),
+                    end = Offset(x + h, h),
+                    strokeWidth = 1f
+                )
+                x += spacing
+            }
+        }
+
+        KitPatternKind.Linen -> {
+            val spacing = 9.dp.toPx()
+            val thin = col.copy(alpha = col.alpha * 0.55f)
+
+            var x = 0f
+            while (x < w) {
+                drawLine(
+                    color = thin,
+                    start = Offset(x, 0f),
+                    end = Offset(x, h),
+                    strokeWidth = 1f
+                )
+                x += spacing
+            }
+
+            var y = 0f
+            while (y < h) {
+                drawLine(
+                    color = thin,
+                    start = Offset(0f, y),
+                    end = Offset(w, y),
+                    strokeWidth = 1f
+                )
+                y += spacing
+            }
+        }
+
+        KitPatternKind.Waves -> {
+            val amplitude = 14.dp.toPx()
+            val wavelength = 150.dp.toPx()
+            val stepY = 38.dp.toPx()
+
+            var y = stepY
+            while (y < h + amplitude) {
+                val path = Path()
+                path.moveTo(0f, y)
+
+                var x = 0f
+                while (x <= w) {
+                    val yy = y + sin((x / wavelength) * 2f * PI.toFloat()) * amplitude
+                    path.lineTo(x, yy)
+                    x += 8f
+                }
+
+                drawPath(
+                    path = path,
+                    color = col,
+                    style = Stroke(width = 1.4f)
+                )
+
+                y += stepY
+            }
+        }
+
+        KitPatternKind.Stars -> {
+            val cell = 70.dp.toPx()
+            val count = ((w * h) / (cell * cell)).toInt().coerceIn(18, 160)
+            val baseR = 1.2.dp.toPx()
+
+            for (i in 0 until count) {
+                val fx = homeHash01(i, 1)
+                val fy = homeHash01(i, 2)
+
+                val x = fx * w
+                val y = fy * h
+                val r = if (i % 9 == 0) baseR * 1.7f else baseR
+                val starAlpha = if (i % 5 == 0) 0.9f else 0.55f
+
+                drawCircle(
+                    color = col.copy(alpha = col.alpha * starAlpha),
+                    radius = r,
+                    center = Offset(x, y)
+                )
+            }
+        }
+
+        KitPatternKind.Bokeh -> {
+            val cell = 160.dp.toPx()
+            val count = ((w * h) / (cell * cell)).toInt().coerceIn(5, 24)
+
+            for (i in 0 until count) {
+                val fx = homeHash01(i, 3)
+                val fy = homeHash01(i, 4)
+
+                val x = fx * w
+                val y = fy * h
+                val r = (18f + (i % 5) * 14f).dp.toPx()
+
+                drawCircle(
+                    color = col.copy(alpha = col.alpha * 0.22f),
+                    radius = r,
+                    center = Offset(x, y)
+                )
+            }
+        }
+
+        KitPatternKind.Diamonds -> {
+            val spacing = 42.dp.toPx()
+            var x = -h
+
+            while (x < w) {
+                drawLine(
+                    color = col,
+                    start = Offset(x, 0f),
+                    end = Offset(x + h, h),
+                    strokeWidth = 1f
+                )
+
+                drawLine(
+                    color = col,
+                    start = Offset(x + h, 0f),
+                    end = Offset(x, h),
+                    strokeWidth = 1f
+                )
+
+                x += spacing
+            }
+        }
+    }
+}
+
+@Composable
 private fun HomePatternCanvas(
     base: Color,
     accent: Color,
@@ -659,6 +937,13 @@ fun HomeScreen(
     var newTaskOnDate by remember { mutableLongStateOf(0L) }
 
     var showThemePicker by remember { mutableStateOf(false) }
+    var showBoardThemePicker by remember { mutableStateOf(false) }
+    var boardThemeVersion by remember { mutableIntStateOf(0) }
+
+    val boardTheme = remember(boardThemeVersion) {
+        KitThemeKit.get(context, KitThemeScope.Board)
+    }
+
     var boardFullscreen by rememberSaveable { mutableStateOf(false) }
 
     val (tjy, tjm, tjd) = FaDate.jalali(System.currentTimeMillis())
@@ -750,19 +1035,38 @@ fun HomeScreen(
             Column(Modifier.fillMaxSize()) {
                 if (tab == 3) {
                     if (boardFullscreen) {
-                        BoardScreen(
-                            notes = notes,
-                            noteDao = dao,
-                            onOpenNote = { onOpenNote(it) },
-                            onBack = { boardFullscreen = false }
-                        )
+                        Box(Modifier.fillMaxSize()) {
+                            BoardScreen(
+                                notes = notes,
+                                noteDao = dao,
+                                onOpenNote = { onOpenNote(it) },
+                                onBack = { boardFullscreen = false }
+                            )
+
+                            BoardThemeOverlay(
+                                config = boardTheme,
+                                modifier = Modifier.matchParentSize()
+                            )
+
+                            IconButton(
+                                onClick = { showBoardThemePicker = true },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(top = 12.dp, end = 12.dp)
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = .35f))
+                            ) {
+                                Text("🎨", fontSize = 17.sp)
+                            }
+                        }
                     } else {
                         HomeHeader(
                             count = notes.size,
                             onStats = { showStats = true },
                             onBackup = { doBackup() },
                             onRestore = { restoreLauncher.launch(arrayOf("*/*")) },
-                            onThemePicker = { showThemePicker = true },
+                            onThemePicker = { showBoardThemePicker = true },
                             onBg = onBg,
                             onBgMuted = onBgMuted,
                             onBgAccent = onBgAccent
@@ -809,6 +1113,11 @@ fun HomeScreen(
                                 noteDao = dao,
                                 onOpenNote = { onOpenNote(it) },
                                 onBack = { tab = 0 }
+                            )
+
+                            BoardThemeOverlay(
+                                config = boardTheme,
+                                modifier = Modifier.matchParentSize()
                             )
                         }
                     }
@@ -1307,6 +1616,20 @@ fun HomeScreen(
                 homeThemeSet(context, newConfig)
                 onThemeChanged()
                 showThemePicker = false
+            }
+        )
+    }
+
+    if (showBoardThemePicker) {
+        KitThemeStudioDialog(
+            scope = KitThemeScope.Board,
+            initial = boardTheme,
+            titleOverride = "🎨 استودیوی تابلو",
+            onDismiss = { showBoardThemePicker = false },
+            onApply = { newConfig ->
+                KitThemeKit.set(context, KitThemeScope.Board, newConfig)
+                boardThemeVersion++
+                showBoardThemePicker = false
             }
         )
     }
