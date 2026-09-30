@@ -3,6 +3,7 @@ package ir.yaddasht.app.ui.screen
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -648,6 +649,11 @@ fun HomeScreen(
     var newTaskOnDate by remember { mutableLongStateOf(0L) }
 
     var showThemePicker by remember { mutableStateOf(false) }
+
+    // ===== رفع پریدن از اپ با دکمهٔ برگشت در حالت تابلو =====
+    BackHandler(enabled = tab == 3) {
+        tab = 0
+    }
 
     val today = FaDate.jalali(System.currentTimeMillis())
     var calJy by remember { mutableIntStateOf(today.first) }
