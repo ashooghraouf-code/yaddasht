@@ -109,9 +109,18 @@ data class ThemePreset(
     val config: ThemeConfig
 )
 
+data class ThemeContentColors(
+    val onBackground: Color,
+    val onSurface: Color,
+    val muted: Color,
+    val accent: Color
+)
+
 object ThemeKit {
 
     private const val PREFS = "yaddasht_theme_kit"
+    private const val LEGACY_HOME_PREFS = "home_theme_prefs"
+    private const val LEGACY_HOME_KEY = "home_theme_config"
 
     private val DefaultApp = 0xFF0F3D2E.toInt()
     private val DefaultBoard = 0xFF143D2B.toInt()
@@ -121,8 +130,13 @@ object ThemeKit {
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    private fun key(scope: ThemeScope) =
-        "theme_${scope.name}"
+    private fun scopeKey(scope: ThemeScope, id: Long? = null): String {
+        return if (id != null && id > 0L) {
+            "theme_${scope.name}_$id"
+        } else {
+            "theme_${scope.name}"
+        }
+    }
 
     fun default(scope: ThemeScope): ThemeConfig = when (scope) {
         ThemeScope.App -> ThemeConfig(
@@ -148,8 +162,7 @@ object ThemeKit {
     }
 
     fun get(context: Context, scope: ThemeScope): ThemeConfig {
-        val raw = prefs(context).getString(key(scope), null)
-
+        val raw = prefs(context).getString(scopeKey(scope), null)
         if (!raw.isNullOrBlank()) {
             decode(raw)?.let { return it }
         }
@@ -163,8 +176,68 @@ object ThemeKit {
 
     fun set(context: Context, scope: ThemeScope, config: ThemeConfig) {
         prefs(context).edit()
-            .putString(key(scope), encode(config))
+            .putString(scopeKey(scope), encode(config))
             .apply()
+
+        if (scope == ThemeScope.App) {
+            writeLegacyHomeConfig(context, config)
+        }
+    }
+
+    fun getBoard(context: Context, boardId: Long): ThemeConfig {
+        if (boardId > 0L) {
+            val raw = prefs(context).getString(scopeKey(ThemeScope.Board, boardId), null)
+            if (!raw.isNullOrBlank()) {
+                decode(raw)?.let { return it }
+            }
+        }
+
+        return get(context, ThemeScope.Board)
+    }
+
+    fun setBoard(context: Context, boardId: Long, config: ThemeConfig) {
+        if (boardId > 0L) {
+            prefs(context).edit()
+                .putString(scopeKey(ThemeScope.Board, boardId), encode(config))
+                .apply()
+        } else {
+            set(context, ThemeScope.Board, config)
+        }
+    }
+
+    fun getNotePaper(context: Context, noteId: Long): ThemeConfig {
+        if (noteId > 0L) {
+            val raw = prefs(context).getString(scopeKey(ThemeScope.NotePaper, noteId), null)
+            if (!raw.isNullOrBlank()) {
+                decode(raw)?.let { return it }
+            }
+        }
+
+        return get(context, ThemeScope.NotePaper)
+    }
+
+    fun setNotePaper(context: Context, noteId: Long, config: ThemeConfig) {
+        if (noteId > 0L) {
+            prefs(context).edit()
+                .putString(scopeKey(ThemeScope.NotePaper, noteId), encode(config))
+                .apply()
+        } else {
+            set(context, ThemeScope.NotePaper, config)
+        }
+    }
+
+    fun getWidgetNote(context: Context): ThemeConfig =
+        get(context, ThemeScope.WidgetNote)
+
+    fun setWidgetNote(context: Context, config: ThemeConfig) {
+        set(context, ThemeScope.WidgetNote, config)
+    }
+
+    fun getWidgetTask(context: Context): ThemeConfig =
+        get(context, ThemeScope.WidgetTask)
+
+    fun setWidgetTask(context: Context, config: ThemeConfig) {
+        set(context, ThemeScope.WidgetTask, config)
     }
 
     private fun encode(config: ThemeConfig): String {
@@ -219,8 +292,8 @@ object ThemeKit {
     private fun legacyHomeConfig(context: Context): ThemeConfig? {
         return try {
             val raw = context
-                .getSharedPreferences("home_theme_prefs", Context.MODE_PRIVATE)
-                .getString("home_theme_config", null)
+                .getSharedPreferences(LEGACY_HOME_PREFS, Context.MODE_PRIVATE)
+                .getString(LEGACY_HOME_KEY, null)
                 ?: return null
 
             val parts = raw.split("|")
@@ -252,6 +325,23 @@ object ThemeKit {
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun writeLegacyHomeConfig(context: Context, config: ThemeConfig) {
+        val raw = buildString {
+            append(config.kind.name).append('|')
+            append(config.primary).append('|')
+            append(config.secondary?.toString() ?: "n").append('|')
+            append(config.pattern.name).append('|')
+            append(config.textureAlpha).append('|')
+            append(config.dim)
+        }
+
+        context
+            .getSharedPreferences(LEGACY_HOME_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(LEGACY_HOME_KEY, raw)
+            .apply()
     }
 
     val patternLabels: List<Pair<PatternKind, String>> = listOf(
@@ -317,7 +407,7 @@ object ThemeKit {
 
     val boardSwatches: List<ThemeSwatch> = listOf(
         ThemeSwatch("تابلوی سبز", "🟩", 0xFF143D2B.toInt()),
-        ThemeSwatch("گچ‌تخته", "🧑‍🏫", 0xFF0B3D2C.toInt()),
+        ThemeSwatch("گچ‌تخته", "🧑‍", 0xFF0B3D2C.toInt()),
         ThemeSwatch("تخته سیاه", "⬛", 0xFF111111.toInt()),
         ThemeSwatch("چوب گرم", "🪵", 0xFF6B4A2B.toInt()),
         ThemeSwatch("کاغذ کاهی", "📜", 0xFFE0D3B8.toInt()),
@@ -325,7 +415,7 @@ object ThemeKit {
         ThemeSwatch("نیلوفر تیره", "🌌", 0xFF18244A.toInt()),
         ThemeSwatch("فیروزه تیره", "🧿", 0xFF074B52.toInt()),
         ThemeSwatch("قهوه تلخ", "☕", 0xFF3E2723.toInt()),
-        ThemeSwatch("کرم روشن", "", 0xFFFFF3D6.toInt()),
+        ThemeSwatch("کرم روشن", "🥛", 0xFFFFF3D6.toInt()),
         ThemeSwatch("مه سرد", "🌫️", 0xFFD7DEE8.toInt()),
         ThemeSwatch("زغالی", "🌑", 0xFF1A1A1A.toInt())
     )
@@ -464,7 +554,7 @@ object ThemeKit {
         ),
         ThemePreset(
             "گچ‌تخته",
-            "🧑‍🏫",
+            "🧑‍",
             ThemeConfig(
                 kind = ThemeKind.Pattern,
                 primary = 0xFF0B3D2C.toInt(),
@@ -745,6 +835,31 @@ object ThemeKit {
         ThemeScope.NotePaper -> 110
         ThemeScope.WidgetNote,
         ThemeScope.WidgetTask -> 90
+    }
+
+    fun isLight(config: ThemeConfig): Boolean {
+        val base = Color(config.primary)
+        val dimFactor = 1f - config.dim.coerceIn(0f, 0.85f)
+        val effectiveLuminance = base.luminance() * dimFactor
+        return effectiveLuminance > 0.52f
+    }
+
+    fun contentColors(config: ThemeConfig): ThemeContentColors {
+        return if (isLight(config)) {
+            ThemeContentColors(
+                onBackground = Color(0xFF17201B),
+                onSurface = Color(0xFF202820),
+                muted = Color(0xFF5B665F),
+                accent = Color(0xFF8A5A00)
+            )
+        } else {
+            ThemeContentColors(
+                onBackground = Color(0xFFF7FBF8),
+                onSurface = Color(0xFFE6EDF3),
+                muted = Color(0xFF8FA596),
+                accent = Color(0xFFFFB74D)
+            )
+        }
     }
 }
 
@@ -1302,12 +1417,15 @@ fun ThemeStudioDialog(
     scope: ThemeScope,
     initial: ThemeConfig,
     onDismiss: () -> Unit,
-    onApply: (ThemeConfig) -> Unit
+    onApply: (ThemeConfig) -> Unit,
+    titleOverride: String? = null,
+    defaultConfig: ThemeConfig? = null
 ) {
     val gold = Color(0xFFFFB74D)
     val muted = Color(0xFF8B949E)
     val text = Color(0xFFE6EDF3)
 
+    val fallback = defaultConfig ?: ThemeKit.default(scope)
     var draft by remember(initial) { mutableStateOf(initial) }
 
     AlertDialog(
@@ -1315,7 +1433,7 @@ fun ThemeStudioDialog(
         containerColor = Color(0xFF151A20),
         title = {
             Text(
-                ThemeKit.titleFor(scope),
+                titleOverride ?: ThemeKit.titleFor(scope),
                 color = gold,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
@@ -1458,7 +1576,7 @@ fun ThemeStudioDialog(
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                TextButton(onClick = { draft = ThemeKit.default(scope) }) {
+                TextButton(onClick = { draft = fallback }) {
                     Text("پیش‌فرض", color = muted)
                 }
                 TextButton(onClick = onDismiss) {
@@ -1488,7 +1606,7 @@ private fun ThemePreviewCard(
             modifier = Modifier.fillMaxSize()
         )
 
-        val useDark = Color(config.primary).luminance() > 0.55f && config.dim < 0.25f
+        val useDark = ThemeKit.isLight(config)
         val fg = if (useDark) dark else light
 
         Column(Modifier.padding(14.dp)) {
