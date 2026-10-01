@@ -19,6 +19,7 @@ import android.text.StaticLayout
 import android.text.TextPaint
 import android.text.TextUtils
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -77,6 +78,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -119,7 +121,14 @@ import coil.compose.AsyncImage
 import ir.yaddasht.app.data.Note
 import ir.yaddasht.app.data.NoteDao
 import ir.yaddasht.app.ui.theme.LalezarFont
+import ir.yaddasht.app.ui.theme.PatternKind
+import ir.yaddasht.app.ui.theme.ThemeBackground
+import ir.yaddasht.app.ui.theme.ThemeConfig
+import ir.yaddasht.app.ui.theme.ThemeKit
+import ir.yaddasht.app.ui.theme.ThemeScope
+import ir.yaddasht.app.ui.theme.ThemeStudioDialog
 import ir.yaddasht.app.ui.theme.VazirFont
+import ir.yaddasht.app.ui.theme.renderThemeBitmap
 import ir.yaddasht.app.util.Board
 import ir.yaddasht.app.util.BoardImage
 import ir.yaddasht.app.util.BoardItem
@@ -160,7 +169,7 @@ private val BOARD_SIZES_DP = BOARD_SIZES_PT
 private const val BASE_NOTE_WIDTH = 150f
 private const val BASE_IMAGE_WIDTH = 150f
 
-private val EXPORT_RASTER_SCALE = 300f / 72f
+private const val EXPORT_RASTER_SCALE = 300f / 72f
 private const val MAX_EXPORT_PIXELS = 35_000_000f
 private const val FINGER_THROTTLE_MS = 50L
 
@@ -550,6 +559,27 @@ private fun drawConnectionsToCanvas(
     }
 }
 
+private fun drawCorkDotsToCanvas(
+    canvas: AndroidCanvas,
+    bgIndex: Int,
+    w: Int,
+    h: Int
+) {
+    val dotA = corkDotA(bgIndex).toArgb()
+    val dotB = corkDotB(bgIndex).toArgb()
+    val paint = Paint().apply { isAntiAlias = true }
+    val rnd = Random(1337)
+
+    repeat(600) {
+        val x = rnd.nextFloat() * w
+        val y = rnd.nextFloat() * h
+        val r = rnd.nextFloat() * 3.2f + 0.8f
+        val dark = rnd.nextBoolean()
+        paint.color = if (dark) dotA else dotB
+        canvas.drawCircle(x, y, r, paint)
+    }
+}
+
 private fun renderBoardToCanvas(
     ctx: Context,
     canvas: AndroidCanvas,
@@ -561,6 +591,7 @@ private fun renderBoardToCanvas(
     noteSizes: Map<String, Pair<Int, Int>>,
     imageSizes: Map<Long, Pair<Int, Int>>,
     bgIndex: Int,
+    boardTheme: ThemeConfig,
     density: Float,
     fontScale: Float,
     outW: Int,
@@ -576,7 +607,17 @@ private fun renderBoardToCanvas(
     val titleType = safeTypeface(ctx, "lalezar", true)
     val bodyType = safeTypeface(ctx, "vazir", false)
 
-    canvas.drawColor(boardBase(bgIndex).toArgb())
+    val bgBitmap = renderThemeBitmap(ctx, boardTheme, outW, outH)
+    if (bgBitmap != null) {
+        canvas.drawBitmap(bgBitmap, 0f, 0f, null)
+        bgBitmap.recycle()
+    } else {
+        canvas.drawColor(boardBase(bgIndex).toArgb())
+    }
+
+    if (boardTheme.pattern == PatternKind.None) {
+        drawCorkDotsToCanvas(canvas, bgIndex, outW, outH)
+    }
 
     drawConnectionsToCanvas(
         canvas = canvas,
@@ -740,6 +781,13 @@ fun BoardScreen(
     var showSearch by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
+    var showBoardThemeStudio by remember { mutableStateOf(false) }
+    var boardThemeVersion by remember { mutableIntStateOf(0) }
+
+    val boardTheme = remember(currentBoard, boardThemeVersion) {
+        ThemeKit.getBoard(context, currentBoard)
+    }
+
     var connectMode by remember { mutableStateOf(false) }
     var pendingConnection by remember { mutableStateOf<ConnRef?>(null) }
 
@@ -775,6 +823,10 @@ fun BoardScreen(
         pendingConnection = null
         connectMode = false
         showConnectionsDialog = false
+    }
+
+    BackHandler(enabled = true) {
+        onBack()
     }
 
     val updateFinger: (Float, Float) -> Unit = { x, y ->
@@ -1005,6 +1057,7 @@ fun BoardScreen(
         val snapshotImageSizes = imageSizes.value.toMap()
 
         val snapshotBg = bgIndex
+        val snapshotBoardTheme = boardTheme
         val sBoardId = currentBoard
         val sSizeIndex = boardSizeIndex
         val sPhone = isPhoneSize
@@ -1050,6 +1103,7 @@ fun BoardScreen(
                     noteSizes = snapshotNoteSizes,
                     imageSizes = snapshotImageSizes,
                     bgIndex = snapshotBg,
+                    boardTheme = snapshotBoardTheme,
                     density = sDensity,
                     fontScale = sFontScale,
                     outW = rasterW,
@@ -1142,7 +1196,11 @@ fun BoardScreen(
     }
 
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().background(boardBase(bgIndex))) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(Color(boardTheme.primary))
+        ) {
             if (!isExporting) {
                 Row(
                     Modifier
@@ -1278,12 +1336,9 @@ fun BoardScreen(
                     }
 
                     IconButton(
-                        onClick = {
-                            BoardStore.setBackground(context, currentBoard, (bgIndex + 1) % 6)
-                            refresh()
-                        }
+                        onClick = { showBoardThemeStudio = true }
                     ) {
-                        Icon(Icons.Filled.Palette, "پس‌زمینه", tint = Color(0xFFFFE0B2))
+                        Icon(Icons.Filled.Palette, "تم تابلو", tint = Color(0xFFFFE0B2))
                     }
 
                     Surface(
@@ -1497,8 +1552,11 @@ fun BoardScreen(
                                         }
                                     }
                             ) {
-                                CorkTexture(bgIndex)
-                                Vignette(bgIndex)
+                                BoardThemeLayer(
+                                    theme = boardTheme,
+                                    bgIndex = bgIndex,
+                                    modifier = Modifier.fillMaxSize()
+                                )
 
                                 ConnectionsLayer(
                                     connections = connections,
@@ -2131,6 +2189,20 @@ fun BoardScreen(
                 TextButton(onClick = { showAddNote = false }) {
                     Text("بستن")
                 }
+            }
+        )
+    }
+
+    if (showBoardThemeStudio) {
+        ThemeStudioDialog(
+            scope = ThemeScope.Board,
+            initial = boardTheme,
+            titleOverride = "🎨 استودیوی تابلو",
+            onDismiss = { showBoardThemeStudio = false },
+            onApply = { cfg ->
+                ThemeKit.setBoard(context, currentBoard, cfg)
+                boardThemeVersion++
+                showBoardThemeStudio = false
             }
         )
     }
@@ -2822,13 +2894,31 @@ private fun BoardImageItem(
 }
 
 @Composable
+private fun BoardThemeLayer(
+    theme: ThemeConfig,
+    bgIndex: Int,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier) {
+        ThemeBackground(
+            config = theme,
+            modifier = Modifier.matchParentSize()
+        )
+
+        if (theme.pattern == PatternKind.None) {
+            CorkTexture(bgIndex)
+        }
+
+        Vignette(bgIndex)
+    }
+}
+
+@Composable
 private fun CorkTexture(bgIndex: Int) {
-    val base = boardBase(bgIndex)
     val dotA = corkDotA(bgIndex)
     val dotB = corkDotB(bgIndex)
 
     ComposeCanvas(Modifier.fillMaxSize()) {
-        drawRect(base)
         val rnd = Random(1337)
         repeat(600) {
             val x = rnd.nextFloat() * size.width
@@ -3173,4 +3263,3 @@ private fun CurledCorner(modifier: Modifier = Modifier) {
         )
     }
 }
-// ✅ پایان کامل فایل BoardScreen.kt
