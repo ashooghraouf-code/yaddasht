@@ -650,7 +650,6 @@ fun HomeScreen(
 
     var showThemePicker by remember { mutableStateOf(false) }
 
-    // ===== رفع پریدن از اپ با دکمهٔ برگشت در حالت تابلو =====
     BackHandler(enabled = tab == 3) {
         tab = 0
     }
@@ -781,7 +780,7 @@ fun HomeScreen(
                     TabRow(
                         selectedTabIndex = tab,
                         containerColor = Color.Transparent,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
                     ) {
                         Tab(
                             selected = tab == 0,
@@ -821,23 +820,23 @@ fun HomeScreen(
                             onClick = { onOpenNote(memory.id) },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 6.dp),
-                            shape = RoundedCornerShape(16.dp),
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(14.dp),
                             color = onBgAccent.copy(alpha = .14f),
                             border = BorderStroke(1.dp, onBgAccent.copy(alpha = .4f))
                         ) {
                             Row(
-                                Modifier.padding(12.dp),
+                                Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("⏳", fontSize = 22.sp)
+                                Text("⏳", fontSize = 20.sp)
                                 Spacer(Modifier.width(10.dp))
 
                                 Column(Modifier.weight(1f)) {
                                     Text(
                                         "خاطره‌ای از گذشته",
                                         fontFamily = LalezarFont,
-                                        fontSize = 14.sp,
+                                        fontSize = 13.sp,
                                         color = onBgAccent
                                     )
 
@@ -852,13 +851,13 @@ fun HomeScreen(
 
                                 IconButton(
                                     onClick = { hideMemory = true },
-                                    modifier = Modifier.size(28.dp)
+                                    modifier = Modifier.size(26.dp)
                                 ) {
                                     Icon(
                                         Icons.Filled.Close,
                                         contentDescription = null,
                                         tint = onBgMuted,
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(15.dp)
                                     )
                                 }
                             }
@@ -869,7 +868,7 @@ fun HomeScreen(
                         SearchBox(
                             query = query,
                             onQueryChange = { query = it },
-                            modifier = Modifier.padding(horizontal = 20.dp)
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                         )
                     }
 
@@ -890,7 +889,7 @@ fun HomeScreen(
                                 columns = GridCells.Adaptive(168.dp),
                                 contentPadding = PaddingValues(
                                     start = 14.dp,
-                                    top = 16.dp,
+                                    top = 10.dp,
                                     end = 14.dp,
                                     bottom = 120.dp
                                 ),
@@ -947,7 +946,7 @@ fun HomeScreen(
                             else -> LazyColumn(
                                 contentPadding = PaddingValues(
                                     start = 16.dp,
-                                    top = 12.dp,
+                                    top = 10.dp,
                                     end = 16.dp,
                                     bottom = 120.dp
                                 ),
@@ -988,7 +987,7 @@ fun HomeScreen(
                                     .verticalScroll(rememberScrollState())
                                     .padding(horizontal = 14.dp)
                             ) {
-                                Spacer(Modifier.height(8.dp))
+                                Spacer(Modifier.height(6.dp))
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconButton(onClick = {
@@ -2298,108 +2297,207 @@ private fun HomeHeader(
     onBgAccent: Color
 ) {
     val context = LocalContext.current
+    var showGuide by remember { mutableStateOf(false) }
 
     Column(
-        Modifier.padding(
-            start = 20.dp,
-            end = 12.dp,
-            top = 12.dp,
-            bottom = 8.dp
-        )
+        Modifier.padding(start = 12.dp, end = 6.dp, top = 4.dp, bottom = 2.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .background(Saffron),
-                contentAlignment = Alignment.Center
+            IconButton(
+                onClick = { showGuide = true },
+                modifier = Modifier.size(40.dp)
             ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                    contentDescription = "لوگو چراغ راه",
-                    modifier = Modifier.size(32.dp),
-                    tint = Color.Unspecified
-                )
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Saffron),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                        contentDescription = "راهنمای چراغ راه",
+                        modifier = Modifier.size(26.dp),
+                        tint = Color.Unspecified
+                    )
+                }
             }
 
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(8.dp))
 
             Column(Modifier.weight(1f, fill = false)) {
                 Text(
                     text = "چراغ راه",
                     fontFamily = LalezarFont,
-                    fontSize = 26.sp,
+                    fontSize = 20.sp,
                     color = onBg,
                     maxLines = 1,
                     softWrap = false,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 22.sp
+                )
+
+                Text(
+                    FaDate.full(System.currentTimeMillis()),
+                    fontSize = 10.sp,
+                    color = onBgMuted,
+                    maxLines = 1,
+                    lineHeight = 12.sp
                 )
             }
 
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(2.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
-                IconButton(
-                    onClick = onThemePicker,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Text("🎨", fontSize = 18.sp)
+                HeaderIcon(onClick = onThemePicker) { Text("🎨", fontSize = 15.sp) }
+                HeaderIcon(onClick = { launchHomeToolbox(context) }) { Text("🧰", fontSize = 15.sp) }
+                HeaderIcon(onClick = onBackup) {
+                    Icon(Icons.Filled.FileUpload, "پشتیبان", tint = onBgMuted, modifier = Modifier.size(17.dp))
                 }
-
-                IconButton(
-                    onClick = { launchHomeToolbox(context) },
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Text("🧰", fontSize = 18.sp)
+                HeaderIcon(onClick = onRestore) {
+                    Icon(Icons.Filled.FileDownload, "بازیابی", tint = onBgMuted, modifier = Modifier.size(17.dp))
                 }
-
-                IconButton(
-                    onClick = onBackup,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Filled.FileUpload,
-                        contentDescription = "پشتیبان",
-                        tint = onBgMuted,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                IconButton(
-                    onClick = onRestore,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Filled.FileDownload,
-                        contentDescription = "بازیابی",
-                        tint = onBgMuted,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                IconButton(
-                    onClick = onStats,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Filled.BarChart,
-                        contentDescription = "آمار",
-                        tint = onBgMuted,
-                        modifier = Modifier.size(20.dp)
-                    )
+                HeaderIcon(onClick = onStats) {
+                    Icon(Icons.Filled.BarChart, "آمار", tint = onBgMuted, modifier = Modifier.size(17.dp))
                 }
             }
         }
+    }
 
-        Spacer(Modifier.height(6.dp))
+    if (showGuide) {
+        AppGuideDialog(count = count, onDismiss = { showGuide = false })
+    }
+}
 
+@Composable
+private fun HeaderIcon(
+    onClick: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.size(32.dp)
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun AppGuideDialog(
+    count: Int,
+    onDismiss: () -> Unit
+) {
+    val gold = Color(0xFFFFB74D)
+    val body = Color(0xFFE6EDF3)
+    val muted = Color(0xFF8B949E)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF151A20),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(Saffron),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                        tint = Color.Unspecified
+                    )
+                }
+
+                Spacer(Modifier.width(10.dp))
+
+                Column {
+                    Text(
+                        "چراغ راه 🏮",
+                        color = gold,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = LalezarFont
+                    )
+
+                    Text(
+                        "$count یادداشت در دفترچه‌ات",
+                        color = muted,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                GuideRow("📝", "یادداشت‌ها", "دفترچهٔ بی‌نهایت؛ کاغذ رنگی و طرح‌دار، قفلِ رمز با کد بازیابی، چک‌لیست، دیکتهٔ مداوم، ضمیمهٔ عکس/صدا/فایل، و خروجی PDF/Word/عکس/JSON.")
+                GuideRow("✅", "وظیفه", "لیست کارها با سررسید و ساعت، اولویت، یادآورِ چندمرحله‌ای و تیکِ انجام.")
+                GuideRow("📅", "تقویم", "تقویم جلالی با تعطیلات رسمی و اعیاد قمری، نمایش هم‌زمان میلادی، و چیدمان یادآور/وظیفه روی روزها.")
+                GuideRow("📌", "تابلو", "بومِ نامحدود؛ یادداشت و عکس را بچسبان، جابه‌جا/چرخش/زوم بده، با 🔗 به هم وصل کن و خروجی PDF/PNG با کیفیت چاپ بگیر.")
+                GuideRow("🎨", "استودیوی تم", "پس‌زمینهٔ اپ، تابلو و کاغذِ هر یادداشت؛ رنگ، گرادیان، طرح و شدت تا ۴۰٪.")
+                GuideRow("🧰", "جعبه‌ابزار", "ابزارهای جانبیِ چراغ راه.")
+                GuideRow("⬆️", "پشتیبان", "گرفتن نسخهٔ کاملِ یادداشت‌ها و وظایف در یک فایل.")
+                GuideRow("⬇️", "بازیابی", "بازگرداندن همه‌چیز از فایل پشتیبان.")
+                GuideRow("📊", "آمار", "شمارش یادداشت، کلمه، قفل‌ها و چک‌لیست‌ها.")
+
+                Spacer(Modifier.height(4.dp))
+
+                Text(
+                    "نکته: با لمسِ لوگوی بالای صفحه، همین راهنما باز می‌شود.",
+                    color = muted,
+                    fontSize = 11.sp
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("فهمیدم ✅", color = gold, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
+}
+
+@Composable
+private fun GuideRow(
+    emoji: String,
+    title: String,
+    desc: String
+) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
+    ) {
         Text(
-            FaDate.full(System.currentTimeMillis()),
-            fontSize = 13.sp,
-            color = onBgMuted,
-            modifier = Modifier.padding(start = 2.dp)
+            emoji,
+            fontSize = 18.sp,
+            modifier = Modifier.width(28.dp)
         )
+
+        Spacer(Modifier.width(6.dp))
+
+        Column(Modifier.weight(1f)) {
+            Text(
+                title,
+                color = Color(0xFFFFB74D),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = LalezarFont
+            )
+
+            Text(
+                desc,
+                color = Color(0xFFE6EDF3),
+                fontSize = 12.sp,
+                lineHeight = 18.sp
+            )
+        }
     }
 }
 
@@ -2476,26 +2574,34 @@ private fun SearchBox(
     Row(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .height(40.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(DeepGreenSoft)
-            .border(1.dp, LineGreen, RoundedCornerShape(16.dp))
-            .padding(horizontal = 14.dp, vertical = 2.dp),
+            .border(1.dp, LineGreen, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Filled.Search, contentDescription = null, tint = Saffron)
-        Spacer(Modifier.width(10.dp))
+        Icon(
+            Icons.Filled.Search,
+            contentDescription = null,
+            tint = Saffron,
+            modifier = Modifier.size(16.dp)
+        )
+
+        Spacer(Modifier.width(8.dp))
 
         TextField(
             value = query,
             onValueChange = onQueryChange,
-            placeholder = { Text("جستجو در یادداشت‌ها و وظایف…", color = MutedGreenText) },
+            placeholder = { Text("جستجو…", color = MutedGreenText, fontSize = 12.sp) },
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
                 focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
+                unfocusedIndicatorColor = Color.Transparent,
+                cursorColor = Saffron
             ),
-            textStyle = TextStyle(color = PaperWhite, fontSize = 14.sp),
+            textStyle = TextStyle(color = PaperWhite, fontSize = 13.sp),
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
@@ -2647,7 +2753,7 @@ private fun SectionLabel(text: String, color: Color) {
         fontFamily = LalezarFont,
         fontSize = 16.sp,
         color = color,
-        modifier = Modifier.padding(start = 6.dp, top = 8.dp, bottom = 2.dp)
+        modifier = Modifier.padding(start = 6.dp, top = 6.dp, bottom = 2.dp)
     )
 }
 
