@@ -408,22 +408,69 @@ object ThemeKit {
     )
 
     val paperSwatches = listOf(
+        // ── کاغذهای روشن / کلاسیک ──
         ThemeSwatch("کاغذ کرم", "📜", 0xFFFFF8E1.toInt()),
         ThemeSwatch("سپیا", "🧻", 0xFFF4ECD8.toInt()),
         ThemeSwatch("چای نبات", "🍵", 0xFFE8DCC4.toInt()),
         ThemeSwatch("ابریشم", "🤍", 0xFFFFFBF0.toInt()),
         ThemeSwatch("کاغذ پوستی", "📃", 0xFFEFE6D3.toInt()),
         ThemeSwatch("سفید دفتری", "📄", 0xFFFDFDFD.toInt()),
+        ThemeSwatch("کاغذ کاهی", "🏺", 0xFFE0D3B8.toInt()),
+        ThemeSwatch("مومیایی", "🫖", 0xFFEAD9BD.toInt()),
+
+        // ── پاستل سرد ──
         ThemeSwatch("آسمانی", "☁️", 0xFFE3F2FD.toInt()),
+        ThemeSwatch("فیروزه‌ای", "🩵", 0xFFE0F7FA.toInt()),
         ThemeSwatch("نعنایی", "🌿", 0xFFE8F5E9.toInt()),
-        ThemeSwatch("اسطوخودوس", "💜", 0xFFEDE7F6.toInt()),
-        ThemeSwatch("هلویی", "🍑", 0xFFFFF3E0.toInt()),
         ThemeSwatch("لیمویی", "🍋", 0xFFF9FBE7.toInt()),
         ThemeSwatch("دودی", "🌫️", 0xFFECEFF1.toInt()),
-        ThemeSwatch("صورتی ملایم", "🌸", 0xFFFFE0EC.toInt()),
-        ThemeSwatch("فیروزه‌ای", "🩵", 0xFFE0F7FA.toInt()),
+        ThemeSwatch("یخی", "❄️", 0xFFE1F5FE.toInt()),
+        ThemeSwatch("ابری", "🌥️", 0xFFCFD8DC.toInt()),
+        ThemeSwatch("آبی آسمانی", "🔵", 0xFFBBDEFB.toInt()),
+        ThemeSwatch("سبز پررنگ", "🍃", 0xFFB2DFDB.toInt()),
+        ThemeSwatch("یشمی", "💠", 0xFFB2EBF2.toInt()),
+
+        // ── پاستل گرم ──
+        ThemeSwatch("هلویی", "🍑", 0xFFFFF3E0.toInt()),
         ThemeSwatch("کهربایی", "🟠", 0xFFFFE0B2.toInt()),
-        ThemeSwatch("یاسی", "🪻", 0xFFF3E5F5.toInt())
+        ThemeSwatch("صورتی ملایم", "🌸", 0xFFFFE0EC.toInt()),
+        ThemeSwatch("اسطوخودوس", "💜", 0xFFEDE7F6.toInt()),
+        ThemeSwatch("یاسی", "🪻", 0xFFF3E5F5.toInt()),
+        ThemeSwatch("شتری", "🐫", 0xFFFFE4C4.toInt()),
+        ThemeSwatch("زرد پررنگ", "🌟", 0xFFFFF9C4.toInt()),
+        ThemeSwatch("هلوی پررنگ", "🧡", 0xFFFFCCBC.toInt()),
+        ThemeSwatch("صورتی پررنگ", "🎀", 0xFFF8BBD0.toInt()),
+        ThemeSwatch("بنفش پررنگ", "🔮", 0xFFD1C4E9.toInt()),
+
+        // ── کاغذهای تیره (شب‌نوشت) ──
+        ThemeSwatch("شبِ کاغذ", "🌙", 0xFF121212.toInt()),
+        ThemeSwatch("نفتی", "🛢️", 0xFF0E1116.toInt()),
+        ThemeSwatch("زغالی", "🪨", 0xFF1A1A1A.toInt()),
+        ThemeSwatch("نیمه‌شب", "🌌", 0xFF0B1026.toInt()),
+        ThemeSwatch("جنگل تیره", "🌲", 0xFF102018.toInt()),
+        ThemeSwatch("دود تیره", "🌑", 0xFF20232A.toInt()),
+        ThemeSwatch("سنگِ تخته‌سنگ", "⬛", 0xFF2B3137.toInt()),
+        ThemeSwatch("قهوه تیره", "☕", 0xFF2E1F14.toInt()),
+        ThemeSwatch("عنابی تیره", "🍷", 0xFF2A0E1A.toInt()),
+        ThemeSwatch("نیلی تیره", "🔷", 0xFF0D1B3E.toInt()),
+        ThemeSwatch("ارغوانی تیره", "🟣", 0xFF2A0E3F.toInt()),
+        ThemeSwatch("فیروزه تیره", "🧿", 0xFF074B52.toInt()),
+
+        // ── رنگ‌های تند / جواهری ──
+        ThemeSwatch("زرشک", "🍒", 0xFF8E1B3A.toInt()),
+        ThemeSwatch("لاجورد", "💙", 0xFF283593.toInt()),
+        ThemeSwatch("زمرد", "💚", 0xFF1B5E20.toInt()),
+        ThemeSwatch("فیروزه ایرانی", "🕌", 0xFF00A6A6.toInt()),
+        ThemeSwatch("مس", "🥉", 0xFFB87333.toInt()),
+        ThemeSwatch("آجر", "🧱", 0xFFB71C1C.toInt()),
+        ThemeSwatch("نارنج سوخته", "🔥", 0xFFE65100.toInt()),
+        ThemeSwatch("خردلی", "🌼", 0xFFF9A825.toInt()),
+        ThemeSwatch("زیتون", "🫒", 0xFF6B8E23.toInt()),
+        ThemeSwatch("بنفش تند", "", 0xFF6A1B9A.toInt()),
+        ThemeSwatch("صورتی تند", "🍥", 0xFFEC407A.toInt()),
+        ThemeSwatch("آبی بادامی", "🫧", 0xFF4FC3F7.toInt()),
+        ThemeSwatch("لیمویی تیره", "🍈", 0xFF9E9D24.toInt()),
+        ThemeSwatch("سبزِ دریایی", "🌊", 0xFF00897B.toInt())
     )
 
     val widgetSwatches = listOf(
@@ -587,6 +634,7 @@ object ThemeKit {
     )
 
     val paperPresets = listOf(
+        // ── روشن / کلاسیک (همان‌های قبلی، حفظ شده) ──
         ThemePreset("کاغذ کرم", "📜", ThemeConfig(ThemeKind.Solid, 0xFFFFF8E1.toInt())),
         ThemePreset("خط‌دار کلاسیک", "📘", ThemeConfig(
             kind = ThemeKind.Pattern,
@@ -686,6 +734,74 @@ object ThemeKit {
             secondary = 0xFF37474F.toInt(),
             pattern = PatternKind.Bokeh,
             textureAlpha = 0.14f
+        )),
+
+        // ── تیره / شب‌نوشت (جدید) ──
+        ThemePreset("شبِ کاغذ", "🌙", ThemeConfig(ThemeKind.Solid, 0xFF121212.toInt())),
+        ThemePreset("نفتیِ خط‌دار", "🛢️", ThemeConfig(
+            kind = ThemeKind.Pattern,
+            primary = 0xFF0E1116.toInt(),
+            secondary = 0xFFFFFFFF.toInt(),
+            pattern = PatternKind.Lines,
+            textureAlpha = 0.10f
+        )),
+        ThemePreset("نیمه‌شب ستاره", "🌌", ThemeConfig(
+            kind = ThemeKind.Pattern,
+            primary = 0xFF0B1026.toInt(),
+            secondary = 0xFFFFFFFF.toInt(),
+            pattern = PatternKind.Stars,
+            textureAlpha = 0.16f
+        )),
+        ThemePreset("جنگلِ نقطه‌ای", "🌲", ThemeConfig(
+            kind = ThemeKind.Pattern,
+            primary = 0xFF102018.toInt(),
+            secondary = 0xFF46A758.toInt(),
+            pattern = PatternKind.Dots,
+            textureAlpha = 0.14f
+        )),
+
+        // ── تند / جواهری (جدید) ──
+        ThemePreset("زرشکیِ نقطه‌ای", "🍒", ThemeConfig(
+            kind = ThemeKind.Pattern,
+            primary = 0xFF8E1B3A.toInt(),
+            secondary = 0xFFFFCDD2.toInt(),
+            pattern = PatternKind.Dots,
+            textureAlpha = 0.16f
+        )),
+        ThemePreset("زمردیِ شطرنجی", "💚", ThemeConfig(
+            kind = ThemeKind.Pattern,
+            primary = 0xFF1B5E20.toInt(),
+            secondary = 0xFFC8E6C9.toInt(),
+            pattern = PatternKind.Grid,
+            textureAlpha = 0.12f
+        )),
+        ThemePreset("لاجوردیِ مورب", "💙", ThemeConfig(
+            kind = ThemeKind.Pattern,
+            primary = 0xFF283593.toInt(),
+            secondary = 0xFFC5CAE9.toInt(),
+            pattern = PatternKind.Diagonal,
+            textureAlpha = 0.12f
+        )),
+        ThemePreset("مسِ کتان", "🥉", ThemeConfig(
+            kind = ThemeKind.Pattern,
+            primary = 0xFFB87333.toInt(),
+            secondary = 0xFFFFF3E0.toInt(),
+            pattern = PatternKind.Linen,
+            textureAlpha = 0.10f
+        )),
+        ThemePreset("خردلیِ موج", "🌼", ThemeConfig(
+            kind = ThemeKind.Pattern,
+            primary = 0xFFF9A825.toInt(),
+            secondary = 0xFF3E2723.toInt(),
+            pattern = PatternKind.Waves,
+            textureAlpha = 0.12f
+        )),
+        ThemePreset("عنابیِ بوکه", "🍷", ThemeConfig(
+            kind = ThemeKind.Pattern,
+            primary = 0xFF2A0E1A.toInt(),
+            secondary = 0xFFF8BBD0.toInt(),
+            pattern = PatternKind.Bokeh,
+            textureAlpha = 0.16f
         ))
     )
 
@@ -1780,3 +1896,4 @@ private fun ThemeSliderRow(
         )
     }
 }
+// ✅ END OF ThemeKit.kt — اگر این خط را ندیدی، پیام قطع شده؛ ذخیره نکن.
