@@ -774,7 +774,6 @@ fun BoardScreen(
     var showAddBoard by remember { mutableStateOf(false) }
     var showAddNote by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
-    var showClearBoard by remember { mutableStateOf(false) }
     var showConnectionsDialog by remember { mutableStateOf(false) }
     var boardName by remember { mutableStateOf("") }
     var newBoardSizeIndex by remember { mutableStateOf(1) }
@@ -1333,26 +1332,6 @@ fun BoardScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text("📤 خروجی", color = Color(0xFFFFCDD2), fontSize = 12.sp, fontFamily = VazirFont)
-                        }
-                    }
-
-                    Surface(
-                        onClick = {
-                            if (items.isEmpty() && images.isEmpty() && connections.isEmpty()) {
-                                Toast.makeText(context, "تابلو خالی است 🧹", Toast.LENGTH_SHORT).show()
-                            } else {
-                                showClearBoard = true
-                            }
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFF607D8B).copy(alpha = 0.22f),
-                        border = BorderStroke(1.dp, Color(0xFF90A4AE).copy(alpha = 0.5f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("🧹 پاک کردن", color = Color(0xFFECEFF1), fontSize = 12.sp, fontFamily = VazirFont)
                         }
                     }
 
@@ -2060,82 +2039,6 @@ fun BoardScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showExportDialog = false }) {
-                    Text("انصراف")
-                }
-            }
-        )
-    }
-
-    if (showClearBoard) {
-        AlertDialog(
-            onDismissRequest = { showClearBoard = false },
-            title = {
-                Text(
-                    "🧹 پاک کردن تابلو",
-                    fontFamily = LalezarFont,
-                    fontSize = 20.sp
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "همهٔ یادداشت‌ها و عکس‌های چسبانده‌شده روی این تابلو برداشته شوند؟",
-                        fontFamily = VazirFont,
-                        fontSize = 14.sp
-                    )
-
-                    Text(
-                        "روی این تابلو: ${items.size} یادداشت، ${images.size} تصویر، ${connections.size} اتصال",
-                        fontSize = 12.sp,
-                        color = Color.Gray,
-                        fontFamily = VazirFont
-                    )
-
-                    Text(
-                        "یادداشت‌ها از دفترچهٔ اصلی حذف نمی‌شوند؛ فقط از تابلو جدا می‌شوند. لینک‌ها هم پاک می‌شوند.",
-                        fontSize = 12.sp,
-                        color = Color(0xFFFB8C00),
-                        fontFamily = VazirFont
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val itemsSnapshot = items.toList()
-                        val imagesSnapshot = images.toList()
-
-                        itemsSnapshot.forEach { item ->
-                            BoardStore.removeItem(context, item.noteId, currentBoard)
-                        }
-
-                        imagesSnapshot.forEach { img ->
-                            BoardStore.removeImage(context, img.id, currentBoard)
-                        }
-
-                        connections = emptyList()
-                        saveConnections(context, currentBoard, connections)
-
-                        pendingConnection = null
-                        connectMode = false
-                        noteSizes.value = mutableMapOf()
-                        imageSizes.value = mutableMapOf()
-
-                        refresh()
-                        showClearBoard = false
-
-                        Toast.makeText(context, "تابلو پاک شد 🧹", Toast.LENGTH_SHORT).show()
-                    }
-                ) {
-                    Text(
-                        "پاک کن",
-                        color = Color(0xFFE53935),
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearBoard = false }) {
                     Text("انصراف")
                 }
             }
@@ -3360,4 +3263,3 @@ private fun CurledCorner(modifier: Modifier = Modifier) {
         )
     }
 }
-// ✅ END OF BoardScreen.kt — اگر این خط را ندیدی، پیام قطع شده؛ ذخیره نکن.
