@@ -17,7 +17,6 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -219,7 +218,6 @@ fun EditorScreen(
     var attachments by remember { mutableStateOf<List<Attachment>>(emptyList()) }
     var pendingCameraFile by remember { mutableStateOf<File?>(null) }
 
-    var showPalette by remember { mutableStateOf(false) }
     var showPaperStudio by remember { mutableStateOf(false) }
     var paperVersion by remember { mutableIntStateOf(0) }
 
@@ -1215,43 +1213,6 @@ fun EditorScreen(
                     .fillMaxWidth()
                     .background(DeepGreen)
             ) {
-                AnimatedVisibility(showPalette) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        EditorPaperColors.forEachIndexed { index, color ->
-                            Box(
-                                Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(color)
-                                    .border(
-                                        if ((note?.color ?: 0) == index) 3.dp else 1.dp,
-                                        if ((note?.color ?: 0) == index) {
-                                            Saffron
-                                        } else {
-                                            Color.Black.copy(alpha = .2f)
-                                        },
-                                        CircleShape
-                                    )
-                                    .clickable {
-                                        note = (note ?: Note(id = realId)).copy(color = index)
-
-                                        if (realId > 0L) {
-                                            ThemeKit.clearNotePaper(context, realId)
-                                        }
-
-                                        paperVersion++
-                                    }
-                            )
-                        }
-                    }
-                }
-
                 Column(
                     Modifier
                         .fillMaxWidth()
@@ -1319,14 +1280,6 @@ fun EditorScreen(
                             modifier = Modifier.weight(1f)
                         ) {
                             onOpenDraw(realId)
-                        }
-
-                        IconButton(onClick = { showPalette = !showPalette }) {
-                            Icon(
-                                Icons.Filled.Palette,
-                                "رنگ",
-                                tint = if (showPalette) Saffron else Color(0xFF5E8077)
-                            )
                         }
                     }
                 }
@@ -2404,3 +2357,4 @@ private fun importUris(
         }
     }
 }
+// ✅ END OF EditorScreen.kt — اگر این خط را ندیدی، پیام قطع شده؛ ذخیره نکن.
