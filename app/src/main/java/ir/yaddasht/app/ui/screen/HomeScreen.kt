@@ -98,10 +98,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import coil.compose.AsyncImage
 import ir.yaddasht.app.R
 import ir.yaddasht.app.data.Note
 import ir.yaddasht.app.data.NoteDao
@@ -114,7 +112,6 @@ import ir.yaddasht.app.ui.theme.Brick
 import ir.yaddasht.app.ui.theme.DeepGreen
 import ir.yaddasht.app.ui.theme.DeepGreenSoft
 import ir.yaddasht.app.ui.theme.Ink
-import ir.yaddasht.app.ui.theme.InkSoft
 import ir.yaddasht.app.ui.theme.LalezarFont
 import ir.yaddasht.app.ui.theme.LineGreen
 import ir.yaddasht.app.ui.theme.MutedGreenText
@@ -663,11 +660,25 @@ fun HomeScreen(
         onDispose { }
     }
 
-    SideEffect(isLightBackground) {
+    SideEffect {
         window?.let { w ->
             val controller = WindowInsetsControllerCompat(w, w.decorView)
-            controller.isLightStatusBar = isLightBackground
-            controller.isLightNavigationBars = isLightBackground
+
+            controller.setSystemBarsAppearance(
+                if (isLightBackground)
+                    WindowInsetsControllerCompat.APPEARANCE_LIGHT_STATUS_BARS
+                else
+                    0,
+                WindowInsetsControllerCompat.APPEARANCE_LIGHT_STATUS_BARS
+            )
+
+            controller.setSystemBarsAppearance(
+                if (isLightBackground)
+                    WindowInsetsControllerCompat.APPEARANCE_LIGHT_NAVIGATION_BARS
+                else
+                    0,
+                WindowInsetsControllerCompat.APPEARANCE_LIGHT_NAVIGATION_BARS
+            )
         }
     }
 
@@ -2436,7 +2447,6 @@ private fun AppGuideDialog(
     onDismiss: () -> Unit
 ) {
     val gold = Color(0xFFFFB74D)
-    val body = Color(0xFFE6EDF3)
     val muted = Color(0xFF8B949E)
 
     AlertDialog(
