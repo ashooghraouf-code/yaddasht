@@ -1,7 +1,10 @@
 package ir.yaddasht.app.ui.screen
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color as AndroidColor
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -20,11 +23,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -62,7 +67,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -91,6 +98,10 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import coil.compose.AsyncImage
 import ir.yaddasht.app.R
 import ir.yaddasht.app.data.Note
 import ir.yaddasht.app.data.NoteDao
@@ -631,6 +642,35 @@ fun HomeScreen(
     val onBgMuted = if (isLightBackground) Color(0xFF5B665F) else MutedGreenText
     val onBgAccent = if (isLightBackground) Color(0xFF8A5A00) else Saffron
 
+    val window = (context as? Activity)?.window
+
+    DisposableEffect(window) {
+        if (window != null) {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+
+            @Suppress("DEPRECATION")
+            window.statusBarColor = AndroidColor.TRANSPARENT
+
+            @Suppress("DEPRECATION")
+            window.navigationBarColor = AndroidColor.TRANSPARENT
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                window.isStatusBarContrastEnforced = false
+                window.isNavigationBarContrastEnforced = false
+            }
+        }
+
+        onDispose { }
+    }
+
+    SideEffect(isLightBackground) {
+        window?.let { w ->
+            val controller = WindowInsetsControllerCompat(w, w.decorView)
+            controller.isLightStatusBar = isLightBackground
+            controller.isLightNavigationBars = isLightBackground
+        }
+    }
+
     val notes by dao.observeNotes().collectAsState(initial = emptyList())
     val counts by dao.observeAttachmentCounts().collectAsState(initial = emptyList())
     val countMap = counts.associate { it.noteId to it.count }
@@ -728,6 +768,8 @@ fun HomeScreen(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets.systemBars,
         floatingActionButton = {
             when (tab) {
                 0 -> NewNoteFab(onNewNote = onNewNote)
@@ -747,25 +789,31 @@ fun HomeScreen(
             }
         }
     ) { padding ->
-        Box(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+        Box(Modifier.fillMaxSize()) {
             HomeBackground(
                 config = homeTheme,
                 modifier = Modifier.fillMaxSize()
             )
 
             if (tab == 3) {
-                BoardScreen(
-                    notes = notes,
-                    noteDao = dao,
-                    onOpenNote = { id -> onOpenNote(id) },
-                    onBack = { tab = 0 }
-                )
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                ) {
+                    BoardScreen(
+                        notes = notes,
+                        noteDao = dao,
+                        onOpenNote = { id -> onOpenNote(id) },
+                        onBack = { tab = 0 }
+                    )
+                }
             } else {
-                Column(Modifier.fillMaxSize()) {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                ) {
                     HomeHeader(
                         count = notes.size,
                         onStats = { showStats = true },
@@ -3007,3 +3055,4 @@ private fun computeHolidayDays(jy: Int, jm: Int): Set<Int> {
 
     return set
 }
+// ✅ END OF HomeScreen.kt — اگر این خط را ندیدی، پیام قطع شده؛ ذخیره نکن.
