@@ -662,23 +662,9 @@ fun HomeScreen(
 
     SideEffect {
         window?.let { w ->
-            val controller = WindowInsetsControllerCompat(w, w.decorView)
-
-            controller.setSystemBarsAppearance(
-                if (isLightBackground)
-                    WindowInsetsControllerCompat.APPEARANCE_LIGHT_STATUS_BARS
-                else
-                    0,
-                WindowInsetsControllerCompat.APPEARANCE_LIGHT_STATUS_BARS
-            )
-
-            controller.setSystemBarsAppearance(
-                if (isLightBackground)
-                    WindowInsetsControllerCompat.APPEARANCE_LIGHT_NAVIGATION_BARS
-                else
-                    0,
-                WindowInsetsControllerCompat.APPEARANCE_LIGHT_NAVIGATION_BARS
-            )
+            val controller = WindowCompat.getInsetsController(w, w.decorView)
+            controller.isAppearanceLightStatusBars = isLightBackground
+            controller.isAppearanceLightNavigationBars = isLightBackground
         }
     }
 
@@ -3065,4 +3051,3 @@ private fun computeHolidayDays(jy: Int, jm: Int): Set<Int> {
 
     return set
 }
-// ✅ END OF HomeScreen.kt — اگر این خط را ندیدی، پیام قطع شده؛ ذخیره نکن.
