@@ -12,8 +12,8 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <uses-permission android:name="android.permission.USE_BIOMETRIC" tools:node="remove" />
-    <uses-permission android:name="android.permission.USE_FINGERPRINT" tools:node="remove" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
 
     <uses-feature
         android:name="android.hardware.fingerprint"
@@ -134,3 +134,4 @@
     </application>
 
 </manifest>
+// ✅ END OF AndroidManifest.xml — اگر این خط را ندیدی، پیام قطع شده؛ ذخیره نکن.
