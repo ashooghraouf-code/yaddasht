@@ -9,7 +9,6 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -2636,19 +2635,17 @@ private fun SearchBox(
         label = "searchFontSize"
     )
 
-    val borderColor by animateColorAsState(
-        targetValue = if (focused) Saffron else LineGreen,
-        animationSpec = tween(180),
-        label = "searchBorder"
-    )
-
     Row(
         modifier
             .fillMaxWidth()
             .height(boxHeight)
             .clip(RoundedCornerShape(12.dp))
             .background(DeepGreenSoft)
-            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
+            .border(
+                1.dp,
+                if (focused) Saffron else LineGreen,
+                RoundedCornerShape(12.dp)
+            )
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -3090,4 +3087,3 @@ private fun computeHolidayDays(jy: Int, jm: Int): Set<Int> {
 
     return set
 }
-// ✅ END OF HomeScreen.kt — اگر این خط را ندیدی، پیام قطع شده؛ ذخیره نکن.
