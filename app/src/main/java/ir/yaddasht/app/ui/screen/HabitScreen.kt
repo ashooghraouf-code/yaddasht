@@ -65,7 +65,6 @@ import ir.yaddasht.app.ui.theme.PaperWhite
 import ir.yaddasht.app.ui.theme.Saffron
 import ir.yaddasht.app.ui.theme.VazirFont
 import ir.yaddasht.app.util.HabitStreak
-import ir.yaddasht.app.util.fa
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -89,7 +88,8 @@ fun HabitScreen() {
     val logs by dao.observeAllLogs().collectAsState(initial = emptyList())
 
     val logsByHabit = remember(logs) {
-        logs.groupBy { it.habitId }.mapValues { entry -> entry.value.associateBy { it.dateKey } }
+        logs.groupBy { it.habitId }
+            .mapValues { entry -> entry.value.associateBy { it.dateKey } }
     }
 
     var showAdd by remember { mutableStateOf(false) }
@@ -98,8 +98,15 @@ fun HabitScreen() {
 
     val todayKey = HabitStreak.dateKey(now)
     val todayScheduled = habits.filter { HabitStreak.isScheduled(it, now) }
-    val todayDone = todayScheduled.count { HabitStreak.isDone(it, logsByHabit[it.id]?.get(todayKey)) }
-    val progress = if (todayScheduled.isEmpty()) 0f else todayDone.toFloat() / todayScheduled.size
+    val todayDone = todayScheduled.count {
+        HabitStreak.isDone(it, logsByHabit[it.id]?.get(todayKey))
+    }
+
+    val progress = if (todayScheduled.isEmpty()) {
+        0f
+    } else {
+        todayDone.toFloat() / todayScheduled.size
+    }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -113,12 +120,23 @@ fun HabitScreen() {
                     .padding(16.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    ProgressRing(fraction = progress, size = 64.dp)
+                    ProgressRing(
+                        fraction = progress,
+                        size = 64.dp
+                    )
+
                     Spacer(Modifier.width(14.dp))
+
                     Column(Modifier.weight(1f)) {
-                        Text("امروز", fontFamily = LalezarFont, fontSize = 18.sp, color = PaperWhite)
                         Text(
-                            "${todayDone.fa()} از ${todayScheduled.size.fa()} عادت انجام شد",
+                            "امروز",
+                            fontFamily = LalezarFont,
+                            fontSize = 18.sp,
+                            color = PaperWhite
+                        )
+
+                        Text(
+                            todayDone.toString() + " از " + todayScheduled.size.toString() + " عادت انجام شد",
                             fontSize = 13.sp,
                             color = MutedGreenText
                         )
@@ -127,9 +145,14 @@ fun HabitScreen() {
             }
 
             if (habits.isEmpty()) {
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
-                        "هنوز عادتی نداری 🌱\nبا دکمهٔ پایین اولین را بساز",
+                        "هنوز عادتی نداری\nبا دکمه پایین اولین را بساز",
                         color = MutedGreenText,
                         fontSize = 14.sp
                     )
@@ -137,7 +160,12 @@ fun HabitScreen() {
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 110.dp),
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 4.dp,
+                        bottom = 110.dp
+                    ),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(habits, key = { it.id }) { habit ->
@@ -159,8 +187,12 @@ fun HabitScreen() {
                                     dao.toggleRest(habit.id, todayKey)
                                 }
                             },
-                            onEdit = { editHabit = habit },
-                            onArchive = { archiveHabit = habit }
+                            onEdit = {
+                                editHabit = habit
+                            },
+                            onArchive = {
+                                archiveHabit = habit
+                            }
                         )
                     }
                 }
@@ -175,9 +207,18 @@ fun HabitScreen() {
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
         ) {
-            Icon(Icons.Filled.Add, contentDescription = null)
+            Icon(
+                Icons.Filled.Add,
+                contentDescription = null
+            )
+
             Spacer(Modifier.width(6.dp))
-            Text("عادت جدید", fontFamily = LalezarFont, fontSize = 15.sp)
+
+            Text(
+                "عادت جدید",
+                fontFamily = LalezarFont,
+                fontSize = 15.sp
+            )
         }
     }
 
@@ -190,8 +231,13 @@ fun HabitScreen() {
             },
             onSave = { h ->
                 scope.launch(Dispatchers.IO) {
-                    if (h.id == 0L) dao.insertHabit(h) else dao.updateHabit(h)
+                    if (h.id == 0L) {
+                        dao.insertHabit(h)
+                    } else {
+                        dao.updateHabit(h)
+                    }
                 }
+
                 showAdd = false
                 editHabit = null
             }
@@ -200,21 +246,44 @@ fun HabitScreen() {
 
     archiveHabit?.let { h ->
         AlertDialog(
-            onDismissRequest = { archiveHabit = null },
-            title = { Text("آرشیو عادت؟", fontFamily = LalezarFont, fontSize = 20.sp) },
-            text = { Text("«${h.title}» از لیست فعال پنهان می‌شود؛ رکوردها برای آمار حفظ می‌مانند.") },
+            onDismissRequest = {
+                archiveHabit = null
+            },
+            title = {
+                Text(
+                    "آرشیو عادت?",
+                    fontFamily = LalezarFont,
+                    fontSize = 20.sp
+                )
+            },
+            text = {
+                Text("عادت از لیست فعال پنهان می شود، رکوردها حفظ می مانند.")
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
                         archiveHabit = null
-                        scope.launch(Dispatchers.IO) { dao.archiveHabit(h.id) }
+
+                        scope.launch(Dispatchers.IO) {
+                            dao.archiveHabit(h.id)
+                        }
                     }
                 ) {
-                    Text("آرشیو", color = Color(0xFFE5484D), fontWeight = FontWeight.Bold)
+                    Text(
+                        "آرشیو",
+                        color = Color(0xFFE5484D),
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             },
             dismissButton = {
-                TextButton(onClick = { archiveHabit = null }) { Text("انصراف") }
+                TextButton(
+                    onClick = {
+                        archiveHabit = null
+                    }
+                ) {
+                    Text("انصراف")
+                }
             }
         )
     }
@@ -255,12 +324,23 @@ private fun HabitRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(DeepGreenSoft)
-            .border(1.5.dp, if (done) color else LineGreen, RoundedCornerShape(18.dp))
-            .combinedClickable(onClick = { onToggle(1) }, onLongClick = onEdit)
+            .border(
+                1.5.dp,
+                if (done) color else LineGreen,
+                RoundedCornerShape(18.dp)
+            )
+            .combinedClickable(
+                onClick = { onToggle(1) },
+                onLongClick = onEdit
+            )
             .padding(14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(habit.emoji, fontSize = 24.sp)
+            Text(
+                habit.emoji,
+                fontSize = 24.sp
+            )
+
             Spacer(Modifier.width(10.dp))
 
             Column(Modifier.weight(1f)) {
@@ -273,12 +353,20 @@ private fun HabitRow(
                 )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("🔥 ${streak.fa()}", fontSize = 11.sp, color = Saffron, fontWeight = FontWeight.Bold)
+                    Text(
+                        "زنجیره: " + streak.toString(),
+                        fontSize = 11.sp,
+                        color = Saffron,
+                        fontWeight = FontWeight.Bold
+                    )
 
                     if (habit.kind == "COUNT") {
                         Spacer(Modifier.width(10.dp))
+
+                        val currentCount = todayLog?.count ?: 0
+
                         Text(
-                            "${(todayLog?.count ?: 0).fa()}/${habit.targetPerDay.fa()} ${habit.unit}",
+                            currentCount.toString() + "/" + habit.targetPerDay.toString() + " " + habit.unit,
                             fontSize = 11.sp,
                             color = MutedGreenText
                         )
@@ -286,23 +374,33 @@ private fun HabitRow(
                 }
 
                 if (habit.cueText.isNotBlank()) {
-                    Text(habit.cueText, fontSize = 10.sp, color = MutedGreenText)
+                    Text(
+                        habit.cueText,
+                        fontSize = 10.sp,
+                        color = MutedGreenText
+                    )
                 }
             }
 
-            IconButton(onClick = onRest, modifier = Modifier.size(30.dp)) {
+            IconButton(
+                onClick = onRest,
+                modifier = Modifier.size(30.dp)
+            ) {
                 Icon(
                     Icons.Filled.Pause,
-                    contentDescription = "استراحت",
+                    contentDescription = "rest",
                     tint = if (resting) Saffron else MutedGreenText,
                     modifier = Modifier.size(16.dp)
                 )
             }
 
-            IconButton(onClick = onArchive, modifier = Modifier.size(30.dp)) {
+            IconButton(
+                onClick = onArchive,
+                modifier = Modifier.size(30.dp)
+            ) {
                 Icon(
                     Icons.Filled.Close,
-                    contentDescription = "آرشیو",
+                    contentDescription = "archive",
                     tint = MutedGreenText,
                     modifier = Modifier.size(16.dp)
                 )
@@ -312,10 +410,217 @@ private fun HabitRow(
                 Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(if (done || resting) color else Color.Transparent)
+                    .background(
+                        if (done || resting) {
+                            color
+                        } else {
+                            Color.Transparent
+                        }
+                    )
                     .border(2.dp, color, CircleShape)
                     .clickable { onToggle(1) },
                 contentAlignment = Alignment.Center
             ) {
+                when {
+                    resting -> Text(
+                        "\u23F8",
+                        color = PaperWhite,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    done -> Text(
+                        "\u2713",
+                        color = PaperWhite,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        if (habit.kind == "COUNT" && !done) {
+            Spacer(Modifier.height(8.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CountBtn("-") {
+                    onToggle(-1)
+                }
+
+                CountBtn("+") {
+                    onToggle(1)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        HeatStrip(
+            habit = habit,
+            byKey = byKey,
+            now = now,
+            color = color
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun UnscheduledHabitRow(
+    habit: Habit,
+    color: Color,
+    onEdit: () -> Unit,
+    onArchive: () -> Unit
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(DeepGreenSoft.copy(alpha = .45f))
+            .border(
+                1.dp,
+                LineGreen.copy(alpha = .5f),
+                RoundedCornerShape(18.dp)
+            )
+            .combinedClickable(
+                onClick = onEdit,
+                onLongClick = onArchive
+            )
+            .padding(14.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                habit.emoji,
+                fontSize = 22.sp,
+                color = PaperWhite.copy(alpha = .55f)
+            )
+
+            Spacer(Modifier.width(10.dp))
+
+            Column(Modifier.weight(1f)) {
                 Text(
-                    if (resting
+                    habit.title,
+                    fontFamily = VazirFont,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = PaperWhite.copy(alpha = .65f)
+                )
+
+                Text(
+                    "امروز نوبت این عادت نیست، لمس برای ویرایش",
+                    fontSize = 10.sp,
+                    color = MutedGreenText
+                )
+            }
+
+            Box(
+                Modifier
+                    .size(12.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = .35f))
+            )
+        }
+    }
+}
+
+@Composable
+private fun CountBtn(
+    label: String,
+    onClick: () -> Unit
+) {
+    Box(
+        Modifier
+            .size(34.dp)
+            .clip(CircleShape)
+            .background(DeepGreenSoft)
+            .border(1.dp, LineGreen, CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            color = PaperWhite,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun HeatStrip(
+    habit: Habit,
+    byKey: Map<String, HabitLog>,
+    now: Long,
+    color: Color
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        for (i in 29 downTo 0) {
+            val millis = HabitStreak.dayBeforeN(now, i)
+            val scheduled = HabitStreak.isScheduled(habit, millis)
+            val key = HabitStreak.dateKey(millis)
+            val done = HabitStreak.isDone(habit, byKey[key])
+
+            val dotColor = when {
+                !scheduled -> Color.White.copy(alpha = 0.06f)
+                done -> color
+                else -> Color(0xFFE5484D).copy(alpha = 0.35f)
+            }
+
+            Box(
+                Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(dotColor)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProgressRing(
+    fraction: Float,
+    size: Dp
+) {
+    Box(
+        Modifier.size(size),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val stroke = 6.dp.toPx()
+            val arcSize = Size(
+                this.size.width - stroke,
+                this.size.height - stroke
+            )
+            val topLeft = Offset(stroke / 2f, stroke / 2f)
+
+            drawArc(
+                color = Color.White.copy(alpha = 0.12f),
+                startAngle = -90f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = stroke)
+            )
+
+            drawArc(
+                color = Saffron,
+                startAngle = -90f,
+                sweepAngle = 360f * fraction.coerceIn(0f, 1f),
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = stroke)
+            )
+        }
+
+        val percent = (fraction * 100).toInt()
+
+        Text(
+            percent.toString() + "%",
+            color = PaperWhite,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
