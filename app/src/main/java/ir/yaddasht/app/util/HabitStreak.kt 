@@ -1,0 +1,93 @@
+package ir.yaddasht.app.util
+
+import ir.yaddasht.app.data.Habit
+import ir.yaddasht.app.data.HabitLog
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+import java.util.Calendar
+
+object HabitStreak {
+
+    fun dateKey(millis: Long): String {
+        val (y, m, d) = FaDate.jalali(millis)
+        return "%04d-%02d-%02d".format(y, m, d)
+    }
+
+    fun dayBeforeN(millis: Long, n: Int): Long {
+        var day = startOfDay(millis)
+        repeat(n) { day = previousDay(day) }
+        return day
+    }
+
+    fun isScheduled(habit: Habit, millis: Long): Boolean = when (habit.pattern) {
+        "WEEKLY_DAYS" -> {
+            if (habit.weekdaysMask == 0) true
+            else (habit.weekdaysMask shr weekdayIndex(millis)) and 1 == 1
+        }
+
+        "EVERY_N" -> {
+            val n = habit.everyNDays.coerceAtLeast(1)
+            val baseMillis = if (habit.createdAt > 0L) habit.createdAt else millis
+            val diff = ChronoUnit.DAYS.between(localDate(baseMillis), localDate(millis))
+            diff >= 0L && diff % n == 0L
+        }
+
+        else -> true
+    }
+
+    fun isDone(habit: Habit, log: HabitLog?): Boolean {
+        if (log == null) return false
+        if (log.rest) return true
+        return if (habit.kind == "COUNT") log.count >= habit.targetPerDay else log.count >= 1
+    }
+
+    fun currentStreak(habit: Habit, byKey: Map<String, HabitLog>, todayMillis: Long): Int {
+        val todayStart = startOfDay(todayMillis)
+        val todayKey = dateKey(todayStart)
+        val scheduledToday = isScheduled(habit, todayStart)
+        val doneToday = isDone(habit, byKey[todayKey])
+
+        var day = todayStart
+        if (scheduledToday && !doneToday) day = previousDay(day)
+
+        var streak = 0
+        var guard = 0
+        while (guard < 3650) {
+            if (isScheduled(habit, day)) {
+                if (isDone(habit, byKey[dateKey(day)])) streak++ else break
+            }
+            day = previousDay(day)
+            guard++
+        }
+        return streak
+    }
+
+    private fun localDate(millis: Long): LocalDate =
+        LocalDate.ofInstant(Instant.ofEpochMilli(millis), ZoneId.systemDefault())
+
+    private fun startOfDay(millis: Long): Long {
+        val c = Calendar.getInstance()
+        c.timeInMillis = millis
+        c.set(Calendar.HOUR_OF_DAY, 0)
+        c.set(Calendar.MINUTE, 0)
+        c.set(Calendar.SECOND, 0)
+        c.set(Calendar.MILLISECOND, 0)
+        return c.timeInMillis
+    }
+
+    private fun previousDay(millis: Long): Long {
+        val c = Calendar.getInstance()
+        c.timeInMillis = startOfDay(millis)
+        c.add(Calendar.DAY_OF_YEAR, -1)
+        return startOfDay(c.timeInMillis)
+    }
+
+    // شنبه=0، یکشنبه=1، دوشنبه=2، سه‌شنبه=3، چهارشنبه=4، پنجشنبه=5، جمعه=6
+    private fun weekdayIndex(millis: Long): Int {
+        val c = Calendar.getInstance()
+        c.timeInMillis = millis
+        return c.get(Calendar.DAY_OF_WEEK) % 7
+    }
+}
