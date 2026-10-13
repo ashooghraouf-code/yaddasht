@@ -64,7 +64,13 @@ import ir.yaddasht.app.ui.theme.MutedGreenText
 import ir.yaddasht.app.ui.theme.PaperWhite
 import ir.yaddasht.app.ui.theme.Saffron
 import ir.yaddasht.app.ui.theme.VazirFont
-import ir.yaddasht.app.util.HabitStreak
+import ir.yaddasht.app.util.FaDate
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+import java.util.Calendar
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -97,9 +103,13 @@ fun HabitScreen() {
     var archiveHabit by remember { mutableStateOf<Habit?>(null) }
 
     val todayKey = HabitStreak.dateKey(now)
-    val todayScheduled = habits.filter { HabitStreak.isScheduled(it, now) }
-    val todayDone = todayScheduled.count {
-        HabitStreak.isDone(it, logsByHabit[it.id]?.get(todayKey))
+
+    val todayScheduled = habits.filter {
+        HabitStreak.isScheduled(it, now)
+    }
+
+    val todayDone = todayScheduled.count { habit ->
+        HabitStreak.isDone(habit, logsByHabit[habit.id]?.get(todayKey))
     }
 
     val progress = if (todayScheduled.isEmpty()) {
@@ -622,5 +632,150 @@ private fun ProgressRing(
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold
         )
+    }
+}
+
+private object HabitStreak {
+
+    fun dateKey(millis: Long): String {
+        val result = FaDate.jalali(millis)
+        val y = result.first
+        val m = result.second
+        val d = result.third
+        return String.format(Locale.ROOT, "%04d-%02d-%02d", y, m, d)
+    }
+
+    fun dayBeforeN(millis: Long, n: Int): Long {
+        var day = startOfDay(millis)
+
+        repeat(n) {
+            day = previousDay(day)
+        }
+
+        return day
+    }
+
+    fun isScheduled(habit: Habit, millis: Long): Boolean {
+        return when (habit.pattern) {
+            "WEEKLY_DAYS" -> {
+                if (habit.weekdaysMask == 0) {
+                    true
+                } else {
+                    val index = weekdayIndex(millis)
+                    (habit.weekdaysMask shr index) and 1 == 1
+                }
+            }
+
+            "EVERY_N" -> {
+                val n = habit.everyNDays.coerceAtLeast(1)
+                val baseMillis = if (habit.createdAt > 0L) habit.createdAt else millis
+
+                val diff = ChronoUnit.DAYS.between(
+                    localDate(baseMillis),
+                    localDate(millis)
+                )
+
+                diff >= 0L && diff % n == 0L
+            }
+
+            else -> true
+        }
+    }
+
+    fun isDone(habit: Habit, log: HabitLog?): Boolean {
+        if (log == null) return false
+        if (log.rest) return true
+
+        return if (habit.kind == "COUNT") {
+            log.count >= habit.targetPerDay
+        } else {
+            log.count >= 1
+        }
+    }
+
+    fun currentStreak(
+        habit: Habit,
+        byKey: Map<String, HabitLog>,
+        todayMillis: Long
+    ): Int {
+        val todayStart = startOfDay(todayMillis)
+        val todayKey = dateKey(todayStart)
+
+        val scheduledToday = isScheduled(habit, todayStart)
+        val doneToday = isDone(habit, byKey[todayKey])
+
+        var day = todayStart
+
+        if (scheduledToday && !doneToday) {
+            day = previousDay(day)
+        }
+
+        var streak = 0
+        var guard = 0
+
+        while (guard < 3650) {
+            if (isScheduled(habit, day)) {
+                val key = dateKey(day)
+
+                if (isDone(habit, byKey[key])) {
+                    streak++
+                } else {
+                    break
+                }
+            }
+
+            day = previousDay(day)
+            guard++
+        }
+
+        return streak
+    }
+
+    private fun localDate(millis: Long): LocalDate {
+        return LocalDate.ofInstant(
+            Instant.ofEpochMilli(millis),
+            ZoneId.systemDefault()
+        )
+    }
+
+    private fun startOfDay(millis: Long): Long {
+        val c = Calendar.getInstance()
+        c.timeInMillis = millis
+        c.set(Calendar.HOUR_OF_DAY, 0)
+        c.set(Calendar.MINUTE, 0)
+        c.set(Calendar.SECOND, 0)
+        c.set(Calendar.MILLISECOND, 0)
+        return c.timeInMillis
+    }
+
+    private fun previousDay(millis: Long): Long {
+        val c = Calendar.getInstance()
+        c.timeInMillis = startOfDay(millis)
+        c.add(Calendar.DAY_OF_YEAR, -1)
+        return startOfDay(c.timeInMillis)
+    }
+
+    private fun weekdayIndex(millis: Long): Int {
+        val c = Calendar.getInstance()
+        c.timeInMillis = millis
+
+        // Calendar:
+        // Sunday = 1
+        // Monday = 2
+        // Tuesday = 3
+        // Wednesday = 4
+        // Thursday = 5
+        // Friday = 6
+        // Saturday = 7
+        //
+        // Iranian week:
+        // Saturday = 0
+        // Sunday = 1
+        // Monday = 2
+        // Tuesday = 3
+        // Wednesday = 4
+        // Thursday = 5
+        // Friday = 6
+        return c.get(Calendar.DAY_OF_WEEK) % 7
     }
 }
