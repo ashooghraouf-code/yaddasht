@@ -57,14 +57,208 @@ val HabitPalette = listOf(
     Color(0xFFEC407A)
 )
 
+private data class HabitTemplate(
+    val name: String,
+    val emoji: String,
+    val kind: String,
+    val target: Int,
+    val unit: String,
+    val basePattern: String,
+    val weekdaysMask: Int,
+    val everyNDays: Int,
+    val remindHour: Int,
+    val remindMinute: Int,
+    val cue: String,
+    val reward: String,
+    val colorIndex: Int
+)
+
+private val HabitTemplates = listOf(
+    HabitTemplate(
+        name = "مطالعه/درس",
+        emoji = "📚",
+        kind = "COUNT",
+        target = 25,
+        unit = "دقیقه",
+        basePattern = "DAILY",
+        weekdaysMask = 0,
+        everyNDays = 1,
+        remindHour = 20,
+        remindMinute = 0,
+        cue = "میز خلوت، گوشی سایلنت",
+        reward = "یک چای/موسیقی کوتاه",
+        colorIndex = 4
+    ),
+    HabitTemplate(
+        name = "قرص/دارو",
+        emoji = "💊",
+        kind = "BINARY",
+        target = 1,
+        unit = "بار",
+        basePattern = "DAILY",
+        weekdaysMask = 0,
+        everyNDays = 1,
+        remindHour = 9,
+        remindMinute = 0,
+        cue = "کنار لیوان آب بگذار",
+        reward = "",
+        colorIndex = 3
+    ),
+    HabitTemplate(
+        name = "آب",
+        emoji = "💧",
+        kind = "COUNT",
+        target = 8,
+        unit = "لیوان",
+        basePattern = "DAILY",
+        weekdaysMask = 0,
+        everyNDays = 1,
+        remindHour = -1,
+        remindMinute = 0,
+        cue = "هر ساعت یک لیوان",
+        reward = "",
+        colorIndex = 5
+    ),
+    HabitTemplate(
+        name = "ورزش",
+        emoji = "🏋️",
+        kind = "BINARY",
+        target = 1,
+        unit = "بار",
+        basePattern = "WEEKLY_DAYS",
+        weekdaysMask = (1 shl 2) or (1 shl 4) or (1 shl 6),
+        everyNDays = 1,
+        remindHour = 18,
+        remindMinute = 0,
+        cue = "لباس ورزش آماده باشد",
+        reward = "دوش گرم و استراحت",
+        colorIndex = 6
+    ),
+    HabitTemplate(
+        name = "خواب به‌موقع",
+        emoji = "😴",
+        kind = "BINARY",
+        target = 1,
+        unit = "بار",
+        basePattern = "DAILY",
+        weekdaysMask = 0,
+        everyNDays = 1,
+        remindHour = 23,
+        remindMinute = 0,
+        cue = "گوشی را کنار بگذار",
+        reward = "",
+        colorIndex = 1
+    ),
+    HabitTemplate(
+        name = "مدیتیشن",
+        emoji = "🧘",
+        kind = "COUNT",
+        target = 10,
+        unit = "دقیقه",
+        basePattern = "DAILY",
+        weekdaysMask = 0,
+        everyNDays = 1,
+        remindHour = 7,
+        remindMinute = 0,
+        cue = "بعد از بیدار شدن",
+        reward = "یک نفس عمیق و لبخند",
+        colorIndex = 0
+    ),
+    HabitTemplate(
+        name = "کتاب",
+        emoji = "📖",
+        kind = "COUNT",
+        target = 20,
+        unit = "صفحه",
+        basePattern = "DAILY",
+        weekdaysMask = 0,
+        everyNDays = 1,
+        remindHour = 22,
+        remindMinute = 0,
+        cue = "قبل از خواب",
+        reward = "",
+        colorIndex = 2
+    ),
+    HabitTemplate(
+        name = "پیاده‌روی",
+        emoji = "🚶",
+        kind = "COUNT",
+        target = 30,
+        unit = "دقیقه",
+        basePattern = "DAILY",
+        weekdaysMask = 0,
+        everyNDays = 1,
+        remindHour = 17,
+        remindMinute = 0,
+        cue = "کفش راحت",
+        reward = "یه موز یا چای",
+        colorIndex = 7
+    ),
+    HabitTemplate(
+        name = "نماز/معنویت",
+        emoji = "🙏",
+        kind = "BINARY",
+        target = 1,
+        unit = "بار",
+        basePattern = "DAILY",
+        weekdaysMask = 0,
+        everyNDays = 1,
+        remindHour = 6,
+        remindMinute = 0,
+        cue = "اول صبح",
+        reward = "",
+        colorIndex = 1
+    ),
+    HabitTemplate(
+        name = "زبان/یادگیری",
+        emoji = "🧠",
+        kind = "COUNT",
+        target = 15,
+        unit = "دقیقه",
+        basePattern = "DAILY",
+        weekdaysMask = 0,
+        everyNDays = 1,
+        remindHour = 21,
+        remindMinute = 0,
+        cue = "۱۰ لغت + ۵ دقیقه گوش دادن",
+        reward = "",
+        colorIndex = 8
+    )
+)
+
 private val HabitEmojis = listOf(
-    "✅", "💊", "🏋️", "📚", "",
-    "💧", "🥗", "", "😴", "🌱",
+    "✅", "💊", "🏋️", "📚", "🧘",
+    "💧", "🥗", "📖", "😴", "🌱",
     "✍️", "🎯", "", "☀️", "🙏",
-    "🎸", "🚶", "🚭", "", "❤️"
+    "🎸", "🚶", "", "🧹", "❤️"
 )
 
 private val WeekLetters = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
+
+private fun patternBase(pattern: String): String =
+    pattern.substringBefore("@")
+
+private fun reminderMinutesFromPattern(pattern: String): Int {
+    val at = pattern.indexOf("@")
+    if (at < 0) return -1
+
+    val time = pattern.substring(at + 1)
+    val parts = time.split(":")
+    if (parts.size != 2) return -1
+
+    val h = parts[0].toIntOrNull() ?: return -1
+    val m = parts[1].toIntOrNull() ?: return -1
+
+    if (h !in 0..23 || m !in 0..59) return -1
+    return h * 60 + m
+}
+
+private fun makePattern(base: String, hour: Int, minute: Int, enabled: Boolean): String {
+    if (!enabled) return base
+    val hh = hour.coerceIn(0, 23).toString().padStart(2, '0')
+    val mm = minute.coerceIn(0, 59).toString().padStart(2, '0')
+    return "$base@$hh:$mm"
+}
 
 @Composable
 fun AddHabitDialog(
@@ -72,18 +266,29 @@ fun AddHabitDialog(
     onDismiss: () -> Unit,
     onSave: (Habit) -> Unit
 ) {
+    val initialBase = initial?.pattern?.let { patternBase(it) } ?: "DAILY"
+    val initialReminderMin = initial?.pattern?.let { reminderMinutesFromPattern(it) } ?: -1
+
     var title by remember { mutableStateOf(initial?.title ?: "") }
     var emoji by remember { mutableStateOf(initial?.emoji ?: "✅") }
     var colorIndex by remember { mutableIntStateOf(initial?.colorIndex ?: 0) }
     var kind by remember { mutableStateOf(initial?.kind ?: "BINARY") }
     var target by remember { mutableIntStateOf(initial?.targetPerDay ?: 1) }
     var unit by remember { mutableStateOf(initial?.unit ?: "بار") }
-    var pattern by remember { mutableStateOf(initial?.pattern ?: "DAILY") }
+    var pattern by remember { mutableStateOf(initialBase) }
     var mask by remember { mutableIntStateOf(initial?.weekdaysMask ?: 0) }
     var everyN by remember { mutableIntStateOf(initial?.everyNDays ?: 1) }
     var cue by remember { mutableStateOf(initial?.cueText ?: "") }
     var reward by remember { mutableStateOf(initial?.rewardText ?: "") }
     val createdAt by remember { mutableLongStateOf(initial?.createdAt ?: System.currentTimeMillis()) }
+
+    var reminderEnabled by remember { mutableStateOf(initialReminderMin >= 0) }
+    var remindHour by remember {
+        mutableIntStateOf(if (initialReminderMin >= 0) initialReminderMin / 60 else 21)
+    }
+    var remindMinute by remember {
+        mutableIntStateOf(if (initialReminderMin >= 0) initialReminderMin % 60 else 0)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -99,6 +304,45 @@ fun AddHabitDialog(
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                Text(
+                    "قالب آماده",
+                    fontSize = 12.sp,
+                    color = MutedGreenText,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    HabitTemplates.forEach { t ->
+                        SmallChip(
+                            label = "${t.emoji} ${t.name}",
+                            selected = false
+                        ) {
+                            title = t.name
+                            emoji = t.emoji
+                            kind = t.kind
+                            target = t.target
+                            unit = t.unit
+                            pattern = t.basePattern
+                            mask = t.weekdaysMask
+                            everyN = t.everyNDays
+                            cue = t.cue
+                            reward = t.reward
+                            colorIndex = t.colorIndex
+
+                            if (t.remindHour >= 0) {
+                                reminderEnabled = true
+                                remindHour = t.remindHour
+                                remindMinute = t.remindMinute
+                            } else {
+                                reminderEnabled = false
+                            }
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
@@ -107,7 +351,13 @@ fun AddHabitDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Text("ایموجی", fontSize = 12.sp, color = MutedGreenText, fontWeight = FontWeight.Bold)
+                Text(
+                    "ایموجی",
+                    fontSize = 12.sp,
+                    color = MutedGreenText,
+                    fontWeight = FontWeight.Bold
+                )
+
                 Row(
                     Modifier.horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -121,11 +371,19 @@ fun AddHabitDialog(
                                 .border(1.dp, if (emoji == e) Saffron else LineGreen, CircleShape)
                                 .clickable { emoji = e },
                             contentAlignment = Alignment.Center
-                        ) { Text(e, fontSize = 16.sp) }
+                        ) {
+                            Text(e, fontSize = 16.sp)
+                        }
                     }
                 }
 
-                Text("رنگ", fontSize = 12.sp, color = MutedGreenText, fontWeight = FontWeight.Bold)
+                Text(
+                    "رنگ",
+                    fontSize = 12.sp,
+                    color = MutedGreenText,
+                    fontWeight = FontWeight.Bold
+                )
+
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     HabitPalette.forEachIndexed { i, c ->
                         Box(
@@ -143,7 +401,13 @@ fun AddHabitDialog(
                     }
                 }
 
-                Text("نوع", fontSize = 12.sp, color = MutedGreenText, fontWeight = FontWeight.Bold)
+                Text(
+                    "نوع",
+                    fontSize = 12.sp,
+                    color = MutedGreenText,
+                    fontWeight = FontWeight.Bold
+                )
+
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     SmallChip("انجام شد / نشد", kind == "BINARY") { kind = "BINARY" }
                     SmallChip("شمارشی", kind == "COUNT") { kind = "COUNT" }
@@ -153,12 +417,16 @@ fun AddHabitDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(
                             value = target.toString(),
-                            onValueChange = { target = it.filter { ch -> ch.isDigit() }.toIntOrNull() ?: 1 },
+                            onValueChange = {
+                                target = it.filter { ch -> ch.isDigit() }.toIntOrNull() ?: 1
+                            },
                             label = { Text("هدف روزانه") },
                             singleLine = true,
                             modifier = Modifier.width(120.dp)
                         )
+
                         Spacer(Modifier.width(8.dp))
+
                         OutlinedTextField(
                             value = unit,
                             onValueChange = { unit = it },
@@ -169,7 +437,13 @@ fun AddHabitDialog(
                     }
                 }
 
-                Text("الگو", fontSize = 12.sp, color = MutedGreenText, fontWeight = FontWeight.Bold)
+                Text(
+                    "الگو",
+                    fontSize = 12.sp,
+                    color = MutedGreenText,
+                    fontWeight = FontWeight.Bold
+                )
+
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     SmallChip("هر روز", pattern == "DAILY") { pattern = "DAILY" }
                     SmallChip("روزهای خاص", pattern == "WEEKLY_DAYS") { pattern = "WEEKLY_DAYS" }
@@ -180,6 +454,7 @@ fun AddHabitDialog(
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         WeekLetters.forEachIndexed { i, w ->
                             val on = (mask shr i) and 1 == 1
+
                             Box(
                                 Modifier
                                     .size(34.dp)
@@ -189,7 +464,12 @@ fun AddHabitDialog(
                                     .clickable { mask = mask xor (1 shl i) },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(w, fontSize = 13.sp, color = if (on) Ink else PaperWhite, fontWeight = FontWeight.Bold)
+                                Text(
+                                    w,
+                                    fontSize = 13.sp,
+                                    color = if (on) Ink else PaperWhite,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
@@ -199,28 +479,71 @@ fun AddHabitDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("هر", fontSize = 13.sp)
                         Spacer(Modifier.width(6.dp))
+
                         OutlinedTextField(
                             value = everyN.toString(),
-                            onValueChange = { everyN = (it.filter { ch -> ch.isDigit() }.toIntOrNull() ?: 1).coerceAtLeast(1) },
+                            onValueChange = {
+                                everyN = (it.filter { ch -> ch.isDigit() }.toIntOrNull() ?: 1)
+                                    .coerceAtLeast(1)
+                            },
                             singleLine = true,
                             modifier = Modifier.width(80.dp)
                         )
+
                         Spacer(Modifier.width(6.dp))
                         Text("روز یک‌بار", fontSize = 13.sp)
+                    }
+                }
+
+                Text(
+                    "یادآور",
+                    fontSize = 12.sp,
+                    color = MutedGreenText,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SmallChip("بدون یادآور", !reminderEnabled) { reminderEnabled = false }
+                    SmallChip("ساعت یادآور", reminderEnabled) { reminderEnabled = true }
+                }
+
+                if (reminderEnabled) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = remindHour.toString(),
+                            onValueChange = {
+                                remindHour = it.filter { ch -> ch.isDigit() }.toIntOrNull() ?: 0
+                            },
+                            label = { Text("ساعت") },
+                            singleLine = true,
+                            modifier = Modifier.width(90.dp)
+                        )
+
+                        Text(" : ", fontSize = 18.sp, color = PaperWhite)
+
+                        OutlinedTextField(
+                            value = remindMinute.toString(),
+                            onValueChange = {
+                                remindMinute = it.filter { ch -> ch.isDigit() }.toIntOrNull() ?: 0
+                            },
+                            label = { Text("دقیقه") },
+                            singleLine = true,
+                            modifier = Modifier.width(90.dp)
+                        )
                     }
                 }
 
                 OutlinedTextField(
                     value = cue,
                     onValueChange = { cue = it },
-                    label = { Text("اشاره (چرا این عادت؟) — اختیاری") },
+                    label = { Text("اشاره/شرایط انجام — اختیاری") },
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
                     value = reward,
                     onValueChange = { reward = it },
-                    label = { Text("پاداش (بعدش چه؟) — اختیاری") },
+                    label = { Text("پاداش بعد از انجام — اختیاری") },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -229,9 +552,17 @@ fun AddHabitDialog(
             TextButton(
                 enabled = title.isNotBlank(),
                 onClick = {
-                    val finalPattern = if (pattern == "WEEKLY_DAYS" && mask == 0) "DAILY" else pattern
-                    val finalMask = if (finalPattern == "WEEKLY_DAYS") mask else 0
-                    val finalEveryN = if (finalPattern == "EVERY_N") everyN.coerceAtLeast(1) else 1
+                    val finalBase = if (pattern == "WEEKLY_DAYS" && mask == 0) "DAILY" else pattern
+                    val finalMask = if (finalBase == "WEEKLY_DAYS") mask else 0
+                    val finalEveryN = if (finalBase == "EVERY_N") everyN.coerceAtLeast(1) else 1
+
+                    val finalPattern = makePattern(
+                        base = finalBase,
+                        hour = remindHour.coerceIn(0, 23),
+                        minute = remindMinute.coerceIn(0, 59),
+                        enabled = reminderEnabled
+                    )
+
                     onSave(
                         Habit(
                             id = initial?.id ?: 0L,
@@ -250,9 +581,15 @@ fun AddHabitDialog(
                         )
                     )
                 }
-            ) { Text("ذخیره", color = Saffron, fontWeight = FontWeight.Bold) }
+            ) {
+                Text("ذخیره", color = Saffron, fontWeight = FontWeight.Bold)
+            }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } }
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("انصراف")
+            }
+        }
     )
 }
 
@@ -269,3 +606,4 @@ private fun SmallChip(label: String, selected: Boolean, onClick: () -> Unit) {
         Text(label, fontSize = 11.sp, color = if (selected) Ink else PaperWhite)
     }
 }
+// ✅ END OF AddHabitDialog.kt
