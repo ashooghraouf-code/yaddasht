@@ -22,6 +22,7 @@ sealed class DictationState {
 class ContinuousDictation(private val context: Context) {
 
     private val mainHandler = Handler(Looper.getMainLooper())
+
     private var recognizer: SpeechRecognizer? = null
 
     @Volatile
@@ -31,6 +32,7 @@ class ContinuousDictation(private val context: Context) {
     private var restartPending = false
 
     private var noMatchStreak = 0
+    private var watchdog: Runnable? = null
 
     private val _committed = MutableStateFlow("")
     val committed: StateFlow<String> = _committed
@@ -47,11 +49,16 @@ class ContinuousDictation(private val context: Context) {
     private val listener = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) {
             noMatchStreak = 0
-            if (active) _state.value = DictationState.Listening
+            cancelWatchdog()
+            if (active) {
+                _state.value = DictationState.Listening
+            }
         }
 
         override fun onBeginningOfSpeech() {
-            if (active) _state.value = DictationState.Hearing
+            if (active) {
+                _state.value = DictationState.Hearing
+            }
         }
 
         override fun onRmsChanged(rmsdB: Float) {
@@ -61,7 +68,9 @@ class ContinuousDictation(private val context: Context) {
         }
 
         override fun onEndOfSpeech() {
-            if (active) scheduleRestart(80L)
+            if (active) {
+                scheduleRestart(120L)
+            }
         }
 
         override fun onError(error: Int) {
@@ -72,30 +81,8 @@ class ContinuousDictation(private val context: Context) {
                     fail("دسترسی میکروفون نداری؛ دیکته متوقف شد.")
                 }
 
-                SpeechRecognizer.ERROR_CLIENT -> {
-                    resetRecognizer()
-                    transientRestart()
-                }
-
-                SpeechRecognizer.ERROR_NO_MATCH -> {
-                    transientRestart()
-                }
-
-                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
-                    transientRestart()
-                }
-
-                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> {
-                    transientRestart()
-                }
-
-                SpeechRecognizer.ERROR_AUDIO,
-                SpeechRecognizer.ERROR_NETWORK,
-                SpeechRecognizer.ERROR_SERVER -> {
-                    transientRestart()
-                }
-
                 else -> {
+                    resetRecognizer()
                     transientRestart()
                 }
             }
@@ -112,9 +99,11 @@ class ContinuousDictation(private val context: Context) {
                 appendFinal(text)
                 noMatchStreak = 0
                 _partial.value = ""
-                scheduleRestart(80L)
+                resetRecognizer()
+                scheduleRestart(120L)
             } else {
                 _partial.value = ""
+                resetRecognizer()
                 transientRestart()
             }
         }
@@ -151,7 +140,6 @@ class ContinuousDictation(private val context: Context) {
         _partial.value = ""
         _state.value = DictationState.Listening
 
-        ensureRecognizer()
         beginListening()
     }
 
@@ -166,6 +154,8 @@ class ContinuousDictation(private val context: Context) {
         active = false
         restartPending = false
         noMatchStreak = 0
+
+        cancelWatchdog()
         mainHandler.removeCallbacksAndMessages(null)
 
         try {
@@ -186,6 +176,8 @@ class ContinuousDictation(private val context: Context) {
         active = false
         restartPending = false
         noMatchStreak = 0
+
+        cancelWatchdog()
         mainHandler.removeCallbacksAndMessages(null)
 
         try {
@@ -200,51 +192,84 @@ class ContinuousDictation(private val context: Context) {
         _state.value = DictationState.Idle
     }
 
-    fun release() = cancel()
-
-    private fun buildIntent(): Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-        putExtra(
-            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-        )
-        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
-        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-
-        putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 10_000L)
-        putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 8_000L)
-        putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 6_000L)
+    fun release() {
+        cancel()
     }
 
-    private fun ensureRecognizer() {
-        if (recognizer != null) return
-
-        val r = SpeechRecognizer.createSpeechRecognizer(context)
-        recognizer = r
-        r.setRecognitionListener(listener)
-    }
+    private fun buildIntent(): Intent =
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+            )
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR")
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 5000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+        }
 
     private fun beginListening() {
         if (!active) return
 
-        ensureRecognizer()
-        val r = recognizer ?: return
+        resetRecognizer()
+
+        val r = try {
+            SpeechRecognizer.createSpeechRecognizer(context)
+        } catch (_: Exception) {
+            fail("ساخت موتور گفتار ناموفق بود.")
+            return
+        }
+
+        recognizer = r
+        r.setRecognitionListener(listener)
 
         try {
             r.startListening(buildIntent())
             _state.value = DictationState.Listening
+            armWatchdog()
         } catch (_: Exception) {
             resetRecognizer()
-            ensureRecognizer()
-            val r2 = recognizer ?: return
+
+            val r2 = try {
+                SpeechRecognizer.createSpeechRecognizer(context)
+            } catch (_: Exception) {
+                fail("شروع دیکته ناموفق بود. میکروفون/سرویس گفتار را بررسی کن.")
+                return
+            }
+
+            recognizer = r2
+            r2.setRecognitionListener(listener)
 
             try {
                 r2.startListening(buildIntent())
                 _state.value = DictationState.Listening
+                armWatchdog()
             } catch (_: Exception) {
                 fail("شروع دیکته ناموفق بود. میکروفون/سرویس گفتار را بررسی کن.")
             }
         }
+    }
+
+    private fun armWatchdog() {
+        cancelWatchdog()
+
+        val runnable = Runnable {
+            if (active && !restartPending) {
+                resetRecognizer()
+                scheduleRestart(250L)
+            }
+        }
+
+        watchdog = runnable
+        mainHandler.postDelayed(runnable, 3500L)
+    }
+
+    private fun cancelWatchdog() {
+        watchdog?.let { mainHandler.removeCallbacks(it) }
+        watchdog = null
     }
 
     private fun scheduleRestart(delayMs: Long) {
@@ -255,21 +280,30 @@ class ContinuousDictation(private val context: Context) {
 
         mainHandler.postDelayed({
             restartPending = false
-            if (active) beginListening()
-        }, delayMs.coerceAtLeast(50L))
+            if (active) {
+                beginListening()
+            }
+        }, delayMs.coerceAtLeast(80L))
     }
 
     private fun transientRestart() {
         _partial.value = ""
         noMatchStreak++
+
+        if (noMatchStreak >= 15) {
+            fail("سرویس گفتار پاسخ نداد؛ چند بار تلاش کرد و متوقف شد.")
+            return
+        }
+
         scheduleRestart(restartDelay())
     }
 
     private fun restartDelay(): Long = when {
-        noMatchStreak <= 1 -> 120L
-        noMatchStreak <= 3 -> 800L
-        noMatchStreak <= 5 -> 2_200L
-        else -> 5_000L
+        noMatchStreak <= 1 -> 150L
+        noMatchStreak <= 3 -> 500L
+        noMatchStreak <= 5 -> 1200L
+        noMatchStreak <= 8 -> 2200L
+        else -> 3500L
     }
 
     private fun resetRecognizer() {
@@ -294,8 +328,12 @@ class ContinuousDictation(private val context: Context) {
         active = false
         restartPending = false
         noMatchStreak = 0
+
+        cancelWatchdog()
         mainHandler.removeCallbacksAndMessages(null)
+
         _state.value = DictationState.Error(message)
         resetRecognizer()
     }
 }
+// ✅ END OF ContinuousDictation.kt
