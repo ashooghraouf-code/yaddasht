@@ -17,7 +17,10 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -42,6 +45,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -53,7 +57,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Share
@@ -89,7 +92,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -155,7 +160,6 @@ private fun buildDocumentXml(title: String, body: String): String {
     val sb = StringBuilder()
     sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>")
     sb.append("<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body>")
-
     sb.append("<w:p><w:pPr><w:jc w:val=\"right\"/><w:rtl/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val=\"44\"/><w:rtl/></w:rPr><w:t xml:space=\"preserve\">")
     sb.append(xmlEsc(title))
     sb.append("</w:t></w:r></w:p>")
@@ -217,34 +221,30 @@ fun EditorScreen(
     var lastSaved by remember { mutableStateOf<Note?>(null) }
     var attachments by remember { mutableStateOf<List<Attachment>>(emptyList()) }
     var pendingCameraFile by remember { mutableStateOf<File?>(null) }
-
     var showPaperStudio by remember { mutableStateOf(false) }
     var paperVersion by remember { mutableIntStateOf(0) }
-
     var confirmDelete by remember { mutableStateOf(false) }
     var viewerImage by remember { mutableStateOf<Attachment?>(null) }
     var showFocus by remember { mutableStateOf(false) }
     var showAi by remember { mutableStateOf(false) }
     var showExport by remember { mutableStateOf(false) }
-
     var lockMode by remember { mutableStateOf<LockMode?>(null) }
     var pass1 by remember { mutableStateOf("") }
     var pass2 by remember { mutableStateOf("") }
     var lockError by remember { mutableStateOf("") }
     var showRecoveryCode by remember { mutableStateOf<String?>(null) }
-
     var showDatePicker by remember { mutableStateOf(false) }
     var showLeads by remember { mutableStateOf(false) }
     var pickedDate by remember { mutableLongStateOf(0L) }
     var leads by remember { mutableStateOf<Set<LeadTime>>(setOf(LeadTime.NONE, LeadTime.HOUR_1)) }
-
     var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
     var recordingFile by remember { mutableStateOf<File?>(null) }
     var recordSeconds by remember { mutableIntStateOf(0) }
 
+    var bodyFocused by remember { mutableStateOf(false) }
+
     val isLocked = note?.body?.let(NoteLock::isLocked) == true
     val isChecklist = note?.body?.let(Checklist::isChecklist) == true
-
     val baseIndex = note?.color ?: 0
 
     val paperConfig = remember(realId, baseIndex, paperVersion) {
@@ -315,7 +315,7 @@ fun EditorScreen(
             val text = dictation.stop()
             appendDictationText(text)
             dictating = false
-            Toast.makeText(context, st.message.orEmpty(), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, st.message, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -420,7 +420,6 @@ fun EditorScreen(
         ActivityResultContracts.TakePicture()
     ) { ok ->
         val file = pendingCameraFile
-
         if (ok && file != null && file.length() > 0) {
             scope.launch(Dispatchers.IO) {
                 dao.insertAttachment(
@@ -436,7 +435,6 @@ fun EditorScreen(
         } else {
             file?.delete()
         }
-
         pendingCameraFile = null
     }
 
@@ -537,8 +535,8 @@ fun EditorScreen(
 
     fun scheduleReminder(ts: Long, leadsSet: Set<LeadTime>) {
         val n = note ?: return
-
         note = n.copy(reminderAt = ts)
+
         ReminderScheduler.scheduleMulti(
             context,
             realId,
@@ -707,7 +705,6 @@ fun EditorScreen(
                 if (!dir.exists()) dir.mkdirs()
 
                 val file = File(dir, "${safeName(n.title)}.png")
-
                 val width = 1080
                 val lineHeight = 60
                 val padding = 60
@@ -858,7 +855,6 @@ fun EditorScreen(
         }
 
         ready = true
-
         delay(600)
 
         if (note == null) {
@@ -872,6 +868,24 @@ fun EditorScreen(
             }
         }
     }
+
+    val titleFontSize by animateFloatAsState(
+        targetValue = if (bodyFocused) 16f else 26f,
+        animationSpec = tween(180),
+        label = "titleFontSize"
+    )
+
+    val titleVerticalPadding by animateDpAsState(
+        targetValue = if (bodyFocused) 2.dp else 8.dp,
+        animationSpec = tween(180),
+        label = "titlePadding"
+    )
+
+    val titleSpacerHeight by animateDpAsState(
+        targetValue = if (bodyFocused) 2.dp else 8.dp,
+        animationSpec = tween(180),
+        label = "titleSpacer"
+    )
 
     Scaffold(
         containerColor = DeepGreen,
@@ -1055,31 +1069,42 @@ fun EditorScreen(
                             Spacer(Modifier.height(10.dp))
                         }
 
-                        TextField(
+                        BasicTextField(
                             value = note?.title.orEmpty(),
                             onValueChange = {
                                 note = (note ?: Note(id = realId)).copy(title = it)
                             },
-                            placeholder = {
-                                Text(
-                                    "عنوان یادداشت",
-                                    fontFamily = LalezarFont,
-                                    color = paperInkSoft,
-                                    fontSize = 22.sp
-                                )
-                            },
+                            singleLine = true,
                             textStyle = TextStyle(
                                 fontFamily = LalezarFont,
-                                fontSize = 26.sp,
+                                fontSize = titleFontSize.sp,
                                 color = paperInk,
                                 textDirection = TextDirection.Rtl
                             ),
-                            colors = transparentFieldColors(),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                            cursorBrush = SolidColor(paperAccent),
+                            decorationBox = { inner ->
+                                Box(
+                                    Modifier.fillMaxWidth(),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    if (note?.title.isNullOrBlank()) {
+                                        Text(
+                                            "عنوان یادداشت",
+                                            fontFamily = LalezarFont,
+                                            color = paperInkSoft,
+                                            fontSize = (titleFontSize - 2f).coerceAtLeast(12f).sp,
+                                            textDirection = TextDirection.Rtl
+                                        )
+                                    }
+                                    inner()
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = titleVerticalPadding)
                         )
 
-                        Spacer(Modifier.height(6.dp))
+                        Spacer(Modifier.height(titleSpacerHeight))
 
                         if (!isLocked && attachments.isNotEmpty()) {
                             AttachmentsSection(
@@ -1102,7 +1127,6 @@ fun EditorScreen(
 
                         if (dictating) {
                             val state = dictationState
-
                             val live = when {
                                 partial.isNotBlank() && committed.isNotBlank() -> "$committed\n$partial"
                                 partial.isNotBlank() -> partial
@@ -1113,9 +1137,8 @@ fun EditorScreen(
                                 is DictationState.Hearing -> "دارم می‌شنوم…"
                                 is DictationState.Restarting -> "در حال اتصال مجدد…"
                                 is DictationState.Listening -> "آماده‌ی شنیدن…"
-                                is DictationState.Error -> state.message.orEmpty()
+                                is DictationState.Error -> state.message
                                 is DictationState.Idle -> "…"
-                                else -> "…"
                             }
 
                             Row(
@@ -1174,17 +1197,10 @@ fun EditorScreen(
                             }
 
                             else -> {
-                                TextField(
+                                BasicTextField(
                                     value = note?.body.orEmpty(),
                                     onValueChange = {
                                         note = (note ?: Note(id = realId)).copy(body = it)
-                                    },
-                                    placeholder = {
-                                        Text(
-                                            "اینجا بنویس یا از «دیکته» و «چک‌لیست» استفاده کن",
-                                            color = paperInkSoft,
-                                            fontSize = 15.sp
-                                        )
                                     },
                                     textStyle = TextStyle(
                                         fontFamily = VazirFont,
@@ -1195,10 +1211,25 @@ fun EditorScreen(
                                         textAlign = TextAlign.Start,
                                         textDirection = TextDirection.Rtl
                                     ),
-                                    colors = transparentFieldColors(),
+                                    cursorBrush = SolidColor(paperAccent),
+                                    decorationBox = { inner ->
+                                        Box(Modifier.fillMaxSize()) {
+                                            if (note?.body.isNullOrBlank()) {
+                                                Text(
+                                                    "اینجا بنویس یا از «دیکته» و «چک‌لیست» استفاده کن",
+                                                    color = paperInkSoft,
+                                                    fontSize = 15.sp,
+                                                    textDirection = TextDirection.Rtl
+                                                )
+                                            }
+                                            inner()
+                                        }
+                                    },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .weight(1f)
+                                        .verticalScroll(rememberScrollState())
+                                        .onFocusChanged { bodyFocused = it.isFocused }
                                 )
                             }
                         }
@@ -1367,7 +1398,6 @@ fun EditorScreen(
                                     dao.deleteById(n.id)
                                 }
                             }
-
                             onBack()
                         }
                     }
@@ -1922,7 +1952,7 @@ private fun RecordStopPill(
         targetValue = .25f,
         animationSpec = infiniteRepeatable(
             tween(550),
-            androidx.compose.animation.core.RepeatMode.Reverse
+            RepeatMode.Reverse
         ),
         label = "dot"
     )
@@ -2094,7 +2124,6 @@ private fun AttachmentsSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("📄", fontSize = 18.sp)
-
             Spacer(Modifier.width(8.dp))
 
             Text(
@@ -2161,7 +2190,6 @@ private fun AudioAttachmentRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text("🎤", fontSize = 18.sp)
-
         Spacer(Modifier.width(8.dp))
 
         Text(
@@ -2338,7 +2366,6 @@ private fun importUris(
     scope.launch(Dispatchers.IO) {
         uris.forEach { uri ->
             val file = AttachmentStore.copyToPrivate(context, uri) ?: return@forEach
-
             val mime = context.contentResolver.getType(uri) ?: guessMimeType(file.name)
 
             dao.insertAttachment(
@@ -2357,4 +2384,4 @@ private fun importUris(
         }
     }
 }
-// ✅ END OF EditorScreen.kt — اگر این خط را ندیدی، پیام قطع شده؛ ذخیره نکن.
+// ✅ END OF EditorScreen.kt
