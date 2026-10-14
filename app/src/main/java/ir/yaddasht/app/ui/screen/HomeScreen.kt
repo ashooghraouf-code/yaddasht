@@ -68,8 +68,6 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -105,7 +103,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import ir.yaddasht.app.R
 import ir.yaddasht.app.data.Note
 import ir.yaddasht.app.data.NoteDao
@@ -693,7 +690,7 @@ fun HomeScreen(
 
     var showThemePicker by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = tab == 3) {
+    BackHandler(enabled = tab == 3 || tab == 4) {
         tab = 0
     }
 
@@ -864,6 +861,14 @@ fun HomeScreen(
                             selectedContentColor = onBgAccent,
                             unselectedContentColor = onBgMuted
                         )
+
+                        Tab(
+                            selected = tab == 4,
+                            onClick = { tab = 4 },
+                            text = { Text("🌱 برنامه‌ریز", fontFamily = LalezarFont, fontSize = 13.sp) },
+                            selectedContentColor = onBgAccent,
+                            unselectedContentColor = onBgMuted
+                        )
                     }
 
                     if (tab == 0 && !hideMemory && memory != null && query.isBlank()) {
@@ -915,7 +920,7 @@ fun HomeScreen(
                         }
                     }
 
-                    if (tab != 2) {
+                    if (tab != 2 && tab != 4) {
                         SearchBox(
                             query = query,
                             onQueryChange = { query = it },
@@ -1025,6 +1030,14 @@ fun HomeScreen(
                                     }
                                 }
                             }
+                        }
+
+                        4 -> Box(
+                            Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                        ) {
+                            HabitScreen()
                         }
 
                         else -> {
@@ -2491,6 +2504,7 @@ private fun AppGuideDialog(
                 GuideRow("✅", "وظیفه", "لیست کارها با سررسید و ساعت، اولویت، یادآورِ چندمرحله‌ای و تیکِ انجام.")
                 GuideRow("📅", "تقویم", "تقویم جلالی با تعطیلات رسمی و اعیاد قمری، نمایش هم‌زمان میلادی، و چیدمان یادآور/وظیفه روی روزها.")
                 GuideRow("📌", "تابلو", "بومِ نامحدود؛ یادداشت و عکس را بچسبان، جابه‌جا/چرخش/زوم بده، با 🔗 به هم وصل کن و خروجی PDF/PNG با کیفیت چاپ بگیر.")
+                GuideRow("🌱", "برنامه‌ریز", "عادت‌های روزانه با تیک/شمارنده، زنجیره، heat-map و روز استراحت.")
                 GuideRow("🎨", "استودیوی تم", "پس‌زمینهٔ اپ، تابلو و کاغذِ هر یادداشت؛ رنگ، گرادیان، طرح و شدت تا ۴۰٪.")
                 GuideRow("🧰", "جعبه‌ابزار", "ابزارهای جانبیِ چراغ راه.")
                 GuideRow("⬆️", "پشتیبان", "گرفتن نسخهٔ کاملِ یادداشت‌ها و وظایف در یک فایل.")
@@ -3087,3 +3101,4 @@ private fun computeHolidayDays(jy: Int, jm: Int): Set<Int> {
 
     return set
 }
+// ✅ END OF HomeScreen.kt
