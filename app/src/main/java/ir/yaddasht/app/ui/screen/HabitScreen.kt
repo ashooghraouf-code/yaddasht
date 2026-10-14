@@ -65,15 +65,14 @@ import ir.yaddasht.app.ui.theme.PaperWhite
 import ir.yaddasht.app.ui.theme.Saffron
 import ir.yaddasht.app.ui.theme.VazirFont
 import ir.yaddasht.app.util.FaDate
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.util.Calendar
-import java.util.Locale
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 @Composable
 fun HabitScreen() {
@@ -103,19 +102,47 @@ fun HabitScreen() {
     var archiveHabit by remember { mutableStateOf<Habit?>(null) }
 
     val todayKey = HabitStreak.dateKey(now)
+    val nowMinute = nowMinuteOfDay()
+
+    val isDone: (Habit) -> Boolean = { habit ->
+        HabitStreak.isDone(habit, logsByHabit[habit.id]?.get(todayKey))
+    }
 
     val todayScheduled = habits.filter {
         HabitStreak.isScheduled(it, now)
     }
 
-    val todayDone = todayScheduled.count { habit ->
-        HabitStreak.isDone(habit, logsByHabit[habit.id]?.get(todayKey))
-    }
+    val todayDone = todayScheduled.count(isDone)
 
     val progress = if (todayScheduled.isEmpty()) {
         0f
     } else {
         todayDone.toFloat() / todayScheduled.size
+    }
+
+    val sortedHabits = remember(habits, now) {
+        habits.sortedWith(
+            compareBy(
+                { it.reminderMin() < 0 },
+                { it.reminderMin() }
+            )
+        )
+    }
+
+    val overdue = sortedHabits.firstOrNull { h ->
+        val m = h.reminderMin()
+        m in 0 until nowMinute && !isDone(h)
+    }
+
+    val upcoming = sortedHabits.firstOrNull { h ->
+        val m = h.reminderMin()
+        m >= nowMinute && !isDone(h)
+    }
+
+    val reminderLine = when {
+        overdue != null -> "یادآور گذشته: ${overdue.title} • ${reminderLabel(overdue.reminderMin())}"
+        upcoming != null -> "نزدیک‌ترین یادآور: ${upcoming.title} • ${reminderLabel(upcoming.reminderMin())}"
+        else -> "یادآور فعالی برای امروز نداری"
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -150,6 +177,14 @@ fun HabitScreen() {
                             fontSize = 13.sp,
                             color = MutedGreenText
                         )
+
+                        Spacer(Modifier.height(4.dp))
+
+                        Text(
+                            reminderLine,
+                            fontSize = 11.sp,
+                            color = if (overdue != null) Color(0xFFFF8A80) else Saffron
+                        )
                     }
                 }
             }
@@ -178,7 +213,7 @@ fun HabitScreen() {
                     ),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(habits, key = { it.id }) { habit ->
+                    items(sortedHabits, key = { it.id }) { habit ->
                         HabitRow(
                             habit = habit,
                             byKey = logsByHabit[habit.id].orEmpty(),
@@ -328,6 +363,9 @@ private fun HabitRow(
     val done = HabitStreak.isDone(habit, todayLog)
     val resting = todayLog?.rest == true
     val streak = HabitStreak.currentStreak(habit, byKey, now)
+    val reminderMin = habit.reminderMin()
+    val nowMinute = nowMinuteOfDay()
+    val overdue = reminderMin >= 0 && reminderMin < nowMinute && !done && !resting
 
     Column(
         Modifier
@@ -336,7 +374,11 @@ private fun HabitRow(
             .background(DeepGreenSoft)
             .border(
                 1.5.dp,
-                if (done) color else LineGreen,
+                when {
+                    overdue -> Color(0xFFE5484D)
+                    done -> color
+                    else -> LineGreen
+                },
                 RoundedCornerShape(18.dp)
             )
             .combinedClickable(
@@ -370,6 +412,16 @@ private fun HabitRow(
                         fontWeight = FontWeight.Bold
                     )
 
+                    if (reminderMin >= 0) {
+                        Spacer(Modifier.width(10.dp))
+
+                        Text(
+                            "⏰ " + reminderLabel(reminderMin),
+                            fontSize = 11.sp,
+                            color = if (overdue) Color(0xFFFF8A80) else MutedGreenText
+                        )
+                    }
+
                     if (habit.kind == "COUNT") {
                         Spacer(Modifier.width(10.dp))
 
@@ -381,6 +433,15 @@ private fun HabitRow(
                             color = MutedGreenText
                         )
                     }
+                }
+
+                if (overdue) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        "از یادآور گذشته‌ای؛ اگر می‌توانی الان انجامش بده",
+                        fontSize = 10.sp,
+                        color = Color(0xFFFF8A80)
+                    )
                 }
 
                 if (habit.cueText.isNotBlank()) {
@@ -635,6 +696,21 @@ private fun ProgressRing(
     }
 }
 
+private fun Habit.reminderMin(): Int =
+    HabitStreak.reminderMinutes(pattern)
+
+private fun reminderLabel(min: Int): String {
+    if (min < 0) return ""
+    val h = (min / 60).toString().padStart(2, '0')
+    val m = (min % 60).toString().padStart(2, '0')
+    return "$h:$m"
+}
+
+private fun nowMinuteOfDay(): Int {
+    val c = Calendar.getInstance()
+    return c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE)
+}
+
 private object HabitStreak {
 
     fun dateKey(millis: Long): String {
@@ -642,7 +718,11 @@ private object HabitStreak {
         val y = result.first
         val m = result.second
         val d = result.third
-        return String.format(Locale.ROOT, "%04d-%02d-%02d", y, m, d)
+        return y.toString().padStart(4, '0') +
+            "-" +
+            m.toString().padStart(2, '0') +
+            "-" +
+            d.toString().padStart(2, '0')
     }
 
     fun dayBeforeN(millis: Long, n: Int): Long {
@@ -655,8 +735,26 @@ private object HabitStreak {
         return day
     }
 
+    fun reminderMinutes(pattern: String): Int {
+        val at = pattern.indexOf("@")
+        if (at < 0) return -1
+
+        val time = pattern.substring(at + 1)
+        val parts = time.split(":")
+        if (parts.size != 2) return -1
+
+        val h = parts[0].toIntOrNull() ?: return -1
+        val m = parts[1].toIntOrNull() ?: return -1
+
+        if (h !in 0..23 || m !in 0..59) return -1
+        return h * 60 + m
+    }
+
+    fun basePattern(pattern: String): String =
+        pattern.substringBefore("@")
+
     fun isScheduled(habit: Habit, millis: Long): Boolean {
-        return when (habit.pattern) {
+        return when (basePattern(habit.pattern)) {
             "WEEKLY_DAYS" -> {
                 if (habit.weekdaysMask == 0) {
                     true
@@ -758,24 +856,7 @@ private object HabitStreak {
     private fun weekdayIndex(millis: Long): Int {
         val c = Calendar.getInstance()
         c.timeInMillis = millis
-
-        // Calendar:
-        // Sunday = 1
-        // Monday = 2
-        // Tuesday = 3
-        // Wednesday = 4
-        // Thursday = 5
-        // Friday = 6
-        // Saturday = 7
-        //
-        // Iranian week:
-        // Saturday = 0
-        // Sunday = 1
-        // Monday = 2
-        // Tuesday = 3
-        // Wednesday = 4
-        // Thursday = 5
-        // Friday = 6
         return c.get(Calendar.DAY_OF_WEEK) % 7
     }
 }
+// ✅ END OF HabitScreen.kt
