@@ -24,3 +24,4 @@ data class HabitLog(
     val doneAt: Long = 0L,
     val rest: Boolean = false
 )
+// ✅ END OF HabitLog.kt
