@@ -14,6 +14,12 @@ abstract class HabitDao {
     @Query("SELECT * FROM habits WHERE archived = 0 ORDER BY createdAt ASC")
     abstract fun observeHabits(): Flow<List<Habit>>
 
+    @Query("SELECT * FROM habits WHERE archived = 0 ORDER BY createdAt ASC")
+    abstract suspend fun getActiveHabitsSync(): List<Habit>
+
+    @Query("SELECT * FROM habits WHERE id = :habitId LIMIT 1")
+    abstract suspend fun getHabitByIdSync(habitId: Long): Habit?
+
     @Query("SELECT * FROM habit_logs")
     abstract fun observeAllLogs(): Flow<List<HabitLog>>
 
@@ -42,6 +48,7 @@ abstract class HabitDao {
     @Transaction
     open suspend fun toggleBinary(habitId: Long, dateKey: String) {
         val current = getLog(habitId, dateKey)
+
         if (current != null && current.count >= 1 && !current.rest) {
             deleteLog(habitId, dateKey)
         } else {
@@ -61,6 +68,7 @@ abstract class HabitDao {
     open suspend fun addCount(habitId: Long, dateKey: String, delta: Int) {
         val current = getLog(habitId, dateKey)
         val nextCount = ((current?.count ?: 0) + delta).coerceAtLeast(0)
+
         if (nextCount == 0) {
             deleteLog(habitId, dateKey)
         } else {
@@ -77,10 +85,26 @@ abstract class HabitDao {
     }
 
     @Transaction
+    open suspend fun markDone(habitId: Long, dateKey: String, target: Int, isCount: Boolean) {
+        val count = if (isCount) target.coerceAtLeast(1) else 1
+
+        upsertLog(
+            HabitLog(
+                habitId = habitId,
+                dateKey = dateKey,
+                count = count,
+                doneAt = System.currentTimeMillis(),
+                rest = false
+            )
+        )
+    }
+
+    @Transaction
     open suspend fun toggleRest(habitId: Long, dateKey: String) {
         val current = getLog(habitId, dateKey)
         val nextRest = !(current?.rest ?: false)
         val nextCount = current?.count ?: 0
+
         if (!nextRest && nextCount == 0) {
             deleteLog(habitId, dateKey)
         } else {
