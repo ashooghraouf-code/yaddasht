@@ -1,98 +1,95 @@
 package ir.yaddasht.app.reminder
 
 import android.app.AlarmManager
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.media.AudioAttributes
-import android.media.RingtoneManager
 import android.os.Build
+import ir.yaddasht.app.data.Habit
+import ir.yaddasht.app.data.HabitSchedule
 
-enum class LeadTime(val minutes: Int, val label: String, val typeCode: Int) {
-    NONE(0, "سر وقت", 0),
-    MIN_10(10, "۱۰ دقیقه قبل", 1),
-    MIN_30(30, "۳۰ دقیقه قبل", 5),
-    HOUR_1(60, "۱ ساعت قبل", 2),
-    HOUR_3(180, "۳ ساعت قبل", 3),
-    DAY_1(1440, "۱ روز قبل", 4),
-    WEEK_1(10080, "۱ هفته قبل", 6);
-}
+object HabitReminderScheduler {
 
-object ReminderScheduler {
-    const val CHANNEL_ID = "yaddasht_reminders_alarm_v2"
-    const val EXTRA_NOTE_ID = "note_id"
-    const val EXTRA_TITLE = "title"
-    const val EXTRA_IS_TASK = "is_task"
-    const val EXTRA_LEAD_TYPE = "lead_type"
-    const val EXTRA_LEAD_MINUTES = "lead_minutes"
+    const val EXTRAHABITID = "habit_id"
+    const val EXTRAHABITTITLE = "habit_title"
+    const val EXTRAHABITEMOJI = "habit_emoji"
+    const val EXTRATRIGGERTIME = "trigger_time"
 
-    private fun alarmSound(context: Context) =
-        RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+    fun schedule(context: Context, habit: Habit, from: Long = System.currentTimeMillis()) {
+        val trigger = HabitSchedule.nextTriggerMillis(habit, from)
 
-    fun ensureChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= 26) {
-            val nm = context.getSystemService(NotificationManager::class.java)
-            nm.deleteNotificationChannel("yaddasht_reminders")
-            if (nm.getNotificationChannel(CHANNEL_ID) == null) {
-                val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
-                val ch = NotificationChannel(CHANNEL_ID, "یادآورهای زنگ‌دار", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "زنگ گوشی و ویبره قوی برای یادآورها"
-                    enableVibration(true)
-                    vibrationPattern = longArrayOf(0, 800, 400, 800, 400, 800, 400, 800)
-                    alarmSound(context)?.let { setSound(it, attrs) }
-                    setShowBadge(true); enableLights(true)
-                }
-                nm.createNotificationChannel(ch)
-            }
+        if (trigger == null) {
+            cancel(context, habit.id)
+            return
         }
+
+        setAlarm(context, habit.id, habit.title, habit.emoji, trigger, dailyCode(habit.id))
     }
 
-    fun schedule(context: Context, noteId: Long, title: String, timeMillis: Long) =
-        scheduleMulti(context, noteId, title, timeMillis, false, setOf(LeadTime.NONE))
-
-    fun schedule(context: Context, id: Long, title: String, timeMillis: Long, isTask: Boolean) =
-        scheduleMulti(context, id, title, timeMillis, isTask, setOf(LeadTime.NONE))
-
-    fun scheduleMulti(context: Context, id: Long, title: String, timeMillis: Long, isTask: Boolean = false, leads: Set<LeadTime>) {
-        ensureChannel(context)
-        val leadsToSchedule = if (leads.isEmpty()) setOf(LeadTime.NONE) else leads
-        val now = System.currentTimeMillis()
-        leadsToSchedule.forEach { lead ->
-            val triggerTime = if (lead == LeadTime.NONE) timeMillis else timeMillis - lead.minutes * 60_000L
-            if (triggerTime <= now) return@forEach
-            val intent = Intent(context, ReminderReceiver::class.java)
-                .putExtra(EXTRA_NOTE_ID, id)
-                .putExtra(EXTRA_TITLE, title.ifBlank { if (isTask) "وظیفه" else "یادداشت" })
-                .putExtra(EXTRA_IS_TASK, isTask)
-                .putExtra(EXTRA_LEAD_TYPE, lead.typeCode)
-                .putExtra(EXTRA_LEAD_MINUTES, lead.minutes)
-            val code = computeCode(id, isTask, lead.typeCode)
-            val pi = PendingIntent.getBroadcast(context, code, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            val am = context.getSystemService(AlarmManager::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pi)
-            else am.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pi)
-        }
+    fun scheduleOneShot(
+        context: Context,
+        habitId: Long,
+        title: String,
+        emoji: String,
+        trigger: Long
+    ) {
+        setAlarm(context, habitId, title, emoji, trigger, oneShotCode(habitId))
     }
 
-    private fun computeCode(id: Long, isTask: Boolean, leadType: Int): Int {
-        val base = if (isTask) id.toInt() + 1_000_000 else id.toInt()
-        return base + leadType * 10_000_000
+    fun cancel(context: Context, habitId: Long) {
+        cancelCode(context, dailyCode(habitId))
+        cancelCode(context, oneShotCode(habitId))
     }
 
-    fun cancel(context: Context, noteId: Long) = cancelAll(context, noteId, false)
-    fun cancel(context: Context, id: Long, isTask: Boolean) = cancelAll(context, id, isTask)
+    private fun setAlarm(
+        context: Context,
+        habitId: Long,
+        title: String,
+        emoji: String,
+        trigger: Long,
+        code: Int
+    ) {
+        val intent = Intent(context, HabitReminderReceiver::class.java)
+            .putExtra(EXTRAHABITID, habitId)
+            .putExtra(EXTRAHABITTITLE, title)
+            .putExtra(EXTRAHABITEMOJI, emoji)
+            .putExtra(EXTRATRIGGERTIME, trigger)
 
-    fun cancelAll(context: Context, id: Long, isTask: Boolean = false) {
+        val pi = PendingIntent.getBroadcast(
+            context,
+            code,
+            intent,
+            PendingIntent.FLAGUPDATECURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val am = context.getSystemService(AlarmManager::class.java)
-        LeadTime.values().forEach { lead ->
-            val code = computeCode(id, isTask, lead.typeCode)
-            val pi = PendingIntent.getBroadcast(context, code, Intent(context, ReminderReceiver::class.java), PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)
-            if (pi != null) { am.cancel(pi); pi.cancel() }
+
+        if (canExact(am)) {
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pi)
+        } else {
+            am.setWindow(AlarmManager.RTCWAKEUP, trigger, 10 * 60000L, pi)
         }
     }
+
+    private fun cancelCode(context: Context, code: Int) {
+        val pi = PendingIntent.getBroadcast(
+            context,
+            code,
+            Intent(context, HabitReminderReceiver::class.java),
+            PendingIntent.FLAGNOCREATE or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        if (pi != null) {
+            val am = context.getSystemService(AlarmManager::class.java)
+            am.cancel(pi)
+            pi.cancel()
+        }
+    }
+
+    private fun dailyCode(habitId: Long): Int = 1000000_000 + habitId.toInt()
+    private fun oneShotCode(habitId: Long): Int = 1200000_000 + habitId.toInt()
+
+    private fun canExact(am: AlarmManager): Boolean =
+        if (Build.VERSION.SDKINT >= Build.VERSIONCODES.S) am.canScheduleExactAlarms() else true
 }
+// ✅ END OF HabitReminderScheduler.kt
