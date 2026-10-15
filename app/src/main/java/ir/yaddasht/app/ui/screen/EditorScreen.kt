@@ -26,7 +26,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -870,7 +869,7 @@ fun EditorScreen(
     }
 
     val titleFontSize by animateFloatAsState(
-        targetValue = if (bodyFocused) 16f else 26f,
+        targetValue = if (bodyFocused) 15f else 26f,
         animationSpec = tween(180),
         label = "titleFontSize"
     )
@@ -882,7 +881,7 @@ fun EditorScreen(
     )
 
     val titleSpacerHeight by animateDpAsState(
-        targetValue = if (bodyFocused) 2.dp else 8.dp,
+        targetValue = if (bodyFocused) 2.dp else 6.dp,
         animationSpec = tween(180),
         label = "titleSpacer"
     )
@@ -1090,10 +1089,12 @@ fun EditorScreen(
                                     if (note?.title.isNullOrBlank()) {
                                         Text(
                                             "عنوان یادداشت",
-                                            fontFamily = LalezarFont,
-                                            color = paperInkSoft,
-                                            fontSize = (titleFontSize - 2f).coerceAtLeast(12f).sp,
-                                            textDirection = TextDirection.Rtl
+                                            style = TextStyle(
+                                                fontFamily = LalezarFont,
+                                                fontSize = (titleFontSize - 2f).coerceAtLeast(12f).sp,
+                                                color = paperInkSoft,
+                                                textDirection = TextDirection.Rtl
+                                            )
                                         )
                                     }
                                     inner()
@@ -1217,9 +1218,11 @@ fun EditorScreen(
                                             if (note?.body.isNullOrBlank()) {
                                                 Text(
                                                     "اینجا بنویس یا از «دیکته» و «چک‌لیست» استفاده کن",
-                                                    color = paperInkSoft,
-                                                    fontSize = 15.sp,
-                                                    textDirection = TextDirection.Rtl
+                                                    style = TextStyle(
+                                                        fontSize = 15.sp,
+                                                        color = paperInkSoft,
+                                                        textDirection = TextDirection.Rtl
+                                                    )
                                                 )
                                             }
                                             inner()
@@ -2384,4 +2387,4 @@ private fun importUris(
         }
     }
 }
-// ✅ END OF EditorScreen.kt
+// ✅ END OF EditorScreen.kt — اگر این خط را دیدی، فایل کامل است.
