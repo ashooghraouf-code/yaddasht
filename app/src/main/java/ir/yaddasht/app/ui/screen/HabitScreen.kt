@@ -56,6 +56,8 @@ import androidx.compose.ui.unit.sp
 import ir.yaddasht.app.data.AppDatabase
 import ir.yaddasht.app.data.Habit
 import ir.yaddasht.app.data.HabitLog
+import ir.yaddasht.app.data.HabitSchedule
+import ir.yaddasht.app.reminder.HabitReminderScheduler
 import ir.yaddasht.app.ui.theme.DeepGreenSoft
 import ir.yaddasht.app.ui.theme.Ink
 import ir.yaddasht.app.ui.theme.LalezarFont
@@ -68,10 +70,6 @@ import ir.yaddasht.app.util.FaDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 import java.util.Calendar
 
 @Composable
@@ -101,15 +99,15 @@ fun HabitScreen() {
     var editHabit by remember { mutableStateOf<Habit?>(null) }
     var archiveHabit by remember { mutableStateOf<Habit?>(null) }
 
-    val todayKey = HabitStreak.dateKey(now)
+    val todayKey = HabitSchedule.dateKey(now)
     val nowMinute = nowMinuteOfDay()
 
     val isDone: (Habit) -> Boolean = { habit ->
-        HabitStreak.isDone(habit, logsByHabit[habit.id]?.get(todayKey))
+        HabitSchedule.isDone(habit, logsByHabit[habit.id]?.get(todayKey))
     }
 
     val todayScheduled = habits.filter {
-        HabitStreak.isScheduled(it, now)
+        HabitSchedule.isScheduledOn(it, now)
     }
 
     val todayDone = todayScheduled.count(isDone)
@@ -123,25 +121,25 @@ fun HabitScreen() {
     val sortedHabits = remember(habits, now) {
         habits.sortedWith(
             compareBy(
-                { it.reminderMin() < 0 },
-                { it.reminderMin() }
+                { HabitSchedule.reminderMinutes(it.pattern) == null },
+                { HabitSchedule.reminderMinutes(it.pattern) ?: 0 }
             )
         )
     }
 
     val overdue = sortedHabits.firstOrNull { h ->
-        val m = h.reminderMin()
-        m in 0 until nowMinute && !isDone(h)
+        val m = HabitSchedule.reminderMinutes(h.pattern)
+        m != null && m < nowMinute && !isDone(h)
     }
 
     val upcoming = sortedHabits.firstOrNull { h ->
-        val m = h.reminderMin()
-        m >= nowMinute && !isDone(h)
+        val m = HabitSchedule.reminderMinutes(h.pattern)
+        m != null && m >= nowMinute && !isDone(h)
     }
 
     val reminderLine = when {
-        overdue != null -> "یادآور گذشته: ${overdue.title} • ${reminderLabel(overdue.reminderMin())}"
-        upcoming != null -> "نزدیک‌ترین یادآور: ${upcoming.title} • ${reminderLabel(upcoming.reminderMin())}"
+        overdue != null -> "یادآور گذشته: ${overdue.title} • ${reminderLabel(HabitSchedule.reminderMinutes(overdue.pattern)!!)}"
+        upcoming != null -> "نزدیک‌ترین یادآور: ${upcoming.title} • ${reminderLabel(HabitSchedule.reminderMinutes(upcoming.pattern)!!)}"
         else -> "یادآور فعالی برای امروز نداری"
     }
 
@@ -277,9 +275,11 @@ fun HabitScreen() {
             onSave = { h ->
                 scope.launch(Dispatchers.IO) {
                     if (h.id == 0L) {
-                        dao.insertHabit(h)
+                        val id = dao.insertHabit(h)
+                        HabitReminderScheduler.schedule(context, h.copy(id = id))
                     } else {
                         dao.updateHabit(h)
+                        HabitReminderScheduler.schedule(context, h)
                     }
                 }
 
@@ -311,6 +311,7 @@ fun HabitScreen() {
 
                         scope.launch(Dispatchers.IO) {
                             dao.archiveHabit(h.id)
+                            HabitReminderScheduler.cancel(context, h.id)
                         }
                     }
                 ) {
@@ -345,7 +346,7 @@ private fun HabitRow(
     onEdit: () -> Unit,
     onArchive: () -> Unit
 ) {
-    val scheduled = HabitStreak.isScheduled(habit, now)
+    val scheduled = HabitSchedule.isScheduledOn(habit, now)
     val color = HabitPalette.getOrElse(habit.colorIndex) { HabitPalette[0] }
 
     if (!scheduled) {
@@ -358,14 +359,14 @@ private fun HabitRow(
         return
     }
 
-    val todayKey = HabitStreak.dateKey(now)
+    val todayKey = HabitSchedule.dateKey(now)
     val todayLog = byKey[todayKey]
-    val done = HabitStreak.isDone(habit, todayLog)
+    val done = HabitSchedule.isDone(habit, todayLog)
     val resting = todayLog?.rest == true
     val streak = HabitStreak.currentStreak(habit, byKey, now)
-    val reminderMin = habit.reminderMin()
+    val reminderMin = HabitSchedule.reminderMinutes(habit.pattern)
     val nowMinute = nowMinuteOfDay()
-    val overdue = reminderMin >= 0 && reminderMin < nowMinute && !done && !resting
+    val overdue = reminderMin != null && reminderMin < nowMinute && !done && !resting
 
     Column(
         Modifier
@@ -412,7 +413,7 @@ private fun HabitRow(
                         fontWeight = FontWeight.Bold
                     )
 
-                    if (reminderMin >= 0) {
+                    if (reminderMin != null) {
                         Spacer(Modifier.width(10.dp))
 
                         Text(
@@ -627,9 +628,9 @@ private fun HeatStrip(
     Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         for (i in 29 downTo 0) {
             val millis = HabitStreak.dayBeforeN(now, i)
-            val scheduled = HabitStreak.isScheduled(habit, millis)
-            val key = HabitStreak.dateKey(millis)
-            val done = HabitStreak.isDone(habit, byKey[key])
+            val scheduled = HabitSchedule.isScheduledOn(habit, millis)
+            val key = HabitSchedule.dateKey(millis)
+            val done = HabitSchedule.isDone(habit, byKey[key])
 
             val dotColor = when {
                 !scheduled -> Color.White.copy(alpha = 0.06f)
@@ -696,9 +697,6 @@ private fun ProgressRing(
     }
 }
 
-private fun Habit.reminderMin(): Int =
-    HabitStreak.reminderMinutes(pattern)
-
 private fun reminderLabel(min: Int): String {
     if (min < 0) return ""
     val h = (min / 60).toString().padStart(2, '0')
@@ -713,18 +711,6 @@ private fun nowMinuteOfDay(): Int {
 
 private object HabitStreak {
 
-    fun dateKey(millis: Long): String {
-        val result = FaDate.jalali(millis)
-        val y = result.first
-        val m = result.second
-        val d = result.third
-        return y.toString().padStart(4, '0') +
-            "-" +
-            m.toString().padStart(2, '0') +
-            "-" +
-            d.toString().padStart(2, '0')
-    }
-
     fun dayBeforeN(millis: Long, n: Int): Long {
         var day = startOfDay(millis)
 
@@ -735,72 +721,16 @@ private object HabitStreak {
         return day
     }
 
-    fun reminderMinutes(pattern: String): Int {
-        val at = pattern.indexOf("@")
-        if (at < 0) return -1
-
-        val time = pattern.substring(at + 1)
-        val parts = time.split(":")
-        if (parts.size != 2) return -1
-
-        val h = parts[0].toIntOrNull() ?: return -1
-        val m = parts[1].toIntOrNull() ?: return -1
-
-        if (h !in 0..23 || m !in 0..59) return -1
-        return h * 60 + m
-    }
-
-    fun basePattern(pattern: String): String =
-        pattern.substringBefore("@")
-
-    fun isScheduled(habit: Habit, millis: Long): Boolean {
-        return when (basePattern(habit.pattern)) {
-            "WEEKLY_DAYS" -> {
-                if (habit.weekdaysMask == 0) {
-                    true
-                } else {
-                    val index = weekdayIndex(millis)
-                    (habit.weekdaysMask shr index) and 1 == 1
-                }
-            }
-
-            "EVERY_N" -> {
-                val n = habit.everyNDays.coerceAtLeast(1)
-                val baseMillis = if (habit.createdAt > 0L) habit.createdAt else millis
-
-                val diff = ChronoUnit.DAYS.between(
-                    localDate(baseMillis),
-                    localDate(millis)
-                )
-
-                diff >= 0L && diff % n == 0L
-            }
-
-            else -> true
-        }
-    }
-
-    fun isDone(habit: Habit, log: HabitLog?): Boolean {
-        if (log == null) return false
-        if (log.rest) return true
-
-        return if (habit.kind == "COUNT") {
-            log.count >= habit.targetPerDay
-        } else {
-            log.count >= 1
-        }
-    }
-
     fun currentStreak(
         habit: Habit,
         byKey: Map<String, HabitLog>,
         todayMillis: Long
     ): Int {
         val todayStart = startOfDay(todayMillis)
-        val todayKey = dateKey(todayStart)
+        val todayKey = HabitSchedule.dateKey(todayStart)
 
-        val scheduledToday = isScheduled(habit, todayStart)
-        val doneToday = isDone(habit, byKey[todayKey])
+        val scheduledToday = HabitSchedule.isScheduledOn(habit, todayStart)
+        val doneToday = HabitSchedule.isDone(habit, byKey[todayKey])
 
         var day = todayStart
 
@@ -812,10 +742,10 @@ private object HabitStreak {
         var guard = 0
 
         while (guard < 3650) {
-            if (isScheduled(habit, day)) {
-                val key = dateKey(day)
+            if (HabitSchedule.isScheduledOn(habit, day)) {
+                val key = HabitSchedule.dateKey(day)
 
-                if (isDone(habit, byKey[key])) {
+                if (HabitSchedule.isDone(habit, byKey[key])) {
                     streak++
                 } else {
                     break
@@ -829,20 +759,15 @@ private object HabitStreak {
         return streak
     }
 
-    private fun localDate(millis: Long): LocalDate {
-        return LocalDate.ofInstant(
-            Instant.ofEpochMilli(millis),
-            ZoneId.systemDefault()
-        )
-    }
-
     private fun startOfDay(millis: Long): Long {
         val c = Calendar.getInstance()
         c.timeInMillis = millis
+
         c.set(Calendar.HOUR_OF_DAY, 0)
         c.set(Calendar.MINUTE, 0)
         c.set(Calendar.SECOND, 0)
         c.set(Calendar.MILLISECOND, 0)
+
         return c.timeInMillis
     }
 
@@ -852,11 +777,4 @@ private object HabitStreak {
         c.add(Calendar.DAY_OF_YEAR, -1)
         return startOfDay(c.timeInMillis)
     }
-
-    private fun weekdayIndex(millis: Long): Int {
-        val c = Calendar.getInstance()
-        c.timeInMillis = millis
-        return c.get(Calendar.DAY_OF_WEEK) % 7
-    }
 }
-// ✅ END OF HabitScreen.kt
