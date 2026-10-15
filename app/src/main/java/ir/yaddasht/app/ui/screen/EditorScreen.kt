@@ -26,6 +26,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -349,7 +350,7 @@ fun EditorScreen(
         if (!ready) return@LaunchedEffect
 
         dao.observeNote(realId).collect { n ->
-            note = n
+            if (note == null) note = n
             if (lastSaved == null) lastSaved = n
         }
     }
