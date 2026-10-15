@@ -82,6 +82,14 @@
             android:exported="false" />
 
         <receiver
+            android:name=".reminder.HabitReminderReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".reminder.HabitReminderActionReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".reminder.BootReceiver"
             android:directBootAware="true"
             android:enabled="true"
