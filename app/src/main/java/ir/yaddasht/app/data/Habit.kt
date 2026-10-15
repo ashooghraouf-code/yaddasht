@@ -99,8 +99,9 @@ object HabitSchedule {
         val c = Calendar.getInstance()
         c.timeInMillis = millis
 
-        // Calendar.DAY_OF_WEEK: شنبه=1، یکشنبه=2، ... جمعه=7
-        return (c.get(Calendar.DAY_OF_WEEK) + 6) % 7
+        // Calendar.DAY_OF_WEEK: یکشنبه=1، دوشنبه=2، ... شنبه=7
+        // با % 7: شنبه=0، یکشنبه=1، ... جمعه=6
+        return c.get(Calendar.DAY_OF_WEEK) % 7
     }
 
     fun isScheduledOn(habit: Habit, millis: Long): Boolean {
@@ -189,3 +190,4 @@ object HabitSchedule {
         return diff / DAY_MS
     }
 }
+// ✅ END OF Habit.kt
