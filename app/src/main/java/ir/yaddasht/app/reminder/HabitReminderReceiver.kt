@@ -13,6 +13,13 @@ import kotlinx.coroutines.launch
 
 class HabitReminderReceiver : BroadcastReceiver() {
 
+    companion object {
+        private const val ACTION_RECEIVER_CLASS = "ir.yaddasht.app.reminder.HabitReminderActionReceiver"
+        private const val ACTION_EXTRA = "habit_action"
+        private const val ACTION_DONE = "habit_done"
+        private const val ACTION_SNOOZE = "habit_snooze"
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         val habitId = intent.getLongExtra(HabitReminderScheduler.EXTRA_HABIT_ID, -1L)
         if (habitId < 0) return
@@ -56,11 +63,12 @@ class HabitReminderReceiver : BroadcastReceiver() {
             null
         }
 
-        val doneIntent = Intent(context, HabitReminderActionReceiver::class.java)
-            .putExtra(HabitReminderActionReceiver.EXTRA_ACTION, HabitReminderActionReceiver.ACTION_DONE)
-            .putExtra(HabitReminderScheduler.EXTRA_HABIT_ID, habitId)
-            .putExtra(HabitReminderScheduler.EXTRA_HABIT_TITLE, title)
-            .putExtra(HabitReminderScheduler.EXTRA_HABIT_EMOJI, emoji)
+        val doneIntent = Intent()
+        doneIntent.setClassName(context, ACTION_RECEIVER_CLASS)
+        doneIntent.putExtra(ACTION_EXTRA, ACTION_DONE)
+        doneIntent.putExtra(HabitReminderScheduler.EXTRA_HABIT_ID, habitId)
+        doneIntent.putExtra(HabitReminderScheduler.EXTRA_HABIT_TITLE, title)
+        doneIntent.putExtra(HabitReminderScheduler.EXTRA_HABIT_EMOJI, emoji)
 
         val donePi = PendingIntent.getBroadcast(
             context,
@@ -69,11 +77,12 @@ class HabitReminderReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val snoozeIntent = Intent(context, HabitReminderActionReceiver::class.java)
-            .putExtra(HabitReminderActionReceiver.EXTRA_ACTION, HabitReminderActionReceiver.ACTION_SNOOZE)
-            .putExtra(HabitReminderScheduler.EXTRA_HABIT_ID, habitId)
-            .putExtra(HabitReminderScheduler.EXTRA_HABIT_TITLE, title)
-            .putExtra(HabitReminderScheduler.EXTRA_HABIT_EMOJI, emoji)
+        val snoozeIntent = Intent()
+        snoozeIntent.setClassName(context, ACTION_RECEIVER_CLASS)
+        snoozeIntent.putExtra(ACTION_EXTRA, ACTION_SNOOZE)
+        snoozeIntent.putExtra(HabitReminderScheduler.EXTRA_HABIT_ID, habitId)
+        snoozeIntent.putExtra(HabitReminderScheduler.EXTRA_HABIT_TITLE, title)
+        snoozeIntent.putExtra(HabitReminderScheduler.EXTRA_HABIT_EMOJI, emoji)
 
         val snoozePi = PendingIntent.getBroadcast(
             context,
@@ -92,8 +101,8 @@ class HabitReminderReceiver : BroadcastReceiver() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
-            .addAction(android.R.drawable.checkbox_on, "انجام شد", donePi)
-            .addAction(android.R.drawable.ic_menu_recent_history, "۱۰ دقیقه دیگر", snoozePi)
+            .addAction(android.R.drawable.ic_menu_save, "✅ انجام شد", donePi)
+            .addAction(android.R.drawable.ic_menu_edit, "⏰ ۱۰ دقیقه دیگر", snoozePi)
 
         if (openPi != null) {
             builder.setContentIntent(openPi)
@@ -101,7 +110,7 @@ class HabitReminderReceiver : BroadcastReceiver() {
 
         try {
             NotificationManagerCompat.from(context)
-                .notify(HabitReminderActionReceiver.notificationIdFor(habitId), builder.build())
+                .notify(500_000_000 + habitId.toInt(), builder.build())
         } catch (_: SecurityException) {
         }
     }
