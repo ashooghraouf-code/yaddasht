@@ -6,69 +6,64 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.core.app.NotificationManagerCompat
 import ir.yaddasht.app.data.AppDatabase
+import ir.yaddasht.app.data.HabitSchedule
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class ReminderActionReceiver : BroadcastReceiver() {
+class HabitReminderActionReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.getStringExtra(EXTRA_ACTION) ?: return
-        val id = intent.getLongExtra(ReminderScheduler.EXTRA_NOTE_ID, -1L)
-        val title = intent.getStringExtra(ReminderScheduler.EXTRA_TITLE) ?: ""
-        val isTask = intent.getBooleanExtra(ReminderScheduler.EXTRA_IS_TASK, false)
-        val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, id.toInt())
-        val originalTime = intent.getLongExtra(EXTRA_ORIGINAL_TIME, System.currentTimeMillis())
-
-        if (id < 0) return
+        val habitId = intent.getLongExtra(HabitReminderScheduler.EXTRA_HABIT_ID, -1L)
+        val title = intent.getStringExtra(HabitReminderScheduler.EXTRA_HABIT_TITLE).orEmpty()
+        val emoji = intent.getStringExtra(HabitReminderScheduler.EXTRA_HABIT_EMOJI).orEmpty()
+        if (habitId < 0) return
 
         try {
-            NotificationManagerCompat.from(context).cancel(notificationId)
+            NotificationManagerCompat.from(context).cancel(notificationIdFor(habitId))
         } catch (_: SecurityException) {
         }
 
+        val app = context.applicationContext
+        val pending = goAsync()
+
         when (action) {
             ACTION_DONE -> {
-                if (!isTask) return
-
-                val db = AppDatabase.get(context.applicationContext)
-                val pending = goAsync()
-
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
-                        db.taskDao().markCompleted(id)
-                        ReminderScheduler.cancelAll(context, id, true)
+                        val db = AppDatabase.get(app)
+                        val habit = db.habitDao().getHabitByIdSync(habitId)
+                        if (habit != null) {
+                            db.habitDao().markDone(
+                                habitId,
+                                HabitSchedule.dateKey(System.currentTimeMillis()),
+                                habit.targetPerDay,
+                                habit.kind == "COUNT"
+                            )
+                        }
                     } catch (_: Exception) {
                     }
-
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "✅ «$title» انجام شد", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(app, "✅ «$title» انجام شد", Toast.LENGTH_SHORT).show()
                         pending.finish()
                     }
                 }
             }
-
             ACTION_SNOOZE -> {
-                val newTime = System.currentTimeMillis() + 5 * 60_000L
-                ReminderScheduler.scheduleMulti(context, id, title, newTime, isTask, setOf(LeadTime.NONE))
-                Toast.makeText(context, "⏰ ۵ دقیقهٔ دیگه یادآوری می‌شه", Toast.LENGTH_SHORT).show()
+                HabitReminderScheduler.scheduleOneShot(app, habitId, title, emoji, System.currentTimeMillis() + 10 * 60_000L)
+                Toast.makeText(app, "⏰ ۱۰ دقیقهٔ دیگه یادآوری می‌شه", Toast.LENGTH_SHORT).show()
+                pending.finish()
             }
-
-            ACTION_TOMORROW -> {
-                val newTime = originalTime + 86_400_000L
-                ReminderScheduler.scheduleMulti(context, id, title, newTime, isTask, setOf(LeadTime.NONE))
-                Toast.makeText(context, "📅 فردا همین موقع", Toast.LENGTH_SHORT).show()
-            }
+            else -> pending.finish()
         }
     }
 
     companion object {
-        const val EXTRA_ACTION = "action"
-        const val EXTRA_NOTIFICATION_ID = "notif_id"
-        const val EXTRA_ORIGINAL_TIME = "orig_time"
-        const val ACTION_DONE = "done"
-        const val ACTION_SNOOZE = "snooze"
-        const val ACTION_TOMORROW = "tomorrow"
+        const val EXTRA_ACTION = "habit_action"
+        const val ACTION_DONE = "habit_done"
+        const val ACTION_SNOOZE = "habit_snooze"
+        fun notificationIdFor(habitId: Long): Int = 500_000_000 + habitId.toInt()
     }
 }
