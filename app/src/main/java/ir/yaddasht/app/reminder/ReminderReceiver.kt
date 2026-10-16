@@ -7,12 +7,19 @@ import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import ir.yaddasht.app.MainActivity
-import ir.yaddasht.app.data.AppDatabase
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 class ReminderReceiver : BroadcastReceiver() {
+
+    companion object {
+        private const val ACTION_RECEIVER_CLASS = "ir.yaddasht.app.reminder.ReminderActionReceiver"
+        private const val ACTION_EXTRA = "action"
+        private const val NOTIF_ID_EXTRA = "notif_id"
+        private const val ORIG_TIME_EXTRA = "orig_time"
+
+        private const val ACTION_DONE = "done"
+        private const val ACTION_SNOOZE = "snooze"
+        private const val ACTION_TOMORROW = "tomorrow"
+    }
 
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getLongExtra(ReminderScheduler.EXTRA_NOTE_ID, -1L)
@@ -26,16 +33,13 @@ class ReminderReceiver : BroadcastReceiver() {
         ReminderScheduler.ensureChannel(context)
 
         val pending = goAsync()
-        val app = context.applicationContext
 
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val originalTime = System.currentTimeMillis() + leadMinutes.toLong() * 60_000L
-                showNotification(app, id, title, isTask, leadType, leadMinutes, originalTime)
-            } catch (_: Exception) {
-            } finally {
-                pending.finish()
-            }
+        try {
+            val originalTime = System.currentTimeMillis() + leadMinutes.toLong() * 60_000L
+            showNotification(context, id, title, isTask, leadMinutes, originalTime)
+        } catch (_: Exception) {
+        } finally {
+            pending.finish()
         }
     }
 
@@ -44,15 +48,13 @@ class ReminderReceiver : BroadcastReceiver() {
         id: Long,
         title: String,
         isTask: Boolean,
-        leadType: Int,
         leadMinutes: Int,
         originalTime: Long
     ) {
-        val openIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("open_id", id)
-            putExtra("open_is_task", isTask)
-        }
+        val openIntent = Intent(context, MainActivity::class.java)
+        openIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        openIntent.putExtra("open_id", id)
+        openIntent.putExtra("open_is_task", isTask)
 
         val openPi = PendingIntent.getActivity(
             context,
@@ -61,14 +63,14 @@ class ReminderReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val doneIntent = Intent(context, ReminderActionReceiver::class.java).apply {
-            putExtra(ReminderActionReceiver.EXTRA_ACTION, ReminderActionReceiver.ACTION_DONE)
-            putExtra(ReminderScheduler.EXTRA_NOTE_ID, id)
-            putExtra(ReminderScheduler.EXTRA_TITLE, title)
-            putExtra(ReminderScheduler.EXTRA_IS_TASK, isTask)
-            putExtra(ReminderActionReceiver.EXTRA_NOTIFICATION_ID, id.toInt())
-            putExtra(ReminderActionReceiver.EXTRA_ORIGINAL_TIME, originalTime)
-        }
+        val doneIntent = Intent()
+        doneIntent.setClassName(context, ACTION_RECEIVER_CLASS)
+        doneIntent.putExtra(ACTION_EXTRA, ACTION_DONE)
+        doneIntent.putExtra(ReminderScheduler.EXTRA_NOTE_ID, id)
+        doneIntent.putExtra(ReminderScheduler.EXTRA_TITLE, title)
+        doneIntent.putExtra(ReminderScheduler.EXTRA_IS_TASK, isTask)
+        doneIntent.putExtra(NOTIF_ID_EXTRA, id.toInt())
+        doneIntent.putExtra(ORIG_TIME_EXTRA, originalTime)
 
         val donePi = PendingIntent.getBroadcast(
             context,
@@ -77,14 +79,14 @@ class ReminderReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val snoozeIntent = Intent(context, ReminderActionReceiver::class.java).apply {
-            putExtra(ReminderActionReceiver.EXTRA_ACTION, ReminderActionReceiver.ACTION_SNOOZE)
-            putExtra(ReminderScheduler.EXTRA_NOTE_ID, id)
-            putExtra(ReminderScheduler.EXTRA_TITLE, title)
-            putExtra(ReminderScheduler.EXTRA_IS_TASK, isTask)
-            putExtra(ReminderActionReceiver.EXTRA_NOTIFICATION_ID, id.toInt())
-            putExtra(ReminderActionReceiver.EXTRA_ORIGINAL_TIME, originalTime)
-        }
+        val snoozeIntent = Intent()
+        snoozeIntent.setClassName(context, ACTION_RECEIVER_CLASS)
+        snoozeIntent.putExtra(ACTION_EXTRA, ACTION_SNOOZE)
+        snoozeIntent.putExtra(ReminderScheduler.EXTRA_NOTE_ID, id)
+        snoozeIntent.putExtra(ReminderScheduler.EXTRA_TITLE, title)
+        snoozeIntent.putExtra(ReminderScheduler.EXTRA_IS_TASK, isTask)
+        snoozeIntent.putExtra(NOTIF_ID_EXTRA, id.toInt())
+        snoozeIntent.putExtra(ORIG_TIME_EXTRA, originalTime)
 
         val snoozePi = PendingIntent.getBroadcast(
             context,
@@ -93,14 +95,14 @@ class ReminderReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val tomorrowIntent = Intent(context, ReminderActionReceiver::class.java).apply {
-            putExtra(ReminderActionReceiver.EXTRA_ACTION, ReminderActionReceiver.ACTION_TOMORROW)
-            putExtra(ReminderScheduler.EXTRA_NOTE_ID, id)
-            putExtra(ReminderScheduler.EXTRA_TITLE, title)
-            putExtra(ReminderScheduler.EXTRA_IS_TASK, isTask)
-            putExtra(ReminderActionReceiver.EXTRA_NOTIFICATION_ID, id.toInt())
-            putExtra(ReminderActionReceiver.EXTRA_ORIGINAL_TIME, originalTime)
-        }
+        val tomorrowIntent = Intent()
+        tomorrowIntent.setClassName(context, ACTION_RECEIVER_CLASS)
+        tomorrowIntent.putExtra(ACTION_EXTRA, ACTION_TOMORROW)
+        tomorrowIntent.putExtra(ReminderScheduler.EXTRA_NOTE_ID, id)
+        tomorrowIntent.putExtra(ReminderScheduler.EXTRA_TITLE, title)
+        tomorrowIntent.putExtra(ReminderScheduler.EXTRA_IS_TASK, isTask)
+        tomorrowIntent.putExtra(NOTIF_ID_EXTRA, id.toInt())
+        tomorrowIntent.putExtra(ORIG_TIME_EXTRA, originalTime)
 
         val tomorrowPi = PendingIntent.getBroadcast(
             context,
@@ -117,11 +119,7 @@ class ReminderReceiver : BroadcastReceiver() {
             else -> "${leadMinutes / 1440} روز قبل"
         }
 
-        val body = buildString {
-            append(kindLabel)
-            append(" • ")
-            append(leadLabel)
-        }
+        val body = "$kindLabel • $leadLabel"
 
         val builder = NotificationCompat.Builder(context, ReminderScheduler.CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
@@ -143,4 +141,3 @@ class ReminderReceiver : BroadcastReceiver() {
         }
     }
 }
-// ✅ END OF ReminderReceiver.kt
