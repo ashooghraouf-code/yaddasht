@@ -49,11 +49,12 @@ object HabitReminderScheduler {
         trigger: Long,
         code: Int
     ) {
-        val intent = Intent(context, HabitReminderReceiver::class.java)
-            .putExtra(EXTRA_HABIT_ID, habitId)
-            .putExtra(EXTRA_HABIT_TITLE, title)
-            .putExtra(EXTRA_HABIT_EMOJI, emoji)
-            .putExtra(EXTRA_TRIGGER_TIME, trigger)
+        val intent = Intent()
+        intent.setClassName(context, "ir.yaddasht.app.reminder.HabitReminderReceiver")
+        intent.putExtra(EXTRA_HABIT_ID, habitId)
+        intent.putExtra(EXTRA_HABIT_TITLE, title)
+        intent.putExtra(EXTRA_HABIT_EMOJI, emoji)
+        intent.putExtra(EXTRA_TRIGGER_TIME, trigger)
 
         val pi = PendingIntent.getBroadcast(
             context,
@@ -72,10 +73,13 @@ object HabitReminderScheduler {
     }
 
     private fun cancelCode(context: Context, code: Int) {
+        val intent = Intent()
+        intent.setClassName(context, "ir.yaddasht.app.reminder.HabitReminderReceiver")
+        
         val pi = PendingIntent.getBroadcast(
             context,
             code,
-            Intent(context, HabitReminderReceiver::class.java),
+            intent,
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
         )
 
