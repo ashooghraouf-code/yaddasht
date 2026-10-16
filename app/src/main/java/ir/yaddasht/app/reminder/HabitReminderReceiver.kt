@@ -23,7 +23,6 @@ class HabitReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val habitId = intent.getLongExtra(HabitReminderScheduler.EXTRA_HABIT_ID, -1L)
         if (habitId < 0) return
-
         val title = intent.getStringExtra(HabitReminderScheduler.EXTRA_HABIT_TITLE).orEmpty()
         val emoji = intent.getStringExtra(HabitReminderScheduler.EXTRA_HABIT_EMOJI).orEmpty()
 
@@ -36,9 +35,7 @@ class HabitReminderReceiver : BroadcastReceiver() {
             try {
                 val db = AppDatabase.get(app)
                 val habit = db.habitDao().getHabitByIdSync(habitId)
-
                 showNotification(app, habitId, title, emoji)
-
                 if (habit != null && !habit.archived) {
                     HabitReminderScheduler.schedule(app, habit, System.currentTimeMillis())
                 }
@@ -51,17 +48,9 @@ class HabitReminderReceiver : BroadcastReceiver() {
 
     private fun showNotification(context: Context, habitId: Long, title: String, emoji: String) {
         val openIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-
-        val openPi = if (openIntent != null) {
-            PendingIntent.getActivity(
-                context,
-                habitId.toInt(),
-                openIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-        } else {
-            null
-        }
+        val openPi: PendingIntent? = if (openIntent != null) {
+            PendingIntent.getActivity(context, habitId.toInt(), openIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        } else null
 
         val doneIntent = Intent()
         doneIntent.setClassName(context, ACTION_RECEIVER_CLASS)
@@ -69,13 +58,7 @@ class HabitReminderReceiver : BroadcastReceiver() {
         doneIntent.putExtra(HabitReminderScheduler.EXTRA_HABIT_ID, habitId)
         doneIntent.putExtra(HabitReminderScheduler.EXTRA_HABIT_TITLE, title)
         doneIntent.putExtra(HabitReminderScheduler.EXTRA_HABIT_EMOJI, emoji)
-
-        val donePi = PendingIntent.getBroadcast(
-            context,
-            1_100_000_000 + habitId.toInt() * 3 + 1,
-            doneIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val donePi = PendingIntent.getBroadcast(context, 1_100_000_000 + habitId.toInt() * 3 + 1, doneIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         val snoozeIntent = Intent()
         snoozeIntent.setClassName(context, ACTION_RECEIVER_CLASS)
@@ -83,16 +66,9 @@ class HabitReminderReceiver : BroadcastReceiver() {
         snoozeIntent.putExtra(HabitReminderScheduler.EXTRA_HABIT_ID, habitId)
         snoozeIntent.putExtra(HabitReminderScheduler.EXTRA_HABIT_TITLE, title)
         snoozeIntent.putExtra(HabitReminderScheduler.EXTRA_HABIT_EMOJI, emoji)
-
-        val snoozePi = PendingIntent.getBroadcast(
-            context,
-            1_100_000_000 + habitId.toInt() * 3 + 2,
-            snoozeIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val snoozePi = PendingIntent.getBroadcast(context, 1_100_000_000 + habitId.toInt() * 3 + 2, snoozeIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         val body = "برنامه‌ریز چراغ راه منتظر تیک توست 🌱"
-
         val builder = NotificationCompat.Builder(context, ReminderScheduler.CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("$emoji زمان عادت: $title")
@@ -101,16 +77,12 @@ class HabitReminderReceiver : BroadcastReceiver() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
-            .addAction(android.R.drawable.ic_menu_save, "✅ انجام شد", donePi)
-            .addAction(android.R.drawable.ic_menu_edit, "⏰ ۱۰ دقیقه دیگر", snoozePi)
-
-        if (openPi != null) {
-            builder.setContentIntent(openPi)
-        }
+            .addAction(android.R.drawable.ic_menu_save, "انجام شد", donePi)
+            .addAction(android.R.drawable.ic_menu_edit, "۱۰ دقیقه دیگر", snoozePi)
+        if (openPi != null) builder.setContentIntent(openPi)
 
         try {
-            NotificationManagerCompat.from(context)
-                .notify(500_000_000 + habitId.toInt(), builder.build())
+            NotificationManagerCompat.from(context).notify(500_000_000 + habitId.toInt(), builder.build())
         } catch (_: SecurityException) {
         }
     }
