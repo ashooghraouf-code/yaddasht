@@ -14,7 +14,9 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.USE_FINGERPRINT" />
 
-    <uses-feature android:name="android.hardware.fingerprint" android:required="false" />
+    <uses-feature
+        android:name="android.hardware.fingerprint"
+        android:required="false" />
 
     <queries>
         <intent>
@@ -41,26 +43,50 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".tools.ToolboxActivity" android:exported="false" android:label="جعبه‌ابزار" android:theme="@style/Theme.Yaddasht" />
+        <activity
+            android:name=".tools.ToolboxActivity"
+            android:exported="false"
+            android:label="جعبه‌ابزار"
+            android:theme="@style/Theme.Yaddasht" />
 
-        <activity android:name=".widget.WidgetConfigActivity" android:exported="true" android:theme="@android:style/Theme.Material.NoActionBar">
+        <activity
+            android:name=".widget.WidgetConfigActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Material.NoActionBar">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
 
-        <activity android:name=".widget.WidgetColorPickerActivity" android:exported="true" android:label="رنگ ویجت" android:theme="@android:style/Theme.Material.NoActionBar" />
+        <activity
+            android:name=".widget.WidgetColorPickerActivity"
+            android:exported="true"
+            android:label="رنگ ویجت"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
 
-        <receiver android:name=".widget.TaskWidgetReceiver" android:exported="false">
+        <receiver
+            android:name=".widget.TaskWidgetReceiver"
+            android:exported="false">
             <intent-filter>
                 <action android:name="TOGGLE_TASK" />
             </intent-filter>
         </receiver>
 
-        <receiver android:name=".reminder.ReminderReceiver" android:exported="false" />
-        <receiver android:name=".reminder.ReminderActionReceiver" android:exported="false" />
-        <receiver android:name=".reminder.HabitReminderReceiver" android:exported="false" />
-        <receiver android:name=".reminder.HabitReminderActionReceiver" android:exported="false" />
+        <receiver
+            android:name=".reminder.ReminderReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".reminder.ReminderActionReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".reminder.HabitReminderReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".reminder.HabitReminderActionReceiver"
+            android:exported="false" />
 
         <receiver
             android:name=".reminder.BootReceiver"
@@ -76,22 +102,30 @@
             </intent-filter>
         </receiver>
 
-        <receiver android:name=".widget.NoteWidget" android:exported="true">
+        <receiver
+            android:name=".widget.NoteWidget"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="ir.yaddasht.app.REFRESH_NOTES" />
                 <action android:name="ir.yaddasht.app.ADD_NOTE" />
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/note_widget_info" />
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/note_widget_info" />
         </receiver>
 
-        <receiver android:name=".widget.TaskWidget" android:exported="true">
+        <receiver
+            android:name=".widget.TaskWidget"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="ir.yaddasht.app.REFRESH_TASKS" />
                 <action android:name="ir.yaddasht.app.ADD_TASK" />
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/task_widget_info" />
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/task_widget_info" />
         </receiver>
 
         <provider
@@ -99,8 +133,11 @@
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
-            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
         </provider>
 
     </application>
+
 </manifest>
