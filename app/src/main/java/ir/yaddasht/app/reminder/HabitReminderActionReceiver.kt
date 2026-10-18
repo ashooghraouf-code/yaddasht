@@ -18,6 +18,7 @@ class HabitReminderActionReceiver : BroadcastReceiver() {
         val action = intent.getStringExtra(EXTRA_ACTION) ?: return
         val habitId = intent.getLongExtra(HabitReminderScheduler.EXTRA_HABIT_ID, -1L)
         val title = intent.getStringExtra(HabitReminderScheduler.EXTRA_HABIT_TITLE).orEmpty()
+        val emoji = intent.getStringExtra(HabitReminderScheduler.EXTRA_HABIT_EMOJI).orEmpty()
 
         if (habitId < 0) return
 
@@ -35,7 +36,6 @@ class HabitReminderActionReceiver : BroadcastReceiver() {
                     try {
                         val db = AppDatabase.get(app)
                         val habit = db.habitDao().getHabitByIdSync(habitId)
-
                         if (habit != null) {
                             db.habitDao().markDone(
                                 habitId,
@@ -46,27 +46,23 @@ class HabitReminderActionReceiver : BroadcastReceiver() {
                         }
                     } catch (_: Exception) {
                     }
-
                     withContext(Dispatchers.Main) {
                         Toast.makeText(app, "✅ «$title» انجام شد", Toast.LENGTH_SHORT).show()
                         pending.finish()
                     }
                 }
             }
-
             ACTION_SNOOZE -> {
                 HabitReminderScheduler.scheduleOneShot(
                     app,
                     habitId,
                     title,
-                    intent.getStringExtra(HabitReminderScheduler.EXTRA_HABIT_EMOJI).orEmpty(),
+                    emoji,
                     System.currentTimeMillis() + 10 * 60_000L
                 )
-
                 Toast.makeText(app, "⏰ ۱۰ دقیقهٔ دیگه یادآوری می‌شه", Toast.LENGTH_SHORT).show()
                 pending.finish()
             }
-
             else -> pending.finish()
         }
     }
