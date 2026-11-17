@@ -25,8 +25,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -77,6 +79,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
+// ✅ FINAL-SCREEN-v2
 @Composable
 fun HabitScreen() {
     val context = LocalContext.current
@@ -90,6 +93,11 @@ fun HabitScreen() {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     LaunchedEffect(Unit) {
+        // بازچینی آلارم‌ها هنگام باز شدن صفحه (force-stop / آپدیت / جامانده)
+        try {
+            HabitReminderScheduler.rescheduleAll(context)
+        } catch (_: Exception) {
+        }
         while (true) {
             delay(60_000L)
             now = System.currentTimeMillis()
@@ -98,6 +106,7 @@ fun HabitScreen() {
 
     val habits by dao.observeHabits().collectAsState(initial = emptyList())
     val logs by dao.observeAllLogs().collectAsState(initial = emptyList())
+    val archived by dao.observeArchivedHabits().collectAsState(initial = emptyList())
 
     val logsByHabit = remember(logs) {
         logs.groupBy { it.habitId }
@@ -107,6 +116,8 @@ fun HabitScreen() {
     var showAdd by remember { mutableStateOf(false) }
     var editHabit by remember { mutableStateOf<Habit?>(null) }
     var archiveHabit by remember { mutableStateOf<Habit?>(null) }
+    var showArchived by remember { mutableStateOf(false) }
+    var dayEditHabit by remember { mutableStateOf<Habit?>(null) }
 
     val todayKey = HabitSchedule.dateKey(now)
     val nowMinute = Calendar.getInstance().get(Calendar.HOUR_OF_DAY) * 60 +
@@ -177,6 +188,18 @@ fun HabitScreen() {
                             fontSize = 11.sp,
                             color = if (overdue != null) Color(0xFFFF8A80) else Saffron
                         )
+                        if (archived.isNotEmpty()) {
+                            TextButton(
+                                onClick = { showArchived = true },
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Text(
+                                    "🗄 آرشیو (${archived.size})",
+                                    fontSize = 11.sp,
+                                    color = MutedGreenText
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -225,7 +248,8 @@ fun HabitScreen() {
                                 }
                             },
                             onEdit = { editHabit = habit },
-                            onArchive = { archiveHabit = habit }
+                            onArchive = { archiveHabit = habit },
+                            onOpenDays = { dayEditHabit = habit }
                         )
                     }
                 }
@@ -280,11 +304,9 @@ fun HabitScreen() {
     archiveHabit?.let { h ->
         AlertDialog(
             onDismissRequest = { archiveHabit = null },
-            title = {
-                Text("آرشیو عادت؟", fontFamily = LalezarFont, fontSize = 20.sp)
-            },
+            title = { Text("آرشیو عادت؟", fontFamily = LalezarFont, fontSize = 20.sp) },
             text = {
-                Text("عادت از لیست فعال پنهان می‌شود و یادآورش لغو می‌گردد؛ رکوردها حفظ می‌مانند.")
+                Text("عادت از لیست فعال پنهان می‌شود و یادآورش لغو می‌گردد؛ رکوردها حفظ می‌مانند. از بخش «🗄 آرشیو» می‌توانی برگردانی یا کامل حذف کنی.")
             },
             confirmButton = {
                 TextButton(
@@ -300,9 +322,76 @@ fun HabitScreen() {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { archiveHabit = null }) {
-                    Text("انصراف")
+                TextButton(onClick = { archiveHabit = null }) { Text("انصراف") }
+            }
+        )
+    }
+
+    if (showArchived) {
+        AlertDialog(
+            onDismissRequest = { showArchived = false },
+            title = { Text("🗄 عادت‌های آرشیوشده", fontFamily = LalezarFont, fontSize = 18.sp) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    if (archived.isEmpty()) {
+                        Text("چیزی در آرشیو نیست", fontSize = 12.sp, color = MutedGreenText)
+                    }
+                    archived.forEach { h ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        ) {
+                            Text(h.emoji, fontSize = 18.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                h.title,
+                                fontSize = 13.sp,
+                                color = PaperWhite,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(
+                                onClick = {
+                                    scope.launch(Dispatchers.IO) {
+                                        dao.unarchiveHabit(h.id)
+                                        HabitReminderScheduler.schedule(context, h)
+                                    }
+                                },
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Text("بازگردانی", fontSize = 11.sp, color = Saffron)
+                            }
+                            TextButton(
+                                onClick = {
+                                    scope.launch(Dispatchers.IO) {
+                                        HabitReminderScheduler.cancel(context, h.id)
+                                        dao.deleteHabit(h.id)
+                                    }
+                                },
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Text("حذف", fontSize = 11.sp, color = Color(0xFFE5484D))
+                            }
+                        }
+                    }
                 }
+            },
+            confirmButton = {
+                TextButton(onClick = { showArchived = false }) { Text("بستن") }
+            }
+        )
+    }
+
+    dayEditHabit?.let { h ->
+        DayEditorDialog(
+            habit = h,
+            byKey = logsByHabit[h.id].orEmpty(),
+            now = now,
+            onDismiss = { dayEditHabit = null },
+            onSetCount = { key, count ->
+                scope.launch(Dispatchers.IO) { dao.setCountForDate(h.id, key, count) }
+            },
+            onSetRest = { key, rest ->
+                scope.launch(Dispatchers.IO) { dao.setRestForDate(h.id, key, rest) }
             }
         )
     }
@@ -317,7 +406,8 @@ private fun HabitRow(
     onToggle: (Int) -> Unit,
     onRest: () -> Unit,
     onEdit: () -> Unit,
-    onArchive: () -> Unit
+    onArchive: () -> Unit,
+    onOpenDays: () -> Unit
 ) {
     val scheduled = HabitSchedule.isScheduledOn(habit, now)
     val color = HabitPalette.getOrElse(habit.colorIndex) { HabitPalette[0] }
@@ -403,6 +493,9 @@ private fun HabitRow(
                 if (habit.cueText.isNotBlank()) {
                     Text(habit.cueText, fontSize = 10.sp, color = MutedGreenText)
                 }
+            }
+            IconButton(onClick = onOpenDays, modifier = Modifier.size(30.dp)) {
+                Text("📅", fontSize = 14.sp)
             }
             IconButton(onClick = onRest, modifier = Modifier.size(30.dp)) {
                 Icon(
@@ -501,6 +594,71 @@ private fun UnscheduledHabitRow(
 }
 
 @Composable
+private fun DayEditorDialog(
+    habit: Habit,
+    byKey: Map<String, HabitLog>,
+    now: Long,
+    onDismiss: () -> Unit,
+    onSetCount: (String, Int) -> Unit,
+    onSetRest: (String, Boolean) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("📅 ویرایش روزها: ${habit.title}", fontFamily = LalezarFont, fontSize = 18.sp) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                for (i in 0..13) {
+                    val millis = HabitStreak.dayBeforeN(now, i)
+                    val key = HabitSchedule.dateKey(millis)
+                    val log = byKey[key]
+                    val done = HabitSchedule.isDone(habit, log)
+                    val rest = log?.rest == true
+                    val label = when (i) {
+                        0 -> "امروز"
+                        1 -> "دیروز"
+                        else -> "$i روز پیش"
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(vertical = 3.dp)
+                    ) {
+                        Text(
+                            label,
+                            fontSize = 12.sp,
+                            color = PaperWhite,
+                            modifier = Modifier.weight(1f)
+                        )
+                        DayChip("✔", done) {
+                            onSetCount(key, if (habit.kind == "COUNT") habit.targetPerDay else 1)
+                        }
+                        Spacer(Modifier.width(6.dp))
+                        DayChip("⏸", rest) { onSetRest(key, !rest) }
+                        Spacer(Modifier.width(6.dp))
+                        DayChip("✖", false) { onSetCount(key, 0) }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("بستن") } }
+    )
+}
+
+@Composable
+private fun DayChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(30.dp)
+            .clip(CircleShape)
+            .background(if (selected) Saffron else DeepGreenSoft)
+            .border(1.dp, if (selected) Saffron else LineGreen, CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, fontSize = 13.sp, color = if (selected) Ink else PaperWhite)
+    }
+}
+
+@Composable
 private fun CountBtn(label: String, onClick: () -> Unit) {
     Box(
         Modifier
@@ -522,22 +680,37 @@ private fun HeatStrip(
     now: Long,
     color: Color
 ) {
+    val todayStart = HabitStreak.dayBeforeN(now, 0)
+    val reminderMin = HabitSchedule.reminderMinutes(habit.pattern)
+    val nowMinute = Calendar.getInstance().get(Calendar.HOUR_OF_DAY) * 60 +
+        Calendar.getInstance().get(Calendar.MINUTE)
+
     Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         for (i in 29 downTo 0) {
             val millis = HabitStreak.dayBeforeN(now, i)
             val sched = HabitSchedule.isScheduledOn(habit, millis)
-            val done = HabitSchedule.isDone(habit, byKey[HabitSchedule.dateKey(millis)])
+            val log = byKey[HabitSchedule.dateKey(millis)]
+            val done = HabitSchedule.isDone(habit, log)
+            val rest = log?.rest == true
+
+            val missed = sched && !done && !rest &&
+                (millis < todayStart || (millis == todayStart && reminderMin != null && reminderMin < nowMinute))
+            val pending = sched && !done && !rest && !missed
+
+            val dot = when {
+                !sched -> Color.White.copy(alpha = 0.06f)
+                done -> color
+                rest -> PaperWhite.copy(alpha = 0.35f)
+                missed -> Color(0xFFE5484D).copy(alpha = 0.35f)
+                pending -> LineGreen.copy(alpha = 0.6f)
+                else -> Color.White.copy(alpha = 0.06f)
+            }
+
             Box(
                 Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(
-                        when {
-                            !sched -> Color.White.copy(alpha = 0.06f)
-                            done -> color
-                            else -> Color(0xFFE5484D).copy(alpha = 0.35f)
-                        }
-                    )
+                    .background(dot)
             )
         }
     }
@@ -606,7 +779,8 @@ private object HabitStreak {
         while (guard < 3650) {
             if (HabitSchedule.isScheduledOn(habit, day)) {
                 val key = HabitSchedule.dateKey(day)
-                if (HabitSchedule.isDone(habit, byKey[key])) streak++ else break
+                val log = byKey[key]
+                if (HabitSchedule.isDone(habit, log) || log?.rest == true) streak++ else break
             }
             day = previousDay(day)
             guard++
