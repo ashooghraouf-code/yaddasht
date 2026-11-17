@@ -45,6 +45,7 @@ import ir.yaddasht.app.ui.theme.MutedGreenText
 import ir.yaddasht.app.ui.theme.PaperWhite
 import ir.yaddasht.app.ui.theme.Saffron
 
+// ✅ FINAL-DIALOG-v2
 val HabitPalette = listOf(
     Color(0xFF2E7D52), Color(0xFF0F3D2E), Color(0xFFB87333), Color(0xFF8E1B3A),
     Color(0xFF283593), Color(0xFF00838F), Color(0xFFE65100), Color(0xFF6A1B9A),
@@ -81,8 +82,8 @@ private val HabitTemplates = listOf(
 )
 
 private val HabitEmojis = listOf(
-    "✅", "💊", "🏋️", "📚", "🧘", "💧", "🥗", "", "", "🌱",
-    "✍️", "🎯", "", "️", "", "🎸", "🚶", "", "❤️", ""
+    "✅", "💊", "🏋️", "📚", "🧘", "💧", "🥗", "📖", "😴", "🌱",
+    "✍️", "🎯", "☀️", "🙏", "🎸", "🚶", "🧹", "❤️", "🧠", "🍎"
 )
 
 private val WeekLetters = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
@@ -216,3 +217,163 @@ fun AddHabitDialog(
                             label = { Text("هدف روزانه") },
                             singleLine = true,
                             modifier = Modifier.width(120.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        OutlinedTextField(
+                            value = unit,
+                            onValueChange = { unit = it },
+                            label = { Text("واحد") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                Text("الگو", fontSize = 12.sp, color = MutedGreenText, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SmallChip("هر روز", pattern == "DAILY") { pattern = "DAILY" }
+                    SmallChip("روزهای خاص", pattern == "WEEKLY_DAYS") { pattern = "WEEKLY_DAYS" }
+                    SmallChip("هر N روز", pattern == "EVERY_N") { pattern = "EVERY_N" }
+                }
+
+                if (pattern == "WEEKLY_DAYS") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        WeekLetters.forEachIndexed { i, w ->
+                            val on = (mask shr i) and 1 == 1
+                            Box(
+                                Modifier
+                                    .size(34.dp)
+                                    .clip(CircleShape)
+                                    .background(if (on) Saffron else DeepGreenSoft)
+                                    .border(1.dp, if (on) Saffron else LineGreen, CircleShape)
+                                    .clickable { mask = mask xor (1 shl i) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    w,
+                                    fontSize = 13.sp,
+                                    color = if (on) Ink else PaperWhite,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (pattern == "EVERY_N") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("هر", fontSize = 13.sp)
+                        Spacer(Modifier.width(6.dp))
+                        OutlinedTextField(
+                            value = everyN.toString(),
+                            onValueChange = { everyN = (it.filter { ch -> ch.isDigit() }.toIntOrNull() ?: 1).coerceAtLeast(1) },
+                            singleLine = true,
+                            modifier = Modifier.width(80.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("روز یک‌بار", fontSize = 13.sp)
+                    }
+                }
+
+                Text("⏰ یادآور ساعتی", fontSize = 12.sp, color = MutedGreenText, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SmallChip("بدون یادآور", !reminderEnabled) { reminderEnabled = false }
+                    SmallChip("با یادآور", reminderEnabled) { reminderEnabled = true }
+                }
+
+                if (reminderEnabled) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = remindHour.toString(),
+                            onValueChange = { remindHour = it.filter { ch -> ch.isDigit() }.toIntOrNull()?.coerceIn(0, 23) ?: 0 },
+                            label = { Text("ساعت") },
+                            singleLine = true,
+                            modifier = Modifier.width(90.dp)
+                        )
+                        Text(" : ", fontSize = 18.sp, color = PaperWhite)
+                        OutlinedTextField(
+                            value = remindMinute.toString(),
+                            onValueChange = { remindMinute = it.filter { ch -> ch.isDigit() }.toIntOrNull()?.coerceIn(0, 59) ?: 0 },
+                            label = { Text("دقیقه") },
+                            singleLine = true,
+                            modifier = Modifier.width(90.dp)
+                        )
+                    }
+                    Text(
+                        "سر ساعت ${remindHour.toString().padStart(2, '0')}:${remindMinute.toString().padStart(2, '0')} نوتیفیکیشن زنگ‌دار می‌گیری",
+                        fontSize = 11.sp,
+                        color = Saffron
+                    )
+                }
+
+                OutlinedTextField(
+                    value = cue,
+                    onValueChange = { cue = it },
+                    label = { Text("اشاره/شرایط — اختیاری") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = reward,
+                    onValueChange = { reward = it },
+                    label = { Text("پاداش — اختیاری") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = title.isNotBlank(),
+                onClick = {
+                    val finalBase = if (pattern == "WEEKLY_DAYS" && mask == 0) "DAILY" else pattern
+                    val finalMask = if (finalBase == "WEEKLY_DAYS") mask else 0
+                    val finalEveryN = if (finalBase == "EVERY_N") everyN.coerceAtLeast(1) else 1
+                    val minutes = if (reminderEnabled) {
+                        remindHour.coerceIn(0, 23) * 60 + remindMinute.coerceIn(0, 59)
+                    } else {
+                        null
+                    }
+                    val finalPattern = HabitSchedule.makePattern(base = finalBase, minutes = minutes)
+
+                    onSave(
+                        Habit(
+                            id = initial?.id ?: 0L,
+                            title = title.trim(),
+                            emoji = emoji,
+                            colorIndex = colorIndex,
+                            kind = kind,
+                            targetPerDay = if (kind == "COUNT") target.coerceAtLeast(1) else 1,
+                            unit = unit.ifBlank { "بار" },
+                            pattern = finalPattern,
+                            weekdaysMask = finalMask,
+                            everyNDays = finalEveryN,
+                            cueText = cue.trim(),
+                            rewardText = reward.trim(),
+                            createdAt = createdAt
+                        )
+                    )
+                }
+            ) {
+                Text("ذخیره", color = Saffron, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("انصراف")
+            }
+        }
+    )
+}
+
+@Composable
+private fun SmallChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (selected) Saffron else DeepGreenSoft)
+            .border(1.dp, if (selected) Saffron else LineGreen, RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        Text(label, fontSize = 11.sp, color = if (selected) Ink else PaperWhite)
+    }
+}
